@@ -126,6 +126,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 ### 1.8.2 — Constellations plus discrètes
 - Traits deux fois plus transparents (intensité 0,4 → 0,2 dans `LINE_VERTEX`, `src/render/sky.ts`). Se règle en une ligne si c'est encore trop ou pas assez.
 
+### 1.9.0 — Les biomes : le vrai climat de la Terre (étape 4a)
+- Le sol prend les couleurs du **vrai climat** du lieu : classification de **Köppen-Geiger** (grille de 0,5° ≈ 55 km, Kottek et al. 2006), fichier `src/data/climate.json` (78 Ko, inclus dans le code, fabriqué par `scripts/build-climate.mjs` — **ne pas le modifier à la main** ; origine et citation dans `src/data/STARS-LICENSE.txt`).
+- `src/core/climate.ts` : un biome par classe (couleurs de la végétation basse, altitude de la neige), **mélangé en douceur** entre les 4 cases voisines (pas de frontière nette). La mer est remplie avec la terre la plus proche (les côtes ont un climat).
+- Effets : désert ocre (Sahara), savane dorée, forêt équatoriale vert profond, taïga sombre, toundra brune, glace blanche aux pôles. La **limite des neiges** et les seuils lande/roche suivent le climat : 5 000 m sous les tropiques, 2 450 m en Bretagne et dans les Alpes, 700 m en toundra, glace partout en Antarctique. La Bretagne garde exactement ses couleurs d'avant.
+- Pas encore : arbres et végétation (étape 4b, version suivante), saisons qui changent les couleurs.
+- Limites : le climat est moyen sur 55 km (une vallée alpine et son sommet partagent la même classe ; seule l'altitude les distingue), pas de lacs ni de fleuves.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -140,7 +147,7 @@ Sans objet : jeu local, sans compte ni serveur.
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
 2. ✅ Déplacement de l'origine du rendu (voyager loin sans défaut d'image) (1.3.1)
 3. ✅ Carte réelle de relief et d'océans à basse résolution, détail inventé par-dessus (1.7.0)
-4. Biomes (climat → couleurs, végétation, neige, désert, glace)
+4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) arbres et végétation par biome
 5. Voyage par coordonnées (téléportation) et carte du monde
 
 **Ensuite** : Bateau à voile · Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.

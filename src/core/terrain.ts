@@ -8,6 +8,7 @@
 import { worldToLatLon } from './geo';
 import { clamp, smoothstep } from './math';
 import { Noise2D, fbm } from './noise';
+import { Biome, Climate, uniformClimate } from './climate';
 import type { Relief } from './relief';
 
 // Niveau de la mer.
@@ -19,6 +20,7 @@ export interface Terrain {
   heightAt(x: number, z: number): number; // altitude du sol en (x, z), en mètres
   realHeightAt(x: number, z: number): number; // altitude réelle lissée (sans détail inventé), en mètres
   colorNoise(x: number, z: number): number; // variation douce (-1..1) pour les couleurs du sol
+  biomeAt(x: number, z: number): Biome; // climat d'ici : couleurs de la végétation, altitude de la neige
 }
 
 // Position de départ du joueur.
@@ -38,7 +40,7 @@ const sharpenShore = (h: number): number => {
 };
 
 // Fabrique un terrain à partir d'une graine et du relief réel.
-export function createTerrain(seed: number, relief: Relief): Terrain {
+export function createTerrain(seed: number, relief: Relief, climate: Climate = uniformClimate()): Terrain {
   const hillNoise = new Noise2D(seed + 23); // grandes collines
   const midNoise = new Noise2D(seed + 29); // collines moyennes
   const smallNoise = new Noise2D(seed + 37); // bosses
@@ -86,7 +88,12 @@ export function createTerrain(seed: number, relief: Relief): Terrain {
   const colorNoise = (x: number, z: number): number =>
     fbm(colorN, x * 0.045, z * 0.045, 3) * 0.7 + fbm(colorN, x * 0.5, z * 0.5, 1) * 0.3; // taches larges + grain fin
 
-  return { seed, heightAt, realHeightAt, colorNoise };
+  const biomeAt = (x: number, z: number): Biome => {
+    const { lat, lon } = worldToLatLon(x, z);
+    return climate.biomeAt(lat, lon); // le climat réel de la Terre à cet endroit
+  };
+
+  return { seed, heightAt, realHeightAt, colorNoise, biomeAt };
 }
 
 // Trouve un point de départ agréable : sur la terre ferme, juste derrière la plage, face à la mer.

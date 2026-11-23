@@ -76,7 +76,7 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
       const ny = inv; // composante verticale de la normale unitaire
       positions.set([i * cell, h, j * cell], v * 3); // position locale
       normals.set([-dhdx * inv, ny, -dhdz * inv], v * 3); // normale unitaire
-      const c = terrainColor(h, ny, terrain.colorNoise(x0 + i * cell, z0 + j * cell)); // couleur du sol ici
+      const c = terrainColor(h, ny, terrain.colorNoise(x0 + i * cell, z0 + j * cell), terrain.biomeAt(x0 + i * cell, z0 + j * cell)); // couleur du sol ici (selon le climat)
       colors.set(c, v * 3);
       if (h < minY) minY = h; // met à jour les bornes d'altitude
       if (h > maxY) maxY = h;

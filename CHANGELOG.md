@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.9.0 — 2026-11-23
+
+Biomes : le sol suit le vrai climat de la Terre (Köppen-Geiger)
+
 ## 1.8.2 — 2026-11-23
 
 Traits des constellations plus discrets

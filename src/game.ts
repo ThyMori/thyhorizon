@@ -9,6 +9,7 @@ import { START_LAT, dayOfYearFromDate, realSolarClock, wrapDay } from './core/ge
 import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
 import { createRelief } from './core/relief';
+import { realClimate } from './world/climateData';
 import type { ReliefGrid } from './core/relief';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
@@ -61,7 +62,7 @@ export class Game {
     const rawSave = loadJson(SAVE_KEY);
     this.seedText = readSavedSeed(rawSave);
     const seed = hashSeed(this.seedText);
-    this.terrain = createTerrain(seed, createRelief(reliefGrid)); // le vrai relief de la Terre + un détail inventé
+    this.terrain = createTerrain(seed, createRelief(reliefGrid), realClimate); // le vrai relief de la Terre + un détail inventé
     const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
     this.day = save.day;

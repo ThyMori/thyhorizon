@@ -5,6 +5,7 @@ import { ChunkData, buildChunk } from '../core/chunk';
 import { createRelief } from '../core/relief';
 import type { ReliefGrid } from '../core/relief';
 import { Terrain, createTerrain } from '../core/terrain';
+import { realClimate } from './climateData';
 
 // Messages envoyés au worker.
 export type WorkerRequest =
@@ -27,7 +28,7 @@ let terrain: Terrain | null = null; // le terrain de ce worker (créé à l'init
 ctx.onmessage = (event) => {
   const msg = event.data; // le message reçu
   if (msg.type === 'init') {
-    terrain = createTerrain(msg.seed, createRelief(msg.relief)); // chaque worker a son propre terrain, identique grâce à la graine et au relief
+    terrain = createTerrain(msg.seed, createRelief(msg.relief), realClimate); // chaque worker a son propre terrain, identique grâce à la graine et au relief
     return;
   }
   if (!terrain) return; // pas encore initialisé : on ignore

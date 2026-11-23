@@ -28,6 +28,7 @@ export class SettingsPanel {
   private readonly fps = byId<HTMLInputElement>('set-fps');
   private readonly hours = byId<HTMLInputElement>('set-hours');
   private readonly day = byId<HTMLInputElement>('set-day');
+  private readonly realTime = byId<HTMLInputElement>('set-realtime');
   private readonly daysPass = byId<HTMLInputElement>('set-dayspass');
   private readonly dayLength = byId<HTMLSelectElement>('set-daylength');
   private readonly sensitivity = byId<HTMLInputElement>('set-sensitivity');
@@ -47,6 +48,10 @@ export class SettingsPanel {
     this.dayLength.addEventListener('change', () => this.apply({ ...bridge.getSettings(), dayLengthMinutes: Number(this.dayLength.value) }));
     this.day.addEventListener('input', () => {
       bridge.setDay(Number(this.day.value)); // la date change tout de suite (saison, hauteur du soleil)
+      this.sync();
+    });
+    this.realTime.addEventListener('change', () => {
+      this.apply({ ...bridge.getSettings(), realTime: this.realTime.checked }); // le jeu se cale tout de suite sur l'horloge
       this.sync();
     });
     this.daysPass.addEventListener('change', () => this.apply({ ...bridge.getSettings(), daysPass: this.daysPass.checked }));
@@ -79,6 +84,8 @@ export class SettingsPanel {
     this.day.value = String(this.bridge.getDay());
     byId('out-day').textContent = formatDay(this.bridge.getDay());
     this.daysPass.checked = s.daysPass;
+    this.realTime.checked = s.realTime;
+    for (const el of [this.hours, this.day, this.daysPass, this.dayLength]) el.disabled = s.realTime; // l'horloge réelle décide : ces réglages ne servent plus
     byId('out-place').textContent = `${START_PLACE} — ${formatCoords(START_LAT, START_LON)}`; // le lieu du monde
     byId('out-hours').textContent = formatHours(h);
   }

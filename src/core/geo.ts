@@ -81,6 +81,17 @@ export function sunPosition(latDeg: number, day: number, hours: number): { eleva
   return { elevationDeg, direction: [-west, up, south] }; // monde : +x = est (donc −ouest), +z = sud
 }
 
+// « Temps réel » : heure solaire locale et jour de l'année pour un instant réel (UTC), au lieu de départ.
+// Le soleil est au sud à midi solaire, soit 12 h UTC corrigées de la longitude (15° = 1 h). Équation du temps ignorée (±15 min).
+export function realSolarClock(date: Date, lonDeg = START_LON): { hours: number; day: number } {
+  const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600 + date.getUTCMilliseconds() / 3600000; // heure UTC décimale
+  const solar = utcHours + lonDeg / 15; // heure solaire locale (peut sortir de 0 à 24)
+  const hours = ((solar % 24) + 24) % 24; // ramenée entre 0 et 24
+  const shift = Math.floor(solar / 24); // −1 : la date solaire est celle de la veille ; +1 : du lendemain
+  const day = dayOfYear(date.getUTCMonth() + 1, date.getUTCDate()) + shift; // jour de l'année, décalé si besoin
+  return { hours, day: wrapDay(day) };
+}
+
 // Heures de lever et de coucher (heure solaire, horizon géométrique) ; null au cercle polaire (jour ou nuit continus).
 export function sunriseSunset(latDeg: number, day: number): { sunrise: number; sunset: number } | null {
   const c = -Math.tan(latDeg * DEG) * Math.tan(declinationDeg(day) * DEG); // cosinus de l'angle horaire du lever

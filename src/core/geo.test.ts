@@ -1,6 +1,6 @@
 // Tests de la géographie : dates, déclinaison, position du soleil, lever et coucher.
 import { describe, expect, it } from 'vitest';
-import { METERS_PER_DEGREE, START_LAT, START_LON, dayOfYear, dayOfYearFromDate, declinationDeg, formatDay, siderealAngleDeg, skyRotation, startHours, sunPosition, sunRightAscensionDeg, sunriseSunset, wrapDay, worldToLatLon, latLonToWorld } from './geo';
+import { METERS_PER_DEGREE, START_LAT, START_LON, dayOfYear, dayOfYearFromDate, declinationDeg, realSolarClock, formatDay, siderealAngleDeg, skyRotation, startHours, sunPosition, sunRightAscensionDeg, sunriseSunset, wrapDay, worldToLatLon, latLonToWorld } from './geo';
 
 describe('calendrier', () => {
   it('numérote les jours de l\'année', () => {
@@ -55,6 +55,30 @@ describe('position du soleil à Lannion', () => {
   });
   it('donne toujours un vecteur unitaire', () => {
     for (let h = 0; h < 24; h += 1.5) expect(Math.hypot(...sunPosition(START_LAT, 200, h).direction)).toBeCloseTo(1, 9);
+  });
+});
+
+describe('temps réel', () => {
+  it('midi solaire à Lannion arrive un peu après 12 h UTC', () => {
+    const c = realSolarClock(new Date(Date.UTC(2026, 5, 21, 12, 0, 0)));
+    expect(c.hours).toBeCloseTo(12 + START_LON / 15, 5); // 11,77 h
+    expect(c.day).toBe(dayOfYear(6, 21));
+  });
+  it('change de jour à minuit solaire, pas à minuit UTC', () => {
+    const before = realSolarClock(new Date(Date.UTC(2026, 2, 10, 0, 5, 0))); // 00 h 05 UTC = 23 h 50 solaire la veille
+    expect(before.day).toBe(dayOfYear(3, 9));
+    expect(before.hours).toBeGreaterThan(23);
+    const after = realSolarClock(new Date(Date.UTC(2026, 2, 10, 1, 0, 0)));
+    expect(after.day).toBe(dayOfYear(3, 10));
+  });
+  it('reste dans 0..24 et 1..365', () => {
+    for (const t of [Date.UTC(2026, 0, 1, 0, 0, 0), Date.UTC(2026, 11, 31, 23, 59, 59)]) {
+      const c = realSolarClock(new Date(t));
+      expect(c.hours).toBeGreaterThanOrEqual(0);
+      expect(c.hours).toBeLessThan(24);
+      expect(c.day).toBeGreaterThanOrEqual(1);
+      expect(c.day).toBeLessThanOrEqual(365);
+    }
   });
 });
 

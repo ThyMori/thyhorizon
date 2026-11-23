@@ -33,6 +33,11 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ constellations: 'oui' }).constellations).toBe(false);
     expect(detectQuality({ ...DEFAULT_SETTINGS, constellations: true })).toBe('balanced');
   });
+  it('garde le temps réel désactivé par défaut et le valide', () => {
+    expect(DEFAULT_SETTINGS.realTime).toBe(false);
+    expect(sanitizeSettings({ realTime: true }).realTime).toBe(true);
+    expect(sanitizeSettings({ realTime: 1 }).realTime).toBe(false);
+  });
   it('ne plante pas sur NaN ni Infinity', () => {
     expect(sanitizeSettings({ viewDistance: NaN, resolution: Infinity }).viewDistance).toBe(DEFAULT_SETTINGS.viewDistance);
   });

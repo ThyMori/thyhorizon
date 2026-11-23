@@ -17,6 +17,7 @@ export interface Settings {
   showFps: boolean; // affiche le compteur d'images par seconde
   mouseSensitivity: number; // sensibilité de la souris, de 0.5 à 2
   daysPass: boolean; // le calendrier avance-t-il (un jour de plus à chaque minuit du jeu) ?
+  realTime: boolean; // « Temps réel » : l'heure et la date du jeu suivent la vraie horloge (journées de 24 h)
   dayLengthMinutes: number; // durée d'une journée du jeu en minutes réelles (0 = le temps est arrêté)
 }
 
@@ -35,6 +36,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showFps: true, // visible au début : on a besoin de mesurer la fluidité
   mouseSensitivity: 1,
   daysPass: true, // les saisons avancent lentement tant qu'on joue
+  realTime: false, // par défaut, les journées sont accélérées
   dayLengthMinutes: 30,
 };
 
@@ -77,6 +79,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     shadows: bool(r.shadows, d.shadows),
     shadowSize: num(r.shadowSize, d.shadowSize) >= 2048 ? 2048 : 1024, // seules deux tailles existent
     bloom: bool(r.bloom, d.bloom),
+    realTime: bool(r.realTime, d.realTime),
     constellations: bool(r.constellations, d.constellations),
     resolution: clamp(num(r.resolution, d.resolution), LIMITS.resolution.min, LIMITS.resolution.max),
     showFps: bool(r.showFps, d.showFps),

@@ -5,7 +5,7 @@ import { SaveData, readSavedSeed, sanitizeSave } from './core/save';
 import { formatCount } from './core/format';
 import { hashSeed } from './core/noise';
 import { Settings, sanitizeSettings } from './core/settings';
-import { START_LAT, dayOfYearFromDate, wrapDay } from './core/geo';
+import { START_LAT, dayOfYearFromDate, realSolarClock, wrapDay } from './core/geo';
 import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
 import { createRelief } from './core/relief';
@@ -109,7 +109,11 @@ export class Game {
     const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000)); // durée de l'image, bornée (retour d'onglet, etc.)
     this.last = now;
     this.elapsed += dt;
-    if (this.controls.locked && this.settings.dayLengthMinutes > 0) {
+    if (this.settings.realTime) {
+      const clock = realSolarClock(new Date()); // vraie heure solaire locale et vraie date
+      this.hours = clock.hours;
+      this.day = clock.day;
+    } else if (this.controls.locked && this.settings.dayLengthMinutes > 0) {
       const before = this.hours; // heure avant ce pas de temps
       this.hours = wrapHours(this.hours + (dt * 24) / (this.settings.dayLengthMinutes * 60)); // le temps ne passe que quand on joue
       if (this.settings.daysPass && this.hours < before) this.day = wrapDay(this.day + 1); // minuit passé : le calendrier avance d'un jour

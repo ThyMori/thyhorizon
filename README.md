@@ -111,6 +111,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Pas testé : un long voyage à pied ou en vol à travers les continents ; les performances sur ta carte graphique (relief plus riche = tuiles un peu plus coûteuses à calculer) ; Firefox Android (`DecompressionStream`).
 - Limites connues : résolution de ~18 km (une côte peut se décaler de quelques km par rapport à la réalité), pas de fleuves ni de lacs, un monde plus plat en Bretagne que l'ancien monde inventé, la vue est limitée à la distance d'affichage (en vol haut on ne voit plus le sol).
 
+### 1.8.0 — Vue plus lointaine, étoiles plus naturelles, constellations
+- **Distance d'affichage** : Éco 10, Normal 20, Beau 28 tuiles (le curseur va jusqu'à 36 ≈ 2,3 km).
+- **Étoiles** : couleurs plus nuancées (proches du blanc, un léger bleu ou orangé), et **scintillement** discret propre à chaque étoile, plus marqué près de l'horizon.
+- **Constellations** : traits des 89 constellations (d3-celestial, BSD-3 ; `src/data/constellations.json` fabriqué par `scripts/build-constellations.mjs`, **ne pas modifier à la main**). Touche **L**, bouton **✦** sur téléphone, ou case « Constellations » dans Réglages (réglage mémorisé, hors préréglages de qualité). Les traits pulsent doucement, apparaissent en fondu et ne se voient que la nuit.
+- Vérifié : tests (155), build, captures de nuit (traits alignés sur les étoiles : Orion, Grande Ourse…) et de jour (invisibles). Pas testé : GPU réel, téléphone, coût en images/s de la distance 28 en mode Beau.
+- Limite : la vue lointaine est limitée par la distance d'affichage (on voit encore le bord du monde en vol haut).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

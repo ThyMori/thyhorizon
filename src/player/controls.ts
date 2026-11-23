@@ -20,6 +20,7 @@ export class PlayerControls {
   sensitivity = 1; // sensibilité de la souris
   onBlocked: (() => void) | null = null; // appelé quand l'eau profonde bloque le chemin
   onFlyChange: ((on: boolean) => void) | null = null; // appelé quand on active/désactive le vol
+  onConstellationsKey: (() => void) | null = null; // appelé quand on appuie sur L (constellations)
   onHelpKey: (() => void) | null = null; // appelé quand on appuie sur la touche d'aide
   touchActive = false; // joue-t-on au doigt (sans capture de souris) ?
   touchMove = { forward: 0, right: 0 }; // intention du joystick virtuel, de -1 à 1
@@ -142,6 +143,7 @@ export class PlayerControls {
     this.keys.add(e.code);
     if (e.code === 'KeyV') this.setFly(!this.fly); // V : vol libre
     if (e.code === 'KeyH') this.onHelpKey?.(); // H : aide
+    if (e.code === 'KeyL') this.onConstellationsKey?.(); // L : traits des constellations
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // pas de défilement de page
   }
 

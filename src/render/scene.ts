@@ -84,7 +84,7 @@ export class GameScene {
     container.appendChild(this.renderer.domElement); // le canvas entre dans la page
 
     this.scene.fog = this.fog;
-    this.scene.add(this.sky.dome, this.sky.stars, this.ocean.mesh);
+    this.scene.add(this.sky.dome, this.sky.stars, this.sky.lines, this.ocean.mesh);
     this.scene.add(this.hemi, this.moon, this.moon.target, this.sun, this.sun.target);
 
     this.sun.castShadow = true; // le soleil ombre le terrain proche
@@ -122,6 +122,7 @@ export class GameScene {
     this.sky.setPixelRatio(pixelRatio); // les étoiles gardent leur taille apparente
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.setBloom(settings.bloom, pixelRatio);
+    this.sky.setConstellations(settings.constellations); // traits des constellations (fondu)
     const wantShadows = settings.shadows;
     if (this.renderer.shadowMap.enabled !== wantShadows) {
       this.renderer.shadowMap.enabled = wantShadows;
@@ -223,7 +224,7 @@ export class GameScene {
     toColor(state.skyHorizon, this.tmpColor);
     this.fog.color.copy(this.tmpColor);
 
-    this.sky.update(state, this.camera);
+    this.sky.update(state, this.camera, timeSeconds);
     this.ocean.update(timeSeconds, state, this.camera);
   }
 

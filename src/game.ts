@@ -89,7 +89,8 @@ export class Game {
         this.day = wrapDay(d);
       },
     });
-    this.touchUi = new TouchUi(this.controls, () => this.pauseTouch());
+    this.touchUi = new TouchUi(this.controls, () => this.pauseTouch(), () => this.toggleConstellations());
+    this.touchUi.setConstellations(this.settings.constellations); // état initial du bouton ✦
     this.setTouchMode(window.matchMedia?.('(pointer: coarse)').matches ?? false); // écran tactile principal : commandes au doigt dès le départ
     this.wireEvents();
     this.showPause(); // on démarre sur l'écran d'accueil
@@ -204,6 +205,15 @@ export class Game {
       toast(on ? `Vol libre activé. ${this.touchMode ? 'Touche Vol' : 'Appuie sur V'} pour revenir à pied.` : 'Vol libre coupé : tu retombes doucement au sol.');
     };
     this.controls.onHelpKey = () => this.openHelp();
+    this.controls.onConstellationsKey = () => this.toggleConstellations();
+  }
+
+  // Montre ou cache les traits des constellations ; de jour, on prévient qu'ils n'apparaîtront qu'à la nuit.
+  private toggleConstellations(): void {
+    const on = !this.settings.constellations;
+    this.applySettings({ ...this.settings, constellations: on });
+    const night = sunState(this.hours, START_LAT, this.day).starsOpacity > 0.05;
+    toast(on ? (night ? 'Constellations affichées.' : 'Constellations activées : elles apparaîtront à la nuit.') : 'Constellations cachées.');
   }
 
   private onKeyDown(e: KeyboardEvent): void {
@@ -354,6 +364,7 @@ export class Game {
     this.gs.applySettings(next);
     this.hud.setFpsVisible(next.showFps);
     this.controls.sensitivity = next.mouseSensitivity;
+    this.touchUi.setConstellations(next.constellations); // bouton ✦ à jour
   }
 
   private saveNow(): void {

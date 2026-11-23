@@ -66,6 +66,28 @@ describe('étoiles gardées', () => {
   });
 });
 
+describe('couleurs nuancées', () => {
+  it('restent proches du blanc : jamais très saturées', () => {
+    for (const bv of [-0.3, 0, 0.4, 0.65, 1.2, 1.8]) {
+      const c = starColor(bv);
+      expect(Math.max(...c) - Math.min(...c)).toBeLessThan(0.72); // écart entre canaux, en lumière linéaire
+    }
+  });
+});
+
+describe('scintillement', () => {
+  it('donne à chaque étoile sa graine, variée et stable', () => {
+    const a = buildStarBuffers(stars, 2500).seeds;
+    const b = buildStarBuffers(stars, 2500).seeds;
+    expect(a[10]).toBe(b[10]);
+    expect(new Set(Array.from(a.slice(0, 300))).size).toBeGreaterThan(200);
+    for (const s of a) {
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThan(1);
+    }
+  });
+});
+
 describe('tableaux pour la carte graphique', () => {
   it('placent les étoiles sur une sphère de rayon donné', () => {
     const b = buildStarBuffers(stars, 2500);

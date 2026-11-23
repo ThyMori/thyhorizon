@@ -27,6 +27,12 @@ describe('sanitizeSettings', () => {
     expect(s.showFps).toBe(false);
     expect(s.dayLengthMinutes).toBe(0);
   });
+  it('garde le réglage des constellations hors des préréglages', () => {
+    expect(DEFAULT_SETTINGS.constellations).toBe(false);
+    expect(sanitizeSettings({ constellations: true }).constellations).toBe(true);
+    expect(sanitizeSettings({ constellations: 'oui' }).constellations).toBe(false);
+    expect(detectQuality({ ...DEFAULT_SETTINGS, constellations: true })).toBe('balanced');
+  });
   it('ne plante pas sur NaN ni Infinity', () => {
     expect(sanitizeSettings({ viewDistance: NaN, resolution: Infinity }).viewDistance).toBe(DEFAULT_SETTINGS.viewDistance);
   });

@@ -1,6 +1,7 @@
 // Les étoiles : couleur, éclat et taille d'après le vrai catalogue (magnitude et indice de couleur B-V).
 // Logique pure : fabrique les tableaux de nombres que le rendu envoie à la carte graphique.
 
+import { seedOf } from './constellations';
 import { Rgb, clamp, lerpRgb, srgbToLinear } from './math';
 
 // Une étoile du catalogue : ascension droite (°), déclinaison (°), magnitude (plus petit = plus brillant), indice de couleur B-V.
@@ -9,12 +10,12 @@ export type StarRow = readonly [number, number, number, number];
 // Couleur apparente selon l'indice B-V (bleu ≈ −0,3, blanc ≈ 0, jaune du Soleil ≈ 0,65, orange ≈ 1,2, rouge ≈ 1,8).
 // Les teintes sont un peu adoucies : ce sont celles que l'œil perçoit, pas celles d'un corps noir pur.
 const COLOR_STOPS: ReadonlyArray<readonly [number, Rgb]> = [
-  [-0.3, [0.6, 0.72, 1.0]],
-  [0.0, [0.82, 0.88, 1.0]],
-  [0.4, [1.0, 0.97, 0.92]],
-  [0.65, [1.0, 0.92, 0.78]],
-  [1.2, [1.0, 0.78, 0.55]],
-  [1.8, [1.0, 0.62, 0.42]],
+  [-0.3, [0.76, 0.84, 1.0]], // bleu-blanc
+  [0.0, [0.9, 0.93, 1.0]], // blanc légèrement froid
+  [0.4, [1.0, 0.98, 0.95]], // blanc
+  [0.65, [1.0, 0.95, 0.86]], // blanc-jaune
+  [1.2, [1.0, 0.87, 0.7]], // orange très pâle
+  [1.8, [1.0, 0.77, 0.6]], // orange rosé
 ];
 
 // Couleur d'une étoile en lumière linéaire, d'après son indice B-V.
@@ -54,12 +55,13 @@ export interface StarBuffers {
   sizes: Float32Array; // 1 nombre par étoile (pixels)
   brightness: Float32Array; // 1 nombre par étoile (0 à 1)
   colors: Float32Array; // 3 nombres par étoile (linéaire)
+  seeds: Float32Array; // 1 nombre par étoile (0 à 1) : décale le scintillement d'une étoile à l'autre
 }
 
 export function buildStarBuffers(allStars: readonly StarRow[], radius: number, maxMagnitude = Infinity): StarBuffers {
   const stars = allStars.filter((s) => s[2] <= maxMagnitude); // seules les étoiles assez brillantes sont gardées
   const n = stars.length; // nombre d'étoiles
-  const out: StarBuffers = { positions: new Float32Array(n * 3), sizes: new Float32Array(n), brightness: new Float32Array(n), colors: new Float32Array(n * 3) };
+  const out: StarBuffers = { positions: new Float32Array(n * 3), sizes: new Float32Array(n), brightness: new Float32Array(n), colors: new Float32Array(n * 3), seeds: new Float32Array(n) };
   stars.forEach(([ra, dec, mag, bv], i) => {
     const a = (ra * Math.PI) / 180; // ascension droite en radians
     const d = (dec * Math.PI) / 180; // déclinaison en radians
@@ -67,6 +69,7 @@ export function buildStarBuffers(allStars: readonly StarRow[], radius: number, m
     out.sizes[i] = starSize(mag);
     out.brightness[i] = starBrightness(mag);
     out.colors.set(starColor(bv), i * 3);
+    out.seeds[i] = seedOf(i + 1000); // graine stable propre à cette étoile
   });
   return out;
 }

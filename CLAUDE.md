@@ -19,6 +19,7 @@ Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousi
 
 ## Données
 - `src/data/relief.bin` : relief réel mondial basse résolution (ETOPO, généré par `scripts/build-relief.mjs`, voir `RELIEF-LICENSE.txt`). Ne pas modifier à la main. Les tests le lisent via `src/core/relief.testutil.ts` (jamais importé par le jeu).
+- `src/data/constellations.json` : traits des constellations (généré par `scripts/build-constellations.mjs`, même licence que les étoiles). Ne pas modifier à la main.
 - `src/data/stars.json` : catalogue d'étoiles réel (généré par `scripts/build-stars.mjs`, licence dans `src/data/STARS-LICENSE.txt`). Ne pas modifier à la main.
 
 ## Rendu et grandes coordonnées

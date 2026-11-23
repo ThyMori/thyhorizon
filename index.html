@@ -46,6 +46,7 @@
         <button type="button" id="touch-up" class="touch-btn" aria-label="Monter" hidden>▲</button>
         <button type="button" id="touch-down" class="touch-btn" aria-label="Descendre" hidden>▼</button>
         <button type="button" id="touch-run" class="touch-btn" aria-pressed="false">Courir</button>
+        <button type="button" id="touch-stars" class="touch-btn" aria-pressed="false" aria-label="Constellations">✦</button>
         <button type="button" id="touch-fly" class="touch-btn" aria-pressed="false">Vol</button>
       </div>
     </div>
@@ -103,9 +104,10 @@
           </select>
         </label>
         <label>Distance d'affichage <output id="out-distance"></output>
-          <input id="set-distance" type="range" min="6" max="28" step="1" />
+          <input id="set-distance" type="range" min="6" max="36" step="1" />
         </label>
         <label class="check"><input id="set-shadows" type="checkbox" /> Ombres du soleil</label>
+        <label class="check"><input id="set-constellations" type="checkbox" /> Constellations (touche L)</label>
         <label class="check"><input id="set-bloom" type="checkbox" /> Halo lumineux (soleil, étoiles)</label>
         <label>Finesse des ombres
           <select id="set-shadow-size">
@@ -171,6 +173,7 @@
       </ul>
       <h3>Voler</h3>
       <ul>
+        <li><kbd>L</kbd> : montre ou cache les traits des constellations (la nuit seulement). Sur téléphone, touche <strong>✦</strong>.</li>
         <li><kbd>V</kbd> : active ou coupe le vol libre. Dans ce mode, tu avances là où tu regardes.</li>
         <li><kbd>Espace</kbd> monte, <kbd>C</kbd> descend, <kbd>Maj</kbd> va très vite. Pratique pour explorer.</li>
       </ul>

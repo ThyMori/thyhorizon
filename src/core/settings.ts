@@ -11,6 +11,7 @@ export interface Settings {
   viewDistance: number; // distance d'affichage, en tuiles de 64 m
   shadows: boolean; // ombres portées du soleil
   shadowSize: number; // finesse des ombres (1024 ou 2048)
+  constellations: boolean; // traits des constellations (visibles la nuit)
   bloom: boolean; // halo lumineux autour des lumières (soleil, étoiles) : plus beau, plus gourmand
   resolution: number; // netteté de l'image, de 0.5 à 1 (1 = résolution native de l'écran)
   showFps: boolean; // affiche le compteur d'images par seconde
@@ -21,15 +22,16 @@ export interface Settings {
 
 // Valeurs imposées par chaque préréglage.
 export const PRESETS: Record<Exclude<Quality, 'custom'>, Pick<Settings, 'viewDistance' | 'shadows' | 'shadowSize' | 'resolution' | 'bloom'>> = {
-  eco: { viewDistance: 9, shadows: false, shadowSize: 1024, resolution: 0.75, bloom: false }, // pour les petites configurations
-  balanced: { viewDistance: 14, shadows: true, shadowSize: 1024, resolution: 1, bloom: false }, // par défaut
-  beautiful: { viewDistance: 20, shadows: true, shadowSize: 2048, resolution: 1, bloom: true }, // plus beau, plus gourmand
+  eco: { viewDistance: 10, shadows: false, shadowSize: 1024, resolution: 0.75, bloom: false }, // pour les petites configurations
+  balanced: { viewDistance: 20, shadows: true, shadowSize: 1024, resolution: 1, bloom: false }, // par défaut
+  beautiful: { viewDistance: 28, shadows: true, shadowSize: 2048, resolution: 1, bloom: true }, // plus beau, plus gourmand
 };
 
 // Réglages par défaut.
 export const DEFAULT_SETTINGS: Settings = {
   quality: 'balanced',
   ...PRESETS.balanced,
+  constellations: false, // les traits n'apparaissent que si on les demande (touche L)
   showFps: true, // visible au début : on a besoin de mesurer la fluidité
   mouseSensitivity: 1,
   daysPass: true, // les saisons avancent lentement tant qu'on joue
@@ -41,7 +43,7 @@ export const DAY_LENGTH_CHOICES = [0, 10, 30, 60, 120] as const;
 
 // Bornes des curseurs.
 export const LIMITS = {
-  viewDistance: { min: 6, max: 28 },
+  viewDistance: { min: 6, max: 36 },
   resolution: { min: 0.5, max: 1 },
   mouseSensitivity: { min: 0.5, max: 2 },
 } as const;
@@ -75,6 +77,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     shadows: bool(r.shadows, d.shadows),
     shadowSize: num(r.shadowSize, d.shadowSize) >= 2048 ? 2048 : 1024, // seules deux tailles existent
     bloom: bool(r.bloom, d.bloom),
+    constellations: bool(r.constellations, d.constellations),
     resolution: clamp(num(r.resolution, d.resolution), LIMITS.resolution.min, LIMITS.resolution.max),
     showFps: bool(r.showFps, d.showFps),
     mouseSensitivity: clamp(num(r.mouseSensitivity, d.mouseSensitivity), LIMITS.mouseSensitivity.min, LIMITS.mouseSensitivity.max),

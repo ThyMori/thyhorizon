@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.8.0 — 2026-11-23
+
+Vue plus lointaine, étoiles plus naturelles et scintillantes, constellations (touche L)
+
 ## 1.7.0 — 2026-11-23
 
 Le vrai relief de la Terre (ETOPO) : côtes et montagnes réelles, départ au bord de la Manche près de Lannion, détail inventé selon la rugosité réelle

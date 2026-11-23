@@ -11,6 +11,7 @@ export class TouchUi {
   private readonly joy = byId('joy');
   private readonly knob = byId('joy-knob');
   private readonly runBtn = byId<HTMLButtonElement>('touch-run');
+  private readonly starBtn = byId<HTMLButtonElement>('touch-stars');
   private readonly flyBtn = byId<HTMLButtonElement>('touch-fly');
   private readonly upBtn = byId<HTMLButtonElement>('touch-up');
   private readonly downBtn = byId<HTMLButtonElement>('touch-down');
@@ -26,6 +27,7 @@ export class TouchUi {
   constructor(
     private readonly controls: PlayerControls,
     onMenu: () => void, // ouvre le menu pause
+    onConstellations: () => void, // bascule les constellations
   ) {
     for (const zone of [this.moveZone, this.lookZone]) zone.addEventListener('contextmenu', (e) => e.preventDefault()); // pas de menu contextuel sur appui long
     this.moveZone.addEventListener('pointerdown', (e) => this.moveDown(e));
@@ -40,10 +42,16 @@ export class TouchUi {
       this.runBtn.setAttribute('aria-pressed', String(this.runToggle));
       this.applyRun();
     });
+    this.starBtn.addEventListener('click', onConstellations); // ✦ : constellations (le retour visuel vient de setConstellations)
     this.flyBtn.addEventListener('click', () => this.controls.setFly(!this.controls.fly)); // Vol : bascule (le retour visuel vient de setFly)
     this.holdButton(this.upBtn, 1); // ▲ : monte tant qu'on appuie
     this.holdButton(this.downBtn, -1); // ▼ : descend tant qu'on appuie
     this.setFly(controls.fly);
+  }
+
+  // Retour visuel du bouton ✦ (appelé par le jeu).
+  setConstellations(on: boolean): void {
+    this.starBtn.setAttribute('aria-pressed', String(on));
   }
 
   // Met à jour les boutons selon l'état du vol libre (appelé par le jeu).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRUISER, BoatInput, BoatState, apparentWind, createBoat, hullResistance, pointOfSail, readout, rightingArm, sailCoefficients, sheetAngle, startHeading, stepBoat, wrapPi } from './sailing';
+import { CRUISER, BoatInput, penonFlow, BoatState, apparentWind, createBoat, hullResistance, pointOfSail, readout, rightingArm, sailCoefficients, sheetAngle, startHeading, stepBoat, wrapPi } from './sailing';
 import { msToKnots } from './wind';
 import type { Wind } from './wind';
 
@@ -210,5 +210,32 @@ describe('cap de départ et allures', () => {
   it('les instruments donnent un cap compas entre 0 et 360', () => {
     const s = createBoat(0, 0, Math.PI / 2); // yaw π/2 = cap ouest = 270°
     expect(readout(s, EAST_12).bearing).toBeCloseTo(270, 3);
+  });
+});
+
+describe('penons', () => {
+  const at = (sheet: number): { trim: number; flow: number } => {
+    const s = createBoat(0, 0, -50 * DEG); // cap compas 50°, vent de l'est : au près, à tribord amures
+    s.u = 2.5; // un peu de vitesse
+    s.sheet = sheet;
+    sail(s, EAST_12, 6, 50, false); // on laisse la voile se mettre en place (écoute fixe)
+    return penonFlow(s, EAST_12);
+  };
+  it('voile trop choquée : le penon du vent se soulève (trim < 0)', () => {
+    expect(at(0.95).trim).toBeLessThan(-0.5);
+  });
+  it('voile trop bordée : le penon sous le vent décroche (trim > 0)', () => {
+    expect(at(0.0).trim).toBeGreaterThan(0.3);
+  });
+  it('voile bien réglée : les deux penons filent droit', () => {
+    const s = createBoat(0, 0, -150 * DEG);
+    s.u = 2.5;
+    sail(s, EAST_12, 20, 150, true); // pilote qui garde ~12° d'angle d'attaque
+    const f = penonFlow(s, EAST_12);
+    expect(Math.abs(f.trim)).toBeLessThan(0.8);
+  });
+  it('sans vent, les penons pendent (flow ≈ 0)', () => {
+    const s = createBoat(0, 0, 0);
+    expect(penonFlow(s, { speed: 0, from: 0 }).flow).toBeLessThan(0.05);
   });
 });

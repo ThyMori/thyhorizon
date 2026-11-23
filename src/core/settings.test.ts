@@ -33,6 +33,11 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ constellations: 'oui' }).constellations).toBe(false);
     expect(detectQuality({ ...DEFAULT_SETTINGS, constellations: true })).toBe('balanced');
   });
+  it('affiche les instruments par défaut et valide le réglage', () => {
+    expect(DEFAULT_SETTINGS.showInstruments).toBe(true);
+    expect(sanitizeSettings({ showInstruments: false }).showInstruments).toBe(false);
+    expect(sanitizeSettings({ showInstruments: 'non' }).showInstruments).toBe(true);
+  });
   it('garde le temps réel désactivé par défaut et le valide', () => {
     expect(DEFAULT_SETTINGS.realTime).toBe(false);
     expect(sanitizeSettings({ realTime: true }).realTime).toBe(true);

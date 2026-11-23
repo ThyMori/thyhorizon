@@ -94,7 +94,7 @@ export class Game {
     this.controls.sensitivity = this.settings.mouseSensitivity;
     this.boat = new BoatDriver(this.gs.scene, this.terrain, this.controls);
     this.boat.onChange = (aboard) => {
-      this.boatHud.setVisible(aboard); // instruments visibles seulement à bord
+      this.boatHud.setVisible(aboard && this.settings.showInstruments); // instruments visibles seulement à bord, si on les veut
       byId('btn-boat').textContent = aboard ? 'Voilier : débarquer (B)' : 'Voilier : monter à bord (B)';
     };
     this.hud.setFpsVisible(this.settings.showFps);
@@ -255,12 +255,21 @@ export class Game {
     this.controls.onHelpKey = () => this.openHelp();
     this.controls.onMapKey = () => this.openMap();
     this.controls.onBoatKey = () => this.boat.toggle();
+    this.controls.onInstrumentsKey = () => this.toggleInstruments();
     this.controls.onConstellationsKey = () => this.toggleConstellations();
   }
 
   // Latitude actuelle du joueur, en degrés (sert au soleil : sa hauteur dépend du lieu).
   private playerLat(): number {
     return worldToLatLon(this.controls.x, this.controls.z).lat; // converti depuis la position dans le monde
+  }
+
+  // Montre ou cache les instruments du voilier (touche I) : sans eux, on lit les penons et les voiles.
+  private toggleInstruments(): void {
+    if (!this.boat.aboard) return; // sans bateau, rien à cacher
+    const on = !this.settings.showInstruments;
+    this.applySettings({ ...this.settings, showInstruments: on });
+    toast(on ? 'Instruments affichés (I pour les cacher).' : 'Instruments cachés : lis les penons et la voile. I pour les remettre.');
   }
 
   // Montre ou cache les traits des constellations ; de jour, on prévient qu'ils n'apparaîtront qu'à la nuit.
@@ -476,6 +485,7 @@ export class Game {
     saveJson(SETTINGS_KEY, next);
     this.gs.applySettings(next);
     this.hud.setFpsVisible(next.showFps);
+    this.boatHud.setVisible(this.boat.aboard && next.showInstruments); // instruments du voilier
     this.controls.sensitivity = next.mouseSensitivity;
     this.touchUi.setConstellations(next.constellations); // bouton ✦ à jour
   }

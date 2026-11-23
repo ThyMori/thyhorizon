@@ -25,6 +25,7 @@ export class PlayerControls {
   onConstellationsKey: (() => void) | null = null; // appelé quand on appuie sur L (constellations)
   onMapKey: (() => void) | null = null; // appelé quand on appuie sur M (carte du monde)
   onBoatKey: (() => void) | null = null; // appelé quand on appuie sur B (monter à bord / débarquer)
+  onInstrumentsKey: (() => void) | null = null; // appelé quand on appuie sur I (instruments du voilier)
   onHelpKey: (() => void) | null = null; // appelé quand on appuie sur la touche d'aide
   touchActive = false; // joue-t-on au doigt (sans capture de souris) ?
   touchMove = { forward: 0, right: 0 }; // intention du joystick virtuel, de -1 à 1
@@ -157,6 +158,7 @@ export class PlayerControls {
     if (e.code === 'KeyB') this.onBoatKey?.(); // B : monter à bord / débarquer
     if (e.code === 'KeyH') this.onHelpKey?.(); // H : aide
     if (e.code === 'KeyM') this.onMapKey?.(); // M : carte du monde
+    if (e.code === 'KeyI') this.onInstrumentsKey?.(); // I : montre ou cache les instruments du voilier
     if (e.code === 'KeyL') this.onConstellationsKey?.(); // L : traits des constellations
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // pas de défilement de page
   }

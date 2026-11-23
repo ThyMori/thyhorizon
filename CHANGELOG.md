@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.14.0 — 2026-11-23
+
+Penons sur la grand-voile et touche I pour cacher les instruments
+
 ## 1.13.2 — 2026-11-23
 
 Rouf du voilier arrondi (flancs inclinés, toit bombé, nez)

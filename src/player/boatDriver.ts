@@ -70,6 +70,7 @@ export class BoatDriver {
     c.yaw = boat.yaw; // on regarde vers l'avant
     c.pitch = -0.08;
     this.aboard = true;
+    this.view?.setAboard(true); // les penons se voient des deux côtés de la voile
     this.onChange?.(true);
     toast('À bord ! A/D : barre · W/S : écoute (W borde, S choque) · Espace : barre au milieu · B : débarquer.');
   }
@@ -95,6 +96,7 @@ export class BoatDriver {
   leave(): void {
     if (!this.aboard) return;
     this.aboard = false;
+    this.view?.setAboard(false);
     this.controls.aboard = false;
     this.controls.roll = 0;
     const boat = this.state;
@@ -125,7 +127,7 @@ export class BoatDriver {
       this.report(boat);
     }
     const y = waveHeight(boat.x, boat.z, seconds); // le bateau suit la surface de l'eau
-    this.view.update(boat, origin.x, origin.z, y, seconds);
+    this.view.update(boat, this.wind, origin.x, origin.z, y, seconds);
     if (this.aboard) {
       const eye = this.view.eyeWorld(origin.x, origin.z); // position des yeux du barreur
       this.controls.x = eye.x;

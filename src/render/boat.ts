@@ -4,7 +4,10 @@
 
 import * as THREE from 'three';
 import { LAYOUT, bottomHeight, deckHeight, roofHeight, stationOf } from '../core/hull';
+import { penonFlow } from '../core/sailing';
 import type { BoatSpec, BoatState } from '../core/sailing';
+import type { Wind } from '../core/wind';
+import { Penons } from './penons';
 import { deckTexture, teakTexture } from './boatTextures';
 import { P, box, buildCabin, buildCockpitFloor, buildCockpitWalls, buildDeck, buildKeel, buildLifelines, buildMast, buildRigging, buildToeRail, cabinWindow, cylinderBetween, hullBand, merge, transom } from './boatParts';
 
@@ -66,6 +69,14 @@ class SailMesh {
     }
   }
 
+  // Donne le point de la voile à la hauteur q et à la position p de la corde (0 à 1), tel que calculé à la dernière image.
+  sample(q: number, p: number, out: THREE.Vector3): void {
+    const r = Math.min(SAIL_ROWS, Math.max(0, Math.round(q * SAIL_ROWS)));
+    const c = Math.min(SAIL_COLS, Math.max(0, Math.round(p * SAIL_COLS)));
+    const k = (r * (SAIL_COLS + 1) + c) * 3;
+    out.set(this.positions[k]!, this.positions[k + 1]!, this.positions[k + 2]!);
+  }
+
   // Remplit la voile entre ses trois coins. belly = creux (fraction de la corde), dir = côté du creux,
   // flutter = battement (0 = tendue), time = secondes.
   fill(tack: THREE.Vector3, head: THREE.Vector3, clew: THREE.Vector3, belly: number, dir: number, flutter: number, time: number): void {
@@ -120,6 +131,7 @@ export class BoatView {
   private readonly wheel = new THREE.Group(); // roue de barre : tourne avec le safran
   private readonly mainsail: SailMesh;
   private readonly jib: SailMesh;
+  private readonly penons = new Penons(); // rubans de la grand-voile
   private readonly mainsheet: THREE.Mesh; // l'écoute de grand-voile : suit la bôme
   private bellyDir = 1;
   private lastTime = 0;
@@ -205,6 +217,7 @@ export class BoatView {
     this.mainsail = new SailMesh(sailMat, true);
     this.boomPivot.add(this.mainsail.mesh);
     if (this.mainsail.battens) this.boomPivot.add(this.mainsail.battens);
+    this.boomPivot.add(this.penons.group);
     this.group.add(this.boomPivot);
     this.jib = new SailMesh(sailMat, false);
     this.group.add(this.jib.mesh);
@@ -282,7 +295,7 @@ export class BoatView {
   }
 
   // Place le bateau, oriente ses pièces mobiles. y = hauteur de la surface de l'eau sous le bateau.
-  update(s: BoatState, originX: number, originZ: number, y: number, timeSeconds: number): void {
+  update(s: BoatState, wind: Wind, originX: number, originZ: number, y: number, timeSeconds: number): void {
     const dt = Math.min(0.1, Math.max(0, timeSeconds - this.lastTime));
     this.lastTime = timeSeconds;
     this.group.position.set(s.x - originX, y, s.z - originZ);
@@ -298,6 +311,8 @@ export class BoatView {
     const roof = roofHeight(this.spec, LAYOUT.mastU);
     const headLocal = new THREE.Vector3(0, LAYOUT.mastHeight - LAYOUT.boomHeight - 0.45, 0.06);
     this.mainsail.fill(new THREE.Vector3(0, 0.1, 0.05), headLocal, new THREE.Vector3(0, 0.12, LAYOUT.boomLength - 0.12), belly, this.bellyDir, flutter, timeSeconds);
+
+    this.penons.update((q, p, out) => this.mainsail.sample(q, p, out), penonFlow(s, wind), s.side, timeSeconds);
 
     // Foc : l'étai donne le bord d'attaque ; l'écoute suit la bôme.
     const tack = P(L / 2 - 0.5, deckHeight(0.96) + 0.3, 0);
@@ -321,6 +336,11 @@ export class BoatView {
   eyeWorld(originX: number, originZ: number): THREE.Vector3 {
     const eye = this.group.localToWorld(P(this.spec.eyeU, this.spec.eyeHeight, 0));
     return eye.add(new THREE.Vector3(originX, 0, originZ));
+  }
+
+  // Le joueur est à bord : il voit les penons des deux côtés de la voile.
+  setAboard(aboard: boolean): void {
+    this.penons.setSeeThrough(aboard);
   }
 
   setVisible(visible: boolean): void {

@@ -315,6 +315,24 @@ export function startHeading(yaw: number, wind: Wind): number {
   return -newBearing;
 }
 
+// Ce que montrent les penons (petits rubans cousus sur la grand-voile).
+export interface PenonFlow {
+  trim: number; // −1 = voile trop choquée (le penon du côté du vent se soulève), 0 = bien réglée, +1 = trop bordée (le penon sous le vent flotte, l'écoulement décroche)
+  flow: number; // 0 à 1 : force du vent apparent ressenti (sans vent, les penons pendent)
+}
+
+export const TRIM_IDEAL = 9 * DEG; // angle d'attaque où les deux penons filent droit
+export const TRIM_SPREAD = 7 * DEG; // écart à l'idéal qui donne un défaut complet
+
+// Calcule l'écoulement de l'air sur la voile d'après l'angle d'attaque (vent apparent − bôme).
+export function penonFlow(s: BoatState, wind: Wind): PenonFlow {
+  const aw = apparentWind(s, wind);
+  const alpha = Math.max(0, Math.abs(aw.angle) - Math.abs(s.boom)); // angle d'attaque de la voile
+  let trim = clamp((alpha - TRIM_IDEAL) / TRIM_SPREAD, -1, 1); // sous l'idéal : trop choquée ; au-dessus : trop bordée
+  trim = lerp(trim, -1, clamp(s.luff, 0, 1)); // une voile qui faseye est franchement trop choquée
+  return { trim, flow: clamp(aw.speed / 3, 0, 1) };
+}
+
 // Ce qu'affichent les instruments.
 export interface Readout {
   bearing: number; // cap compas, en degrés (0 à 360)

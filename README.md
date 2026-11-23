@@ -174,6 +174,10 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 ### 1.13.2 — Rouf arrondi
 - Le rouf n'est plus une boîte : flancs inclinés, toit bombé, nez arrondi vers l'avant (`buildCabin`, `src/render/boatParts.ts`).
 
+### 1.14.0 — Penons et instruments cachables
+- Trois paires de **penons** (rubans rouge côté tribord, vert côté bâbord) cousus sur la grand-voile. Droits vers l'arrière : voile bien réglée. Ruban du côté du vent qui se soulève : trop choqué (borde). Ruban sous le vent qui flotte : trop bordé, la voile décroche (choque). Sans vent, ils pendent.
+- Touche **I** (et case dans Réglages) : cache ou montre les instruments, pour naviguer comme sur un vrai bateau. Logique pure : `penonFlow` dans `src/core/sailing.ts` (testée) ; dessin : `src/render/penons.ts`.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

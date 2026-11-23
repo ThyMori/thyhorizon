@@ -10,6 +10,10 @@ npm run dev     # lance le jeu ; ouvre l'adresse affichée (http://localhost:517
 ```
 Clique sur « Entrer dans le monde ». Commandes : ZQSD / flèches, souris, Maj = courir, V = vol, H = aide, Échap = pause.
 
+## Jouer en ligne (sans rien installer)
+Adresse : https://thymori.github.io/ThyHorizon/ (mise à jour automatiquement à chaque livraison, environ 1 à 2 minutes).
+Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → « Build and deployment » → Source : **GitHub Actions**. Le suivi se voit dans l'onglet Actions. Les sauvegardes restent dans ton navigateur (propres à chaque adresse).
+
 ## Commandes utiles
 | Commande | Rôle |
 |---|---|

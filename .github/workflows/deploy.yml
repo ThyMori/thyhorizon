@@ -1,0 +1,41 @@
+# Publie le jeu sur GitHub Pages à chaque envoi sur main.
+name: Publier le jeu
+
+on:
+  push:
+    branches: [main] # se déclenche à chaque push sur main
+  workflow_dispatch: # et à la demande depuis l'onglet Actions
+
+permissions:
+  contents: read # lire le code
+  pages: write # écrire sur Pages
+  id-token: write # authentification du déploiement
+
+concurrency:
+  group: pages # un seul déploiement à la fois
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # récupère le code
+      - uses: actions/setup-node@v4 # installe Node
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci # installe les dépendances exactes du verrou
+      - run: npm test # les tests doivent passer avant tout build
+      - run: npm run build # contrôle de types + construction dans dist/
+      - uses: actions/upload-pages-artifact@v3 # prépare le site
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4 # met en ligne

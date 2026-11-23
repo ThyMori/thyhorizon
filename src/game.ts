@@ -15,6 +15,10 @@ import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
 import { TouchUi } from './player/touchUi';
 import { PlacesPanel } from './ui/placesPanel';
+import { WorldMap } from './ui/worldMap';
+import { latLonToWorld, worldToLatLon } from './core/geo';
+import { snapToLand } from './core/worldmap';
+import type { Relief } from './core/relief';
 import { Place, placePosition } from './core/places';
 import { GameScene } from './render/scene';
 import { SAVE_KEY, SETTINGS_KEY, loadJson, saveJson } from './storage';
@@ -42,6 +46,9 @@ export class Game {
   private readonly hud = new Hud();
   private readonly pause = byId('pause');
   private readonly settingsDialog = byId<HTMLDialogElement>('dialog-settings');
+  private readonly mapDialog = byId<HTMLDialogElement>('dialog-map');
+  private relief!: Relief; // le relief réel (pour la carte)
+  private worldMap!: WorldMap; // la carte du monde
   private readonly placesDialog = byId<HTMLDialogElement>('dialog-places');
   private readonly helpDialog = byId<HTMLDialogElement>('dialog-help');
   private readonly installDialog = byId<HTMLDialogElement>('dialog-install');
@@ -65,7 +72,8 @@ export class Game {
     const rawSave = loadJson(SAVE_KEY);
     this.seedText = readSavedSeed(rawSave);
     const seed = hashSeed(this.seedText);
-    this.terrain = createTerrain(seed, createRelief(reliefGrid), realClimate); // le vrai relief de la Terre + un détail inventé
+    this.relief = createRelief(reliefGrid);
+    this.terrain = createTerrain(seed, this.relief, realClimate); // le vrai relief de la Terre + un détail inventé
     const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
     this.day = save.day;
@@ -177,6 +185,18 @@ export class Game {
     byId('btn-settings').addEventListener('click', () => this.openSettings());
     byId('btn-help').addEventListener('click', () => this.openHelp());
     byId('btn-places').addEventListener('click', () => this.openPlaces());
+    byId('btn-map').addEventListener('click', () => this.openMap());
+    this.worldMap = new WorldMap({
+      relief: this.relief,
+      climate: realClimate,
+      getPlayer: () => worldToLatLon(this.controls.x, this.controls.z),
+      onGo: (lat, lon) => this.travelToLatLon(lat, lon),
+    });
+    bindDialog(this.mapDialog, () => this.onDialogClosed());
+    this.mapDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !(e.target instanceof HTMLButtonElement)) this.worldMap.go(); // Entrée : y aller (sauf sur un bouton)
+      if (e.code === 'KeyM') this.mapDialog.close(); // M referme la carte
+    });
     new PlacesPanel((place) => this.travelTo(place)); // liste des lieux (boutons)
     bindDialog(this.placesDialog, () => this.onDialogClosed());
     byId('btn-reset').addEventListener('click', () => byId('rescue-reset').click()); // réutilise la remise à zéro de l'écran de secours
@@ -216,6 +236,7 @@ export class Game {
       toast(on ? `Vol libre activé. ${this.touchMode ? 'Touche Vol' : 'Appuie sur V'} pour revenir à pied.` : 'Vol libre coupé : tu retombes doucement au sol.');
     };
     this.controls.onHelpKey = () => this.openHelp();
+    this.controls.onMapKey = () => this.openMap();
     this.controls.onConstellationsKey = () => this.toggleConstellations();
   }
 
@@ -355,19 +376,56 @@ export class Game {
     openDialog(this.placesDialog);
   }
 
+  private openMap(): void {
+    if (this.controls.locked) document.exitPointerLock(); // la carte se manie à la souris
+    this.hidePause();
+    openDialog(this.mapDialog);
+    this.worldMap.open();
+  }
+
+  // Voyage vers une latitude / longitude choisie sur la carte : si c'est la mer, on se pose sur la côte la plus proche.
+  private travelToLatLon(lat: number, lon: number): void {
+    const land = snapToLand(this.relief, Math.max(-89.5, Math.min(89.5, lat)), lon);
+    if (!land) {
+      toast('Il n\'y a pas de terre à proximité de ce point de l\'océan. Choisis un autre endroit.', 'error');
+      return;
+    }
+    const { x, z } = latLonToWorld(land.lat, land.lon);
+    // Le relief réel est flou : on cherche à pied, autour du point, un sol vraiment hors de l'eau (pas de 100 m, jusqu'à 5 km).
+    let best = { x, z };
+    for (let r = 0; r <= 5000 && this.terrain.heightAt(best.x, best.z) < 3; r += 100) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k * Math.PI) / 4;
+        const cx = x + r * Math.cos(a);
+        const cz = z + r * Math.sin(a);
+        if (this.terrain.heightAt(cx, cz) >= 3) {
+          best = { x: cx, z: cz };
+          break;
+        }
+      }
+    }
+    this.mapDialog.close();
+    this.teleport(best.x, best.z, land.moved ? 'Tu es posé sur la côte la plus proche.' : 'Voyage terminé.');
+  }
+
+  // Place le joueur au sol, face au nord.
+  private teleport(x: number, z: number, message: string): void {
+    this.controls.x = x;
+    this.controls.z = z;
+    this.controls.yaw = 0;
+    this.controls.pitch = 0.04;
+    this.controls.y = this.terrain.heightAt(x, z) + 1.7;
+    this.controls.fly = false;
+    this.touchUi.setFly(false);
+    toast(`${message} Le terrain apparaît en quelques secondes. Touche « Entrer dans le monde ».`);
+    this.saveNow();
+  }
+
   // Voyage instantané vers un lieu : on se pose au sol, face au nord, et on ferme la liste.
   private travelTo(place: Place): void {
     const { x, z } = placePosition(place);
-    this.controls.x = x;
-    this.controls.z = z;
-    this.controls.yaw = 0; // face au nord
-    this.controls.pitch = 0.04;
-    this.controls.y = this.terrain.heightAt(x, z) + 1.7; // au sol (le terrain est calculé par formule : pas besoin d'attendre les tuiles)
-    this.controls.fly = false;
-    this.touchUi.setFly(false);
     this.placesDialog.close(); // retour au menu : « Entrer dans le monde »
-    toast(`${place.name} : le terrain apparaît en quelques secondes. Touche « Entrer dans le monde ».`);
-    this.saveNow();
+    this.teleport(x, z, `${place.name} :`);
   }
 
   private openHelp(): void {

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.10.0 — 2026-11-23
+
+Carte du monde (touche M) avec voyage
+
 ## 1.9.1 — 2026-11-23
 
 Menu Lieux du monde pour visiter chaque climat

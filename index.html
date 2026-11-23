@@ -76,6 +76,7 @@
         <div class="stack">
           <button id="btn-resume" type="button" class="primary">Entrer dans le monde</button>
           <button id="btn-settings" type="button">Réglages</button>
+          <button id="btn-map" type="button">Carte du monde (M)</button>
           <button id="btn-places" type="button">Lieux du monde</button>
           <button id="btn-help" type="button"><span class="icon-i" aria-hidden="true">i</span> Aide</button>
           <button id="btn-install" type="button" class="subtle" hidden>Installer l'application</button>
@@ -155,6 +156,24 @@
     </dialog>
 
     <!-- Aide intégrée. -->
+    <!-- Carte du monde : plein écran. -->
+    <dialog id="dialog-map" class="map" aria-labelledby="map-title">
+      <header>
+        <h2 id="map-title" tabindex="-1">Carte du monde</h2>
+        <div class="map-tools">
+          <button type="button" id="map-here" class="small" aria-label="Centrer sur moi">Moi</button>
+          <button type="button" id="map-zoom-out" class="small" aria-label="Dézoomer">−</button>
+          <button type="button" id="map-zoom-in" class="small" aria-label="Zoomer">+</button>
+          <button type="button" class="close" data-close aria-label="Fermer la carte">✕</button>
+        </div>
+      </header>
+      <canvas id="map-canvas" aria-label="Carte du monde : clique pour choisir un lieu"></canvas>
+      <footer>
+        <output id="map-info" aria-live="polite"></output>
+        <button type="button" id="map-go" class="primary" disabled>Y aller</button>
+      </footer>
+    </dialog>
+
     <!-- Lieux : un point de chaque grand climat de la Terre. -->
     <dialog id="dialog-places" aria-labelledby="places-title">
       <header>
@@ -185,6 +204,7 @@
       </ul>
       <h3>Voler</h3>
       <ul>
+        <li><kbd>M</kbd> : ouvre la carte du monde. Glisse pour te déplacer, molette pour zoomer, clique pour choisir un lieu, puis <strong>Y aller</strong> (ou Entrée). Un point en mer te pose sur la côte la plus proche.</li>
         <li><kbd>L</kbd> : montre ou cache les traits des constellations (la nuit seulement). Sur téléphone, touche <strong>✦</strong>.</li>
         <li><kbd>V</kbd> : active ou coupe le vol libre. Dans ce mode, tu avances là où tu regardes.</li>
         <li><kbd>Espace</kbd> monte, <kbd>C</kbd> descend, <kbd>Maj</kbd> va très vite. Pratique pour explorer.</li>

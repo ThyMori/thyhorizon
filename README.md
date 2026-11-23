@@ -137,6 +137,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Menu pause → **Lieux du monde** : 17 lieux (un par grand climat : Lannion, Provence, Alpes, Sahara, Sahel, Gobi, Atacama, Outback, Congo, Amazonie, Mékong, Pampa, Kazakhstan, Sibérie, Tibet, Groenland, Antarctique). Un appui = voyage au sol, face au nord. Liste dans `src/core/places.ts` (testée : sur la terre ferme, bon climat), fenêtre dans `src/ui/placesPanel.ts`.
 - Vérifié : 176 tests, clic réel sur « Sahara » (position et fermeture), pas de débordement à 360 px. Pas vérifié visuellement : le rendu de la fenêtre (les captures du navigateur sans GPU n'affichent pas les fenêtres).
 
+### 1.10.0 — Carte du monde (touche M) (étape 5)
+- **M** (en jeu ou depuis le menu) ouvre une carte plein écran du monde : relief réel ombré, couleurs du climat (comme dans le jeu), quadrillage tous les 30°. Rond ambre = toi. **Glisser** pour se déplacer (le monde se referme sur lui-même), **molette** ou boutons +/− pour zoomer (jusqu'à ≈ 2,8 km par pixel), **clic** pour choisir un lieu, **Y aller** ou Entrée pour s'y rendre ; **M** referme. Bouton « Moi » pour recentrer.
+- Voyage : on se pose au sol, face au nord. Un clic **en mer** envoie sur la côte la plus proche (recherche jusqu'à 6°) ; s'il n'y a aucune terre à moins de 6° (milieu du Pacifique), un message le dit et rien ne bouge.
+- Technique : `src/core/worldmap.ts` (projection, zoom, couleurs, recherche de terre ; testé), `src/ui/worldMap.ts` (dessin). L'image du monde (1080 × 540) est calculée à la première ouverture, par morceaux (≈ 1 s), puis gardée.
+- Vérifié : 189 tests, carte dessinée et vérifiée sur capture (continents, déserts, forêts, calottes), clic en mer au large du Sénégal → posé sur la côte, fermeture de la carte. Pas testé : au doigt, sur ta carte graphique, l'atterrissage dans des endroits très escarpés.
+- Limites : pas de noms de pays ni de villes, pas de zoom au doigt (pincer), la mer ne montre pas la profondeur (relief marin plafonné à −200 m).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -152,7 +159,7 @@ Sans objet : jeu local, sans compte ni serveur.
 2. ✅ Déplacement de l'origine du rendu (voyager loin sans défaut d'image) (1.3.1)
 3. ✅ Carte réelle de relief et d'océans à basse résolution, détail inventé par-dessus (1.7.0)
 4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) arbres et végétation par biome
-5. Voyage par coordonnées (téléportation) et carte du monde
+5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
 **Ensuite** : Bateau à voile · Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 

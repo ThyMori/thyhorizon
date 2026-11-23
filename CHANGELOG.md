@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.8.2 — 2026-11-23
+
+Traits des constellations plus discrets
+
 ## 1.8.1 — 2026-11-23
 
 Réglage « Temps réel » : l'heure et la date du jeu suivent la vraie horloge

@@ -79,7 +79,7 @@ void main() {
   vec3 dir = normalize(mat3(modelMatrix) * position); // direction dans le monde
   float horizon = smoothstep(0.0, 0.16, dir.y); // les traits s'éteignent vers l'horizon
   float pulse = 0.65 + 0.35 * sin(uTime * (0.8 + aSeed * 1.2) + aSeed * 30.0); // pulsation douce
-  vColor = vec3(0.55, 0.72, 1.0) * 0.4 * uOpacity * horizon * pulse; // pâle, sans éblouir
+  vColor = vec3(0.55, 0.72, 1.0) * 0.2 * uOpacity * horizon * pulse; // pâle, sans éblouir
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;

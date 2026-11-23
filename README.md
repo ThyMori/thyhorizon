@@ -123,6 +123,9 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Tant que la case est cochée, les réglages date, heure, « les jours passent » et durée de journée sont grisés. En la décochant, le jeu repart de l'heure courante.
 - Vérifié : tests (159), capture : un midi forcé est bien remplacé par la vraie heure (nuit). Pas testé : sur ton téléphone, ni le lever/coucher en vrai.
 
+### 1.8.2 — Constellations plus discrètes
+- Traits deux fois plus transparents (intensité 0,4 → 0,2 dans `LINE_VERTEX`, `src/render/sky.ts`). Se règle en une ligne si c'est encore trop ou pas assez.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

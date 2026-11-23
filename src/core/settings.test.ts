@@ -4,6 +4,7 @@ import { hashSeed } from './noise';
 import { DEFAULT_SEED, defaultSave, readSavedSeed, sanitizeSave } from './save';
 import { DEFAULT_SETTINGS, LIMITS, PRESETS, applyPreset, detectQuality, sanitizeSettings } from './settings';
 import { createTerrain } from './terrain';
+import { loadRealRelief } from './relief.testutil';
 
 describe('sanitizeSettings', () => {
   it('redonne les valeurs par défaut pour tout ce qui est illisible', () => {
@@ -45,7 +46,7 @@ describe('préréglages', () => {
 });
 
 describe('sauvegarde', () => {
-  const terrain = createTerrain(hashSeed(DEFAULT_SEED));
+  const terrain = createTerrain(hashSeed(DEFAULT_SEED), loadRealRelief());
   const TODAY = 327; // 23 novembre
   const base = defaultSave(terrain, DEFAULT_SEED, TODAY);
 
@@ -61,7 +62,12 @@ describe('sauvegarde', () => {
     expect(s.yaw).toBe(1);
   });
   it('revient au départ si la position est en eau profonde', () => {
-    const s = sanitizeSave({ ...base, x: -3000, z: 0 }, terrain, DEFAULT_SEED, TODAY);
+    const s = sanitizeSave({ ...base, x: 0, z: base.z - 6000 }, terrain, DEFAULT_SEED, TODAY);
+    expect(s.x).toBe(base.x);
+    expect(s.z).toBe(base.z);
+  });
+  it('ignore une sauvegarde de l\'ancien monde inventé (version 1) : sa position n\'a plus de sens', () => {
+    const s = sanitizeSave({ ...base, version: 1, x: base.x + 500, z: base.z + 500 }, terrain, DEFAULT_SEED, TODAY);
     expect(s.x).toBe(base.x);
     expect(s.z).toBe(base.z);
   });

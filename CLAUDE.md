@@ -1,6 +1,6 @@
 # ThyHorizon — règles du dépôt
 
-Jeu 3D contemplatif personnel (PC d'abord) : monde procédural infini type Pays basque (océan à l'ouest, montagnes à l'est), première personne, rendu « pictural ». Plus tard : bateau, maison, JDR solo.
+Jeu 3D contemplatif personnel (PC d'abord) : monde infini guidé par le vrai relief de la Terre (détail inventé), départ au bord de la Manche près de Lannion, première personne, rendu « pictural ». Plus tard : bateau, maison, JDR solo.
 
 ## Pile technique
 TypeScript + Vite + Vitest + Three.js. Aucune donnée en ligne : tout est local (localStorage, IndexedDB plus tard). Pas de Supabase.
@@ -14,10 +14,11 @@ TypeScript + Vite + Vitest + Three.js. Aucune donnée en ligne : tout est local 
 - Tout nouveau fichier de logique = un test.
 
 ## Repères du monde
-+x = est, −x = ouest (océan), +z = sud, y = haut, niveau de la mer y = 0. Yaw 0 = nord. Soleil : vrai soleil astronomique (`src/core/geo.ts`) pour la latitude du lieu et le jour de l'année ; l'heure du jeu est l'heure SOLAIRE locale (midi = plein sud).
++x = est, −x = ouest, +z = sud (donc le NORD est vers −z), y = haut, niveau de la mer y = 0. Yaw 0 = nord. Soleil : vrai soleil astronomique (`src/core/geo.ts`) pour la latitude du lieu et le jour de l'année ; l'heure du jeu est l'heure SOLAIRE locale (midi = plein sud).
 Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousine de la Terre » (relief et biomes guidés par la vraie Terre, détail inventé) — voir la feuille de route du README.
 
 ## Données
+- `src/data/relief.bin` : relief réel mondial basse résolution (ETOPO, généré par `scripts/build-relief.mjs`, voir `RELIEF-LICENSE.txt`). Ne pas modifier à la main. Les tests le lisent via `src/core/relief.testutil.ts` (jamais importé par le jeu).
 - `src/data/stars.json` : catalogue d'étoiles réel (généré par `scripts/build-stars.mjs`, licence dans `src/data/STARS-LICENSE.txt`). Ne pas modifier à la main.
 
 ## Rendu et grandes coordonnées

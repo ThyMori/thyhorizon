@@ -1,0 +1,6 @@
+relief.bin — relief réel de la Terre en basse résolution (grille de 10 minutes d'arc, ≈ 18 km).
+
+Source : ETOPO, NOAA National Centers for Environmental Information (NCEI), données du gouvernement américain, domaine public.
+Grille récupérée au format VTP dans le dépôt github.com/pyvista/vtk-data (EarthModels/ETOPO_10min_Ice.vtp).
+Transformation (scripts/build-relief.mjs) : altitudes bornées entre −200 m et 6 600 m, arrondies à 4 m, colonne en double retirée, différences codées puis compressées (zlib).
+Le jeu n'utilise cette grille que pour la forme générale du relief ; tout le détail est inventé.

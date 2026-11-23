@@ -94,3 +94,22 @@ export function startHours(latDeg: number, day: number): number {
   const ss = sunriseSunset(latDeg, day); // lever et coucher du jour
   return ss ? Math.max(0, ss.sunset - 1) : 17.5; // repli pour les jours polaires
 }
+
+// ---------- Du monde du jeu à la latitude / longitude réelles ----------
+
+export const METERS_PER_DEGREE = 111320; // longueur d'un degré de latitude, en mètres (1 m du jeu = 1 m réel)
+
+// Le monde du jeu est centré sur le lieu de départ (x = 0, z = 0) : +x = est, +z = sud (donc le NORD est vers −z).
+// Sur chaque ligne de latitude, un degré de longitude est plus court (× cos de la latitude) ; on garde cette relation.
+const cosLat = (latDeg: number): number => Math.max(0.002, Math.cos((Math.min(89.9, Math.max(-89.9, latDeg)) * Math.PI) / 180));
+
+// Latitude et longitude réelles (degrés) d'un point du monde du jeu (mètres depuis le départ).
+export function worldToLatLon(x: number, z: number): { lat: number; lon: number } {
+  const lat = Math.min(90, Math.max(-90, START_LAT - z / METERS_PER_DEGREE)); // vers le sud (z > 0), la latitude diminue
+  return { lat, lon: START_LON + x / (METERS_PER_DEGREE * cosLat(lat)) };
+}
+
+// L'inverse : position dans le monde du jeu (mètres) d'une latitude et d'une longitude réelles.
+export function latLonToWorld(latDeg: number, lonDeg: number): { x: number; z: number } {
+  return { x: (lonDeg - START_LON) * METERS_PER_DEGREE * cosLat(latDeg), z: (START_LAT - latDeg) * METERS_PER_DEGREE };
+}

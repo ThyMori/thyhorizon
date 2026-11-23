@@ -12,7 +12,7 @@ import { isWalkable } from './movement';
 export const DEFAULT_SEED = 'horizon';
 
 export interface SaveData {
-  version: 1; // format de la sauvegarde (pour de futures migrations)
+  version: 2; // 2 = monde du vrai relief (une sauvegarde de version 1 date de l'ancien monde inventé : sa position n'a plus de sens)
   seed: string; // graine du monde
   x: number; // position est-ouest
   z: number; // position nord-sud
@@ -35,7 +35,7 @@ export function readSavedSeed(raw: unknown): string {
 export function defaultSave(terrain: Terrain, seed: string, today: number): SaveData {
   const s = findSpawn(terrain); // point de départ sur la plage
   const day = wrapDay(today); // jour valide
-  return { version: 1, seed, x: s.x, z: s.z, y: terrain.heightAt(s.x, s.z) + 1.7, yaw: s.yaw, pitch: s.pitch, hours: startHours(START_LAT, day), day, fly: false };
+  return { version: 2, seed, x: s.x, z: s.z, y: terrain.heightAt(s.x, s.z) + 1.7, yaw: s.yaw, pitch: s.pitch, hours: startHours(START_LAT, day), day, fly: false };
 }
 
 // Nettoie une sauvegarde brute pour ce terrain. La position redevient celle du départ si elle n'est plus valable.
@@ -47,11 +47,11 @@ export function sanitizeSave(raw: unknown, terrain: Terrain, seed: string, today
   const num = (v: unknown, d: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : d); // nombre valide ou repli
   const x = num(r.x, NaN);
   const z = num(r.z, NaN);
-  const positionOk = Number.isFinite(x) && Math.abs(x) < 1e6 && Number.isFinite(z) && Math.abs(z) < 1e6 && isWalkable(terrain, x, z); // position plausible et hors eau profonde
+  const positionOk = Number.isFinite(x) && Math.abs(x) < 1e6 && Number.isFinite(z) && Math.abs(z) < 1e6 && r.version === 2 && isWalkable(terrain, x, z); // position plausible, du monde actuel et hors eau profonde
   const fly = r.fly === true; // vol libre ?
   const ground = positionOk ? terrain.heightAt(x, z) : 0; // sol sous la position
   return {
-    version: 1,
+    version: 2,
     seed,
     x: positionOk ? x : fallback.x,
     z: positionOk ? z : fallback.z,

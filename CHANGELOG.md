@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.7.0 — 2026-11-23
+
+Le vrai relief de la Terre (ETOPO) : côtes et montagnes réelles, départ au bord de la Manche près de Lannion, détail inventé selon la rugosité réelle
+
 ## 1.6.0 — 2026-11-23
 
 Étoiles moins nombreuses mais lumineuses (halo), bloom (halo lumineux) dans le préréglage Beau

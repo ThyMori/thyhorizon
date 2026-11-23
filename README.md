@@ -47,7 +47,7 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Nouveau : une **date** (curseur sur l'année, sauvegardée) et un réglage « Les jours passent » (actif par défaut : un jour de plus à chaque minuit du jeu).
 - Une partie neuve commence à la date réelle du jour, une heure avant le coucher du soleil.
 - Les anciennes sauvegardes sont reprises (date du jour, heure conservée).
-- Pas encore reprises du réel : la forme de la côte et du relief (le terrain reste inventé, océan à l'ouest) ; l'étape 3 apportera la vraie côte nord de Lannion (la mer y est au nord). La lune est simplement à l'opposé du soleil, sans phases.
+- (Étape 3 livrée en 1.7.0 : le relief et les côtes sont maintenant ceux de la vraie Terre ; ce qui suit est l'ancien état) la mer de Lannion est au nord). La lune est simplement à l'opposé du soleil, sans phases.
 
 ### 1.3.0 — Un vrai ciel étoilé
 - **5 044 vraies étoiles** (catalogue Hipparcos, magnitude ≤ 6, fichier `src/data/stars.json`) avec leur vraie position, leur éclat et leur couleur (bleutées, blanches, jaunes, orangées).
@@ -101,6 +101,16 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - **Anticrénelage** : déjà actif partout (MSAA natif du navigateur) ; avec bloom il est conservé (4 échantillons).
 - Pas testé : le coût réel sur ta carte graphique et sur téléphone (mon navigateur de test n'a pas de GPU : ~10 i/s dans tous les cas), la compatibilité de la chaîne d'effets sur Firefox Android.
 
+### 1.7.0 — Le vrai relief de la Terre (étape 3)
+- Chaque point du monde a une vraie latitude et longitude (`src/core/geo.ts`, 1 m du jeu = 1 m réel, nord = −z). Le relief général (océans, côtes, plaines, massifs) vient de la grille réelle **ETOPO** (NOAA, domaine public, cases de 10 minutes d'arc ≈ 18 km) : `src/data/relief.bin` (0,9 Mo), fabriqué par `scripts/build-relief.mjs` (licence et origine dans `src/data/RELIEF-LICENSE.txt`). **Ne pas le modifier à la main.**
+- Le terrain (`src/core/terrain.ts`) lit cette grille (interpolation cubique) puis ajoute un détail inventé (collines, bosses, crêtes) dont l'amplitude suit la **rugosité réelle** du lieu : la Bretagne a des collines douces, les Alpes de vraies montagnes. Les côtes sont redressées (plages, falaises) et ondulées (caps, baies).
+- **Départ** : on part du bord de la Manche, ≈ 11 km au nord de Lannion (la ville est dans les terres), face à la mer (cap nord). Les anciennes sauvegardes (version 1) sont ignorées : leurs positions n'ont plus de sens.
+- Couleurs adaptées aux vraies altitudes : herbe jusqu'à ~450 m, lande, roche vers 1 000–1 500 m, **neige** au-dessus de ~2 200 m (en attendant les biomes, étape 4).
+- Chargement : `src/world/reliefLoader.ts` télécharge et décompresse le fichier (`DecompressionStream`, navigateurs de 2023 et après), puis le passe aux calculs de terrain en arrière-plan.
+- Vérifié par tests (147) : mer au nord de Lannion et terre au sud, Atlantique, Alpes > 2 000 m, Himalaya, fond marin plafonné, pôles et ligne de changement de date sans erreur, départ à terre au bord de l'eau. Vérifié en captures : côte nord de Lannion, plaine bretonne, neige des Alpes.
+- Pas testé : un long voyage à pied ou en vol à travers les continents ; les performances sur ta carte graphique (relief plus riche = tuiles un peu plus coûteuses à calculer) ; Firefox Android (`DecompressionStream`).
+- Limites connues : résolution de ~18 km (une côte peut se décaler de quelques km par rapport à la réalité), pas de fleuves ni de lacs, un monde plus plat en Bretagne que l'ancien monde inventé, la vue est limitée à la distance d'affichage (en vol haut on ne voit plus le sol).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -114,7 +124,7 @@ Sans objet : jeu local, sans compte ni serveur.
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
 2. ✅ Déplacement de l'origine du rendu (voyager loin sans défaut d'image) (1.3.1)
-3. Carte réelle de relief et d'océans à basse résolution, détail inventé par-dessus
+3. ✅ Carte réelle de relief et d'océans à basse résolution, détail inventé par-dessus (1.7.0)
 4. Biomes (climat → couleurs, végétation, neige, désert, glace)
 5. Voyage par coordonnées (téléportation) et carte du monde
 

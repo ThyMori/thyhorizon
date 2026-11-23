@@ -2,11 +2,13 @@
 // Il reçoit « fabrique la tuile (cx, cz) au détail lod » et renvoie le maillage prêt à l'emploi.
 
 import { ChunkData, buildChunk } from '../core/chunk';
+import { createRelief } from '../core/relief';
+import type { ReliefGrid } from '../core/relief';
 import { Terrain, createTerrain } from '../core/terrain';
 
 // Messages envoyés au worker.
 export type WorkerRequest =
-  | { type: 'init'; seed: number } // choisit la graine du monde
+  | { type: 'init'; seed: number; relief: ReliefGrid } // choisit la graine du monde et reçoit le relief réel
   | { type: 'build'; cx: number; cz: number; lod: number }; // fabrique une tuile
 
 // Messages renvoyés par le worker.
@@ -25,7 +27,7 @@ let terrain: Terrain | null = null; // le terrain de ce worker (créé à l'init
 ctx.onmessage = (event) => {
   const msg = event.data; // le message reçu
   if (msg.type === 'init') {
-    terrain = createTerrain(msg.seed); // chaque worker a son propre terrain, identique grâce à la graine
+    terrain = createTerrain(msg.seed, createRelief(msg.relief)); // chaque worker a son propre terrain, identique grâce à la graine et au relief
     return;
   }
   if (!terrain) return; // pas encore initialisé : on ignore

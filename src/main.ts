@@ -3,6 +3,7 @@
 import './style.css';
 import { Game } from './game';
 import { toast } from './ui/toast';
+import { loadReliefGrid } from './world/reliefLoader';
 
 // Éléments ajoutés à « window » (par l'écran de secours de index.html et par les outils de développement).
 declare global {
@@ -23,13 +24,16 @@ declare global {
   }
 }
 
-try {
-  const game = new Game(); // peut échouer (WebGL absent, par exemple)
-  game.start();
-} catch (error) {
-  const reason = error instanceof Error ? error.message : String(error);
-  window.__thyFail?.(`Démarrage impossible : ${reason}. Vérifie que l'accélération graphique est activée dans ton navigateur.`);
-}
+void (async () => {
+  try {
+    const relief = await loadReliefGrid(); // le relief réel de la Terre (≈ 0,9 Mo, mis en cache ensuite)
+    const game = new Game(relief); // peut échouer (WebGL absent, par exemple)
+    game.start();
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    window.__thyFail?.(`Démarrage impossible : ${reason}. Vérifie ta connexion et que l'accélération graphique est activée dans ton navigateur.`);
+  }
+})();
 
 // Une erreur imprévue pendant le jeu : un message clair plutôt qu'un écran figé sans explication.
 window.addEventListener('error', (event) => {

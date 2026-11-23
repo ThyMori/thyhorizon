@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { RUN_SPEED, WALK_SPEED, flyDelta, isWalkable, smoothTo, stepWalk, keyLookDelta } from './movement';
 import { hashSeed } from './noise';
 import { createTerrain, findSpawn } from './terrain';
+import { loadRealRelief } from './relief.testutil';
 
-const terrain = createTerrain(hashSeed('horizon'));
+const terrain = createTerrain(hashSeed('horizon'), loadRealRelief());
 const spawn = findSpawn(terrain);
 const idle = { forward: 0, right: 0, run: false };
 

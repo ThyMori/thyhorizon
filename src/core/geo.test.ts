@@ -1,6 +1,6 @@
 // Tests de la géographie : dates, déclinaison, position du soleil, lever et coucher.
 import { describe, expect, it } from 'vitest';
-import { START_LAT, dayOfYear, dayOfYearFromDate, declinationDeg, formatDay, siderealAngleDeg, skyRotation, startHours, sunPosition, sunRightAscensionDeg, sunriseSunset, wrapDay } from './geo';
+import { METERS_PER_DEGREE, START_LAT, START_LON, dayOfYear, dayOfYearFromDate, declinationDeg, formatDay, siderealAngleDeg, skyRotation, startHours, sunPosition, sunRightAscensionDeg, sunriseSunset, wrapDay, worldToLatLon, latLonToWorld } from './geo';
 
 describe('calendrier', () => {
   it('numérote les jours de l\'année', () => {
@@ -126,5 +126,34 @@ describe('rotation du ciel étoilé', () => {
     const drift = (siderealAngleDeg(101, 12) - siderealAngleDeg(100, 12) + 360) % 360;
     expect(drift).toBeGreaterThan(0.9);
     expect(drift).toBeLessThan(1.1);
+  });
+});
+
+describe('du monde du jeu à la latitude et la longitude', () => {
+  it('place le départ à Lannion', () => {
+    const p = worldToLatLon(0, 0);
+    expect(p.lat).toBeCloseTo(START_LAT, 9);
+    expect(p.lon).toBeCloseTo(START_LON, 9);
+  });
+  it('met le nord vers −z et l\'est vers +x', () => {
+    expect(worldToLatLon(0, -10000).lat).toBeGreaterThan(START_LAT);
+    expect(worldToLatLon(0, 10000).lat).toBeLessThan(START_LAT);
+    expect(worldToLatLon(10000, 0).lon).toBeGreaterThan(START_LON);
+  });
+  it('compte 1 m pour 1 m : 111 km vers le nord = 1 degré de latitude', () => {
+    expect(worldToLatLon(0, -METERS_PER_DEGREE).lat).toBeCloseTo(START_LAT + 1, 9);
+  });
+  it('rétrécit les degrés de longitude avec la latitude', () => {
+    const lon50 = worldToLatLon(100000, 0).lon - START_LON;
+    const lon0 = worldToLatLon(100000, (START_LAT - 0) * METERS_PER_DEGREE).lon - START_LON; // à l'équateur
+    expect(lon0).toBeLessThan(lon50);
+  });
+  it('est réversible', () => {
+    for (const [x, z] of [[0, 0], [12345, -6789], [-250000, 400000]] as const) {
+      const ll = worldToLatLon(x, z);
+      const back = latLonToWorld(ll.lat, ll.lon);
+      expect(back.x).toBeCloseTo(x, 4);
+      expect(back.z).toBeCloseTo(z, 4);
+    }
   });
 });

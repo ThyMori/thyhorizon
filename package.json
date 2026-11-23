@@ -1,6 +1,6 @@
 {
   "name": "thyhorizon",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "description": "ThyHorizon : un refuge contemplatif en 3D (monde procédural de type Pays basque, maison, voile, JDR solo).",
@@ -17,6 +17,7 @@
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@types/three": "^0.187.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE, ChunkData, chunkKey, lodForDistance } from '../core/chunk';
 import { NO_ORIGIN, Origin } from '../core/origin';
+import type { ReliefGrid } from '../core/relief';
 import type { WorkerRequest, WorkerResponse } from './chunkWorker';
 
 // Une tuile connue du gestionnaire.
@@ -44,6 +45,7 @@ export class ChunkManager {
     private readonly scene: THREE.Scene, // la scène où ajouter les tuiles
     private readonly material: THREE.Material, // matériau commun à toutes les tuiles
     seed: number, // graine du monde
+    reliefGrid: ReliefGrid, // le relief réel (copié dans chaque ouvrier)
     private readonly onError: (message: string) => void, // appelé en cas de problème (une seule fois)
   ) {
     const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4; // cœurs du processeur
@@ -52,7 +54,7 @@ export class ChunkManager {
       const worker = new Worker(new URL('./chunkWorker.ts', import.meta.url), { type: 'module' }); // un ouvrier
       worker.onmessage = (event: MessageEvent<WorkerResponse>) => this.handleResponse(event.data); // réception d'une tuile
       worker.onerror = (event) => this.reportError(event.message || 'Erreur dans le worker de terrain'); // plantage de l'ouvrier
-      worker.postMessage({ type: 'init', seed } satisfies WorkerRequest); // on lui donne la graine
+      worker.postMessage({ type: 'init', seed, relief: reliefGrid } satisfies WorkerRequest); // on lui donne la graine et le relief réel
       this.workers.push(worker);
     }
     this.maxInflight = count * 2; // chaque ouvrier a une file de 2 tuiles

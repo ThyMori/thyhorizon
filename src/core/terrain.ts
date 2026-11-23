@@ -1,13 +1,14 @@
-// Le relief du monde : une côte basque imaginaire, infinie.
+// Le relief du monde : la vraie Terre en grandes lignes, un détail inventé par-dessus.
 //
-// Repère du monde (en mètres) :
-//   +x = est, -x = ouest, +z = sud, -z = nord, +y = haut. Le niveau de la mer est à y = 0.
-//   L'océan s'étend à l'infini vers l'ouest (x négatif). La côte longe l'axe nord-sud.
-//   En allant vers l'est, on monte : plage, collines vertes, puis montagnes.
-// Tout est calculé à partir d'une graine : même graine, même monde.
+// Repère du monde (en mètres, depuis Lannion) : +x = est, −x = ouest, +z = sud, −z = nord, +y = haut. Niveau de la mer : y = 0.
+// Chaque point du monde correspond à une vraie latitude et longitude (geo.ts). Le relief réel (océans, côtes, massifs : grille de ~18 km,
+// relief.ts) donne la forme générale ; le terrain y ajoute des collines, des bosses et des détails de plus en plus fins, plus ou moins
+// marqués selon la « rugosité » réelle du lieu (plat en Beauce, tourmenté dans les Alpes). Même graine → même détail, toujours.
 
+import { worldToLatLon } from './geo';
 import { clamp, smoothstep } from './math';
 import { Noise2D, fbm } from './noise';
+import type { Relief } from './relief';
 
 // Niveau de la mer.
 export const SEA_LEVEL = 0;
@@ -16,7 +17,7 @@ export const SEA_LEVEL = 0;
 export interface Terrain {
   readonly seed: number; // graine utilisée
   heightAt(x: number, z: number): number; // altitude du sol en (x, z), en mètres
-  coastX(z: number): number; // position de la côte (x) pour un z donné
+  realHeightAt(x: number, z: number): number; // altitude réelle lissée (sans détail inventé), en mètres
   colorNoise(x: number, z: number): number; // variation douce (-1..1) pour les couleurs du sol
 }
 
@@ -28,55 +29,81 @@ export interface Spawn {
   pitch: number; // inclinaison du regard (radians)
 }
 
-// Fabrique un terrain à partir d'une graine.
-export function createTerrain(seed: number): Terrain {
-  const coastNoise = new Noise2D(seed + 11); // forme de la côte
-  const hillNoise = new Noise2D(seed + 23); // collines
-  const ridgeNoise = new Noise2D(seed + 37); // crêtes des montagnes
-  const detailNoise = new Noise2D(seed + 51); // petits reliefs
+// La grille réelle est floue (cases de ~18 km) : près de la mer, les pentes sont trop douces pour faire une vraie côte.
+// On les redresse : sous 60 m d'altitude (ou de profondeur), l'altitude passe par une racine carrée, ce qui crée plages et falaises.
+const SHORE_RANGE = 60;
+const sharpenShore = (h: number): number => {
+  const a = Math.abs(h);
+  return a >= SHORE_RANGE ? h : Math.sign(h) * SHORE_RANGE * Math.sqrt(a / SHORE_RANGE);
+};
+
+// Fabrique un terrain à partir d'une graine et du relief réel.
+export function createTerrain(seed: number, relief: Relief): Terrain {
+  const hillNoise = new Noise2D(seed + 23); // grandes collines
+  const midNoise = new Noise2D(seed + 29); // collines moyennes
+  const smallNoise = new Noise2D(seed + 37); // bosses
+  const fineNoise = new Noise2D(seed + 51); // petites irrégularités
+  const ridgeNoise = new Noise2D(seed + 59); // crêtes des montagnes
+  const coastNoise = new Noise2D(seed + 11); // forme des côtes
   const colorN = new Noise2D(seed + 67); // variations de couleur
 
-  // Où passe la côte (x) pour un z donné : des caps et des baies à deux échelles.
-  const coastX = (z: number): number =>
-    260 * fbm(coastNoise, z * 0.0011, 0.37, 3) + // grandes baies (centaines de mètres)
-    70 * fbm(coastNoise, z * 0.006, 9.1, 2); // petits caps
+  // Altitude réelle lissée, redressée près de la mer.
+  const base = (x: number, z: number): number => {
+    const { lat, lon } = worldToLatLon(x, z);
+    return sharpenShore(relief.heightAt(lat, lon));
+  };
 
   const heightAt = (x: number, z: number): number => {
-    const d = x - coastX(z); // distance vers l'intérieur des terres (négatif = en mer)
+    const { lat, lon } = worldToLatLon(x, z);
+    const real = relief.heightAt(lat, lon); // altitude réelle (m)
+    const shaped = sharpenShore(real); // redressée près de la mer
+    const rough = relief.roughnessAt(lat, lon); // rugosité réelle (m) autour d'ici
 
-    if (d <= 0) {
-      // Fond marin : pente douce qui s'approfondit jusqu'à environ -60 m.
-      const base = -60 * (1 - Math.exp(d / 400)); // 0 à la côte, tend vers -60 au large
-      const ripple = 1.4 * fbm(detailNoise, x * 0.02, z * 0.02, 2) * smoothstep(0, 60, -d); // dunes sous l'eau
-      return base + ripple;
+    // Côtes : de petites ondulations déplacent la ligne de rivage (caps et baies), seulement près de l'eau.
+    const nearShore = 1 - smoothstep(30, 120, Math.abs(shaped));
+    const wobble = (12 * fbm(coastNoise, x / 2500, z / 2500, 3) + 4 * fbm(coastNoise, x / 400, z / 400, 2)) * nearShore;
+
+    if (shaped < 0) {
+      // Mer : dunes sous l'eau, de plus en plus marquées en s'éloignant de la côte.
+      const ripple = 1.2 * fbm(smallNoise, x / 60, z / 60, 2) * smoothstep(0, 40, -shaped);
+      return shaped + wobble + ripple;
     }
 
-    // Terre : on additionne plage, collines et montagnes, chacune avec son "masque" selon la distance à la côte.
-    const beach = 2.2 * smoothstep(0, 90, d); // plage qui monte à ~2 m
-    const hillMask = smoothstep(60, 500, d); // les collines apparaissent après la plage
-    const hills = fbm(hillNoise, x * 0.0035, z * 0.0035, 4) * 0.5 + 0.5; // 0..1
-    const mountainMask = smoothstep(450, 1700, d); // les montagnes montent à partir de ~500 m dans les terres
-    const massif = fbm(ridgeNoise, x * 0.0008, z * 0.0008, 3) * 0.5 + 0.5; // 0..1, relief ample et doux (pas de crêtes en lame)
-    const ridged = Math.pow(clamp(massif * 1.15 - 0.05, 0, 1), 2.2); // creuse les vallées, arrondit les sommets
-    const detailMask = smoothstep(30, 200, d); // pas de bosses sur la plage
-    const detail =
-      (fbm(detailNoise, x * 0.03, z * 0.03, 3) * 1.2 + // bosses de quelques mètres
-        fbm(detailNoise, x * 0.12, z * 0.12, 2) * 0.25) * // petites irrégularités
-      detailMask;
-    return beach + hillMask * hills * 45 + mountainMask * (ridged * 460 + hills * 50) + detail;
+    // Terre : l'amplitude du détail suit la rugosité réelle. Chaque couche est plus fine et plus faible que la précédente.
+    const amp = clamp(8 + 0.3 * rough, 8, 420);
+    const land = smoothstep(0, 40, shaped); // pas de relief inventé sur la plage
+    let detail =
+      amp * (0.5 * fbm(hillNoise, x / 5000, z / 5000, 3) + 0.22 * fbm(midNoise, x / 900, z / 900, 3) + 0.07 * fbm(smallNoise, x / 150, z / 150, 2)) +
+      Math.min(amp * 0.02, 2) * fbm(fineNoise, x / 25, z / 25, 2); // bosses de quelques mètres
+    // Montagnes : des crêtes plus nettes là où le relief réel est haut.
+    const mountains = smoothstep(600, 1800, real);
+    if (mountains > 0) detail += mountains * rough * 0.25 * (1 - Math.abs(fbm(ridgeNoise, x / 1800, z / 1800, 3)) - 0.5);
+    return shaped + wobble + detail * land;
   };
+
+  const realHeightAt = (x: number, z: number): number => base(x, z);
 
   const colorNoise = (x: number, z: number): number =>
     fbm(colorN, x * 0.045, z * 0.045, 3) * 0.7 + fbm(colorN, x * 0.5, z * 0.5, 1) * 0.3; // taches larges + grain fin
 
-  return { seed, heightAt, coastX, colorNoise };
+  return { seed, heightAt, realHeightAt, colorNoise };
 }
 
-// Trouve un point de départ agréable : sur la plage, face à l'océan.
+// Trouve un point de départ agréable : sur la terre ferme, juste derrière la plage, face à la mer.
+// Depuis Lannion on marche vers le nord jusqu'à la première eau, puis on se place à quelques dizaines de mètres en retrait.
 export function findSpawn(terrain: Terrain): Spawn {
-  const z = 0; // on commence à z = 0
-  const x = terrain.coastX(z) + 160; // 160 m à l'intérieur des terres : sur l'herbe, au-dessus de la plage
-  return { x, z, yaw: Math.PI / 2, pitch: 0.04 }; // on regarde vers l'ouest (l'océan), un peu vers le ciel
+  const step = 25; // pas de recherche, en mètres
+  const limit = 80000; // on cherche sur 80 km au plus
+  let z = 0;
+  if (terrain.heightAt(0, 0) < 1) {
+    // Départ déjà dans l'eau (cas improbable) : on cherche la terre vers le sud.
+    while (z < limit && terrain.heightAt(0, z) < 3) z += step;
+    return { x: 0, z: z + 100, yaw: 0, pitch: 0.04 };
+  }
+  while (z > -limit && terrain.heightAt(0, z) > -1) z -= step; // vers le nord (−z) jusqu'à la mer
+  let best = z + 120; // 120 m en retrait de l'eau
+  for (let k = 0; k < 40 && (terrain.heightAt(0, best) < 2.5 || slopeAt(terrain, 0, best) > 0.3); k++) best += step; // un peu plus loin si c'est trop pentu ou trop bas
+  return { x: 0, z: best, yaw: 0, pitch: 0.04 }; // on regarde vers le nord, la mer
 }
 
 // Pente du terrain (0 = plat, 1 = 45°) estimée autour d'un point.

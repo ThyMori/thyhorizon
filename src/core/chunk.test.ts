@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { CHUNK_SIZE, LOD_CELLS, buildChunk, chunkKey, lodForDistance } from './chunk';
 import { hashSeed } from './noise';
 import { createTerrain } from './terrain';
+import { loadRealRelief } from './relief.testutil';
 
-const terrain = createTerrain(hashSeed('horizon'));
+const terrain = createTerrain(hashSeed('horizon'), loadRealRelief());
 
 describe('lodForDistance', () => {
   it('donne un détail décroissant avec la distance', () => {

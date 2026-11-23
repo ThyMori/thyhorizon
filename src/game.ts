@@ -8,6 +8,8 @@ import { Settings, sanitizeSettings } from './core/settings';
 import { START_LAT, dayOfYearFromDate, wrapDay } from './core/geo';
 import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
+import { createRelief } from './core/relief';
+import type { ReliefGrid } from './core/relief';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
 import { TouchUi } from './player/touchUi';
@@ -54,12 +56,12 @@ export class Game {
   private fpsFrames = 0; // images comptées depuis la dernière mise à jour du compteur
   private fpsTime = 0; // temps écoulé depuis la dernière mise à jour du compteur
 
-  constructor() {
+  constructor(reliefGrid: ReliefGrid) {
     this.settings = sanitizeSettings(loadJson(SETTINGS_KEY)); // réglages sûrs, même si le stockage est abîmé
     const rawSave = loadJson(SAVE_KEY);
     this.seedText = readSavedSeed(rawSave);
     const seed = hashSeed(this.seedText);
-    this.terrain = createTerrain(seed);
+    this.terrain = createTerrain(seed, createRelief(reliefGrid)); // le vrai relief de la Terre + un détail inventé
     const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
     this.day = save.day;
@@ -68,7 +70,7 @@ export class Game {
     this.gs = new GameScene(byId('stage')); // peut lever une erreur si WebGL est indisponible : main.ts l'affiche
     this.gs.applySettings(this.settings);
     this.gs.resize();
-    this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, seed, (message) =>
+    this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, seed, reliefGrid, (message) =>
       toast(`Le terrain a rencontré un problème (${message}). Si des trous apparaissent, recharge la page.`, 'error'),
     );
     this.applyOrigin(); // le rendu (tuiles, grain du sol, vagues) apprend où est l'origine
@@ -356,7 +358,7 @@ export class Game {
 
   private saveNow(): void {
     const data: SaveData = {
-      version: 1,
+      version: 2,
       seed: this.seedText,
       x: this.controls.x,
       z: this.controls.z,

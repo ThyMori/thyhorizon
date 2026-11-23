@@ -33,6 +33,10 @@ Format x.y.z (z = correction, y = fonction, x = majeur). Ne JAMAIS éditer à la
 ## Avant chaque livraison
 `npm test`, `npm run build` (inclut tsc), bump, commit, push sur main. Fin de livraison : version, Supabase (non), testé / non testé, choix à corriger, comment tester.
 
+## PWA
+- `public/sw.js` (réseau d'abord, repli cache) : sa constante `VERSION` est gérée par `npm run bump`, ne pas l'éditer. Une nouvelle icône ou un fichier à garder hors ligne s'ajoute à la liste `SHELL` du service worker (le reste est mis en cache à l'usage).
+- Logique pure : `src/core/install.ts` (invitation, report 7 jours, 3 fois) ; `src/pwa/` : service worker, bandeau, invitation. Inactif avec `npm run dev`.
+
 ## Particularités
 - Le contrôle visuel se fait avec Chrome sans GPU (SwiftShader, ~10 i/s) : non représentatif des performances.
 - `?debug` dans l'URL expose `window.__thy` (téléportation, heure, stats).

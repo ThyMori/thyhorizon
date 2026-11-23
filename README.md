@@ -63,12 +63,21 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Le saut d'origine est invisible (comparaison image par image : 0 % de pixels différents).
 - Vérifié par tests jusqu'à 22 000 km (raccord exact du grain et des vagues) et en images à 3 000 km. Pas testé : un voyage réel d'une heure, ni une carte graphique réelle.
 
+### 1.4.0 — Application installable (PWA) : mise à jour et installation
+- **Bandeau « Nouvelle version disponible »** (`src/pwa/updates.ts`, `src/pwa/pwa.ts`) : le jeu cherche une nouvelle version à l'ouverture, au retour sur l'onglet et toutes les 30 min. Rien ne se recharge tout seul : bouton **Mettre à jour** (ou ✕ pour plus tard). Pendant qu'on joue, le bandeau est caché et un message discret prévient.
+- **Invitation à installer** sur l'écran d'accueil (`src/pwa/install.ts`, règles pures dans `src/core/install.ts`) : « Plus tard » la reporte d'une semaine, trois fois au plus ; elle disparaît une fois installé. Bouton « Installer l'application » dans le menu, guide par appareil (ordinateur Chrome/Edge, Android, iPhone/iPad, Safari Mac, Firefox).
+- Bouton **À jour ? Recharger** dans le menu (cherche la dernière version puis recharge).
+- `public/sw.js` : service worker « réseau d'abord » (dernière version si en ligne, copie en cache hors ligne). Sa version est mise à jour par `npm run bump`. Il n'est pas actif avec `npm run dev`, seulement sur la version construite/en ligne.
+- Icônes PNG + ICO + SVG (`public/icons/`), `public/manifest.webmanifest`.
+- Pas testé : l'invite d'installation réelle de ton navigateur, l'installation sur ton Android, et l'arrivée réelle d'une mise à jour (elle se verra à la publication de la version suivante).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
 ## Dépannage
 - Écran de secours après 8 s : « Réinitialiser et recharger » (garde tes sauvegardes).
 - Saccades : choisis le préréglage « Éco » dans Réglages.
+- Le jeu ne se met pas à jour : menu → « À jour ? Recharger ». Si ça bloque, « Réinitialiser et recharger ».
 - La souris ne se capture pas : clique dans la fenêtre du jeu ; Échap libère la souris.
 
 ## Feuille de route

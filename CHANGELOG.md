@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.4.0 — 2026-11-23
+
+Application installable (PWA) : bandeau de mise à jour, invitation à installer, icônes, hors ligne
+
 ## 1.3.1 — 2026-11-23
 
 Origine flottante : le rendu est exprimé relativement à l'origine (tuiles, caméra, grain du sol, vagues, ombres), pour voyager à des milliers de kilomètres sans défaut d'image.

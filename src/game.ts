@@ -15,6 +15,8 @@ import { SAVE_KEY, SETTINGS_KEY, loadJson, saveJson } from './storage';
 import { byId } from './ui/dom';
 import { anyDialogOpen, bindDialog, openDialog } from './ui/dialogs';
 import { Hud } from './ui/hud';
+import { initInstall } from './pwa/install';
+import { initPwa } from './pwa/pwa';
 import { SettingsPanel } from './ui/settingsPanel';
 import { toast } from './ui/toast';
 import { ChunkManager } from './world/chunkManager';
@@ -35,6 +37,7 @@ export class Game {
   private readonly pause = byId('pause');
   private readonly settingsDialog = byId<HTMLDialogElement>('dialog-settings');
   private readonly helpDialog = byId<HTMLDialogElement>('dialog-help');
+  private readonly installDialog = byId<HTMLDialogElement>('dialog-install');
   private readonly settingsPanel: SettingsPanel;
   private started = false; // a-t-on déjà joué depuis l'ouverture ? (change le texte du bouton)
   private lastUnlock = 0; // instant de la dernière libération de la souris
@@ -156,6 +159,9 @@ export class Game {
     byId('btn-reset').addEventListener('click', () => byId('rescue-reset').click()); // réutilise la remise à zéro de l'écran de secours
     bindDialog(this.settingsDialog, () => this.onDialogClosed());
     bindDialog(this.helpDialog, () => this.onDialogClosed());
+    bindDialog(this.installDialog, () => this.onDialogClosed());
+    initInstall({ openGuide: () => this.openInstallGuide(), closeGuide: () => this.installDialog.close() }); // invitation et guide d'installation
+    initPwa({ isPlaying: () => this.controls.locked }); // service worker et bandeau de mise à jour
     this.gs.renderer.domElement.addEventListener('click', () => {
       if (!this.controls.locked && !anyDialogOpen() && this.pause.hidden) this.resume(); // clic direct sur le monde (invitation affichée)
     });
@@ -244,6 +250,13 @@ export class Game {
     if (this.controls.locked) document.exitPointerLock(); // l'aide se lit à la souris
     this.hidePause();
     openDialog(this.helpDialog);
+  }
+
+  // Ouvre le guide d'installation (même logique que l'aide).
+  private openInstallGuide(): void {
+    if (this.controls.locked) document.exitPointerLock();
+    this.hidePause();
+    openDialog(this.installDialog);
   }
 
   private onDialogClosed(): void {

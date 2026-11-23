@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { CHUNK_SIZE, ChunkData, chunkKey, lodForDistance } from '../core/chunk';
+import { NO_ORIGIN, Origin } from '../core/origin';
 import type { WorkerRequest, WorkerResponse } from './chunkWorker';
 
 // Une tuile connue du gestionnaire.
@@ -37,6 +38,7 @@ export class ChunkManager {
   private lastCz = Number.NaN; // dernière tuile du joueur en z
   private lastRadius = -1; // dernier rayon demandé
   private errorReported = false; // l'erreur a-t-elle déjà été signalée ?
+  private origin: Origin = NO_ORIGIN; // origine flottante : les objets 3D sont placés relativement à elle
 
   constructor(
     private readonly scene: THREE.Scene, // la scène où ajouter les tuiles
@@ -54,6 +56,21 @@ export class ChunkManager {
       this.workers.push(worker);
     }
     this.maxInflight = count * 2; // chaque ouvrier a une file de 2 tuiles
+  }
+
+  // Change l'origine flottante et replace d'un coup toutes les tuiles déjà affichées (leurs positions sont relatives à l'origine).
+  setOrigin(origin: Origin): void {
+    this.origin = origin;
+    for (const e of this.entries.values()) {
+      if (!e.mesh) continue; // pas encore affichée
+      this.placeMesh(e.mesh, e.cx, e.cz); // nouvelle position relative
+    }
+  }
+
+  // Place une tuile dans la scène : position du monde moins l'origine (petit nombre, précis pour la carte graphique).
+  private placeMesh(mesh: THREE.Mesh, cx: number, cz: number): void {
+    mesh.position.set(cx * CHUNK_SIZE - this.origin.x, 0, cz * CHUNK_SIZE - this.origin.z);
+    mesh.updateMatrix(); // la tuile ne bouge pas seule : on recalcule sa matrice à la main
   }
 
   // Appelé à chaque image : met à jour les tuiles voulues, lance les calculs, affiche celles qui sont prêtes.
@@ -182,9 +199,8 @@ export class ChunkManager {
     const hy = (d.maxY - d.minY) / 2; // demi-hauteur
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(half, (d.minY + d.maxY) / 2, half), Math.sqrt(2 * half * half + hy * hy) + 1); // sphère englobante (évite un calcul coûteux)
     const mesh = new THREE.Mesh(g, this.material);
-    mesh.position.set(d.cx * CHUNK_SIZE, 0, d.cz * CHUNK_SIZE); // placé dans le monde
-    mesh.matrixAutoUpdate = false; // la tuile ne bouge jamais
-    mesh.updateMatrix();
+    this.placeMesh(mesh, d.cx, d.cz); // placée dans le monde (relativement à l'origine flottante)
+    mesh.matrixAutoUpdate = false; // la tuile ne bouge jamais seule
     mesh.castShadow = d.lod <= 1; // seules les tuiles proches projettent des ombres
     mesh.receiveShadow = true; // toutes en reçoivent
     return mesh;

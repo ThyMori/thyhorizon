@@ -20,6 +20,9 @@ Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousi
 ## Données
 - `src/data/stars.json` : catalogue d'étoiles réel (généré par `scripts/build-stars.mjs`, licence dans `src/data/STARS-LICENSE.txt`). Ne pas modifier à la main.
 
+## Rendu et grandes coordonnées
+Ne jamais envoyer une coordonnée du monde à la carte graphique (shader, position d'objet, caméra) : tout est relatif à l'origine flottante (`Game.origin`, `core/origin.ts`). Un shader qui a besoin de la position dans le monde (bruit, vagues) reçoit un décalage calculé en JavaScript (`grainShift`, `wavePhase`).
+
 ## Vocabulaire
 - **Tuile (chunk)** : carré de terrain de 64 m. **LOD** : niveau de détail d'une tuile selon sa distance.
 - **Refuge** : l'ambiance visée (calme, aucune pression).

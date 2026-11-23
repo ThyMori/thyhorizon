@@ -56,6 +56,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Régénérer le fichier : `node scripts/build-stars.mjs chemin/vers/stars.6.json` (source : paquet npm `d3-celestial`, licence BSD-3 dans `src/data/STARS-LICENSE.txt`).
 - Pas encore : Voie lactée, planètes, phases et vraie position de la lune, scintillement.
 
+### 1.3.1 — Origine flottante (voyager loin sans défaut d'image)
+- Le rendu n'utilise plus de grandes coordonnées : tout ce qui est envoyé à la carte graphique (tuiles, caméra, ciel, ombres, grain du sol, vagues) est exprimé par rapport à une **origine** qui saute sous le joueur par pas de 1 024 m dès qu'il s'en éloigne de plus de 1 536 m (`src/core/origin.ts`).
+- Les positions du monde, le terrain et la sauvegarde restent inchangés (double précision).
+- Constaté avant correction à 3 000 km de l'origine : grain du sol en bandes pixélisées, ombres du soleil cassées (sol sombre), vagues rayées. Après : identique à ce qu'on voit près de l'origine.
+- Le saut d'origine est invisible (comparaison image par image : 0 % de pixels différents).
+- Vérifié par tests jusqu'à 22 000 km (raccord exact du grain et des vagues) et en images à 3 000 km. Pas testé : un voyage réel d'une heure, ni une carte graphique réelle.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -67,7 +74,7 @@ Sans objet : jeu local, sans compte ni serveur.
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
-2. Déplacement de l'origine du rendu (voyager loin sans tremblement)
+2. ✅ Déplacement de l'origine du rendu (voyager loin sans défaut d'image) (1.3.1)
 3. Carte réelle de relief et d'océans à basse résolution, détail inventé par-dessus
 4. Biomes (climat → couleurs, végétation, neige, désert, glace)
 5. Voyage par coordonnées (téléportation) et carte du monde

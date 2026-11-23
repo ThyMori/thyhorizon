@@ -64,7 +64,7 @@ export class PlayerControls {
   }
 
   // Avance le joueur d'un pas de temps et place la caméra.
-  update(dt: number, camera: THREE.PerspectiveCamera): void {
+  update(dt: number, camera: THREE.PerspectiveCamera, originX = 0, originZ = 0): void {
     this.blockedCooldown = Math.max(0, this.blockedCooldown - dt);
     if (this.locked) {
       const input: MoveInput = {
@@ -93,7 +93,7 @@ export class PlayerControls {
       const target = this.terrain.heightAt(this.x, this.z) + EYE_HEIGHT; // hauteur des yeux voulue
       this.y = this.y > target ? smoothTo(this.y, target, 5, dt) : smoothTo(this.y, target, 14, dt); // descente douce, relief suivi vite
     }
-    camera.position.set(this.x, this.y, this.z);
+    camera.position.set(this.x - originX, this.y, this.z - originZ); // la caméra est placée relativement à l'origine flottante
     camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ'); // d'abord le cap, puis l'inclinaison
   }
 

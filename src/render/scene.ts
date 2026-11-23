@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE } from '../core/chunk';
 import { lerpRgb } from '../core/math';
+import { GRAIN_FREQUENCIES, GRAIN_PERIOD, Origin, grainShift } from '../core/origin';
 import type { Settings } from '../core/settings';
 import type { SunState } from '../core/sun';
 import { Ocean } from './ocean';
@@ -14,10 +15,17 @@ const FOG_DENSITY_FACTOR = 2; // densité de brume ≈ 2 / distance d'affichage 
 const LIGHT_SCALE = Math.PI; // Three.js divise l'éclairage diffus par π : on le compense pour que les valeurs de sun.ts restent lisibles
 const NIGHT_FILL: [number, number, number] = [0.3, 0.4, 0.7]; // teinte bleutée de la lumière ambiante la nuit
 
+// Écrit un nombre pour le GLSL (toujours avec un point décimal).
+const glsl = (v: number): string => (Number.isInteger(v) ? v.toFixed(1) : String(v));
+
 // Bruit de valeur à trois échelles (≈ 1 m, 20 cm, 6 cm). Les échelles fines s'estompent avec la distance pour ne pas grésiller.
+// Les positions reçues sont relatives à l'origine flottante : chaque échelle ajoute son décalage (uShiftA/B/C) pour retrouver le motif du monde.
 const GROUND_NOISE = /* glsl */ `
+uniform vec2 uShiftA; // décalage du bruit pour la grande échelle
+uniform vec2 uShiftB; // décalage pour l'échelle moyenne
+uniform vec2 uShiftC; // décalage pour l'échelle fine
 float gHash(vec2 p) { // nombre pseudo-aléatoire stable pour une case entière
-  p = mod(p, 512.0); // on boucle pour garder de la précision loin de l'origine
+  p = mod(p, ${glsl(GRAIN_PERIOD)}); // on boucle pour garder de la précision loin de l'origine
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
   return fract(p.x * p.y);
@@ -29,9 +37,9 @@ float gNoise(vec2 p) { // bruit de valeur lissé
   return mix(mix(gHash(i), gHash(i + vec2(1.0, 0.0)), f.x), mix(gHash(i + vec2(0.0, 1.0)), gHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 float groundGrain(vec3 wp, float dist) { // facteur de luminosité du sol (autour de 1)
-  float coarse = gNoise(wp.xz * 1.1); // grandes taches
-  float mid = gNoise(wp.xz * 4.3) * (1.0 - smoothstep(60.0, 220.0, dist)); // brins groupés, visibles de près
-  float fine = gNoise(wp.xz * 15.0) * (1.0 - smoothstep(20.0, 90.0, dist)); // grain fin, tout près
+  float coarse = gNoise(wp.xz * ${glsl(GRAIN_FREQUENCIES[0])} + uShiftA); // grandes taches
+  float mid = gNoise(wp.xz * ${glsl(GRAIN_FREQUENCIES[1])} + uShiftB) * (1.0 - smoothstep(60.0, 220.0, dist)); // brins groupés, visibles de près
+  float fine = gNoise(wp.xz * ${glsl(GRAIN_FREQUENCIES[2])} + uShiftC) * (1.0 - smoothstep(20.0, 90.0, dist)); // grain fin, tout près
   return 0.80 + 0.40 * (coarse * 0.5 + mid * 0.3 + fine * 0.2);
 }
 `;
@@ -52,6 +60,7 @@ export class GameScene {
   private readonly tmpRight = new THREE.Vector3();
   private readonly tmpUp = new THREE.Vector3();
   private readonly tmpTarget = new THREE.Vector3();
+  private readonly grainUniforms = [new THREE.Uniform(new THREE.Vector2()), new THREE.Uniform(new THREE.Vector2()), new THREE.Uniform(new THREE.Vector2())]; // décalages du grain (uShiftA/B/C)
   private shadowSize = 0; // taille actuelle de la carte d'ombres
   private radiusMeters = 800; // distance d'affichage en mètres
 
@@ -82,6 +91,9 @@ export class GameScene {
     });
     // Grain du sol : un bruit calculé dans le shader module la couleur (herbe, sable) sans aucune texture à charger.
     this.terrainMaterial.onBeforeCompile = (shader) => {
+      shader.uniforms.uShiftA = this.grainUniforms[0]!; // les décalages sont partagés avec le jeu (mis à jour à chaque déplacement de l'origine)
+      shader.uniforms.uShiftB = this.grainUniforms[1]!;
+      shader.uniforms.uShiftC = this.grainUniforms[2]!;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vGroundPos;') // position monde transmise au fragment
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
@@ -112,6 +124,12 @@ export class GameScene {
     this.radiusMeters = settings.viewDistance * CHUNK_SIZE; // distance d'affichage
     this.ocean.setRadius(this.radiusMeters * 1.05); // l'eau déborde un peu pour que l'horizon soit propre
     this.fog.density = FOG_DENSITY_FACTOR / this.radiusMeters;
+  }
+
+  // Indique au rendu où est l'origine flottante : le grain du sol et les vagues retrouvent ainsi leur place dans le monde.
+  setOrigin(origin: Origin): void {
+    this.grainUniforms.forEach((u, i) => (u.value as THREE.Vector2).set(...grainShift(origin, GRAIN_FREQUENCIES[i]!))); // un décalage par échelle de bruit
+    this.ocean.setOrigin(origin); // et déphasage des vagues
   }
 
   // À appeler quand la fenêtre change de taille.

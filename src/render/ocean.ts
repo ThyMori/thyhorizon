@@ -3,24 +3,39 @@
 // L'eau est légèrement transparente : le fond marin, teinté de bleu dans ses couleurs, donne la profondeur.
 
 import * as THREE from 'three';
+import { Origin, NO_ORIGIN, wavePhase } from '../core/origin';
 import { buildPolarGrid } from '../core/polar';
 import type { SunState } from '../core/sun';
 import { toColor } from './sky';
 
 // Vagues : somme de sinusoïdes dans des directions différentes (houle large + petites rides).
+// Chaque vague : direction (dx, dz), nombre d'onde k (rad/m), vitesse w (rad/s), amplitude (m).
+const WAVE_DEFS = [
+  { dx: 0.8, dz: 0.6, k: 0.09, w: 0.9, amp: 0.35 }, // houle principale (~70 m)
+  { dx: -0.55, dz: 0.83, k: 0.14, w: 1.2, amp: 0.22 },
+  { dx: 0.95, dz: -0.31, k: 0.26, w: 1.6, amp: 0.12 },
+  { dx: -0.2, dz: -0.98, k: 0.47, w: 2.1, amp: 0.07 },
+  { dx: 0.6, dz: -0.8, k: 0.9, w: 2.9, amp: 0.035 },
+  { dx: 0.3, dz: 0.95, k: 1.7, w: 3.7, amp: 0.018 }, // petites rides
+] as const;
+const LOW_WAVES = 3; // les trois premières déforment la surface ; toutes servent au calcul des reflets
+
+// Texte GLSL d'une somme de vagues. Les positions sont relatives à l'origine flottante : uPh[i] rend à chaque vague sa phase dans le monde.
+const waveSum = (count: number): string =>
+  WAVE_DEFS.slice(0, count)
+    .map((d, i) => `  h += ${d.amp} * sin(dot(p, vec2(${d.dx.toFixed(2)}, ${d.dz.toFixed(2)})) * ${d.k} + t * ${d.w} + uPh[${i}]);`)
+    .join('\n');
+
 const WAVES = /* glsl */ `
+uniform float uPh[${WAVE_DEFS.length}]; // déphasage de chaque vague (origine flottante)
 float waveLow(vec2 p, float t) { // vagues larges, utilisées pour déformer la surface
   float h = 0.0;
-  h += 0.35 * sin(dot(p, vec2( 0.80, 0.60)) * 0.090 + t * 0.90); // houle principale (~70 m)
-  h += 0.22 * sin(dot(p, vec2(-0.55, 0.83)) * 0.140 + t * 1.20);
-  h += 0.12 * sin(dot(p, vec2( 0.95, -0.31)) * 0.260 + t * 1.60);
+${waveSum(LOW_WAVES)}
   return h;
 }
 float waveFull(vec2 p, float t) { // toutes les vagues, utilisées pour calculer les reflets
-  float h = waveLow(p, t);
-  h += 0.07  * sin(dot(p, vec2(-0.20, -0.98)) * 0.470 + t * 2.10);
-  h += 0.035 * sin(dot(p, vec2( 0.60, -0.80)) * 0.900 + t * 2.90);
-  h += 0.018 * sin(dot(p, vec2( 0.30,  0.95)) * 1.700 + t * 3.70); // petites rides
+  float h = 0.0;
+${waveSum(WAVE_DEFS.length)}
   return h;
 }
 `;
@@ -100,6 +115,7 @@ export class Ocean {
           uSunVis: { value: 1 },
           uDaylight: { value: 1 },
           uWater: { value: toColor([0.05, 0.27, 0.3]) }, // vert-bleu de l'Atlantique
+          uPh: { value: WAVE_DEFS.map(() => 0) }, // déphasages des vagues (mis à jour par setOrigin)
         },
       ]),
       fog: true, // l'eau se fond dans la brume
@@ -109,6 +125,11 @@ export class Ocean {
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.mesh.frustumCulled = false; // toujours dessiné (il suit la caméra)
     this.mesh.renderOrder = 10; // dessiné après le terrain opaque
+  }
+
+  // Recalcule le déphasage des vagues quand l'origine flottante change : la mer garde sa forme dans le monde.
+  setOrigin(origin: Origin = NO_ORIGIN): void {
+    this.material.uniforms.uPh!.value = WAVE_DEFS.map((d) => wavePhase(origin, d.dx, d.dz, d.k));
   }
 
   // Rayon du disque d'eau en mètres (au moins la distance d'affichage).

@@ -13,6 +13,7 @@ declare global {
       teleport(x: number, z: number, yaw: number, pitch: number, fly?: boolean, y?: number): void;
       setHours(hours: number): void;
       setDay(day: number): void; // change le jour de l'année (1 à 365)
+      origin(): { x: number; z: number; camera: number[] }; // origine flottante et position de la caméra (pour vérifier)
       hideUi(): void;
       ready(): boolean;
       pending(): number;

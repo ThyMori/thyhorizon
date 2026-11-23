@@ -6,6 +6,7 @@ import { formatCount } from './core/format';
 import { hashSeed } from './core/noise';
 import { Settings, sanitizeSettings } from './core/settings';
 import { START_LAT, dayOfYearFromDate, wrapDay } from './core/geo';
+import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
@@ -24,6 +25,7 @@ export class Game {
   private settings: Settings; // réglages courants
   private hours: number; // heure solaire locale du jeu
   private day: number; // jour de l'année du jeu (1 à 365)
+  private origin: Origin; // origine flottante du rendu (voir core/origin.ts)
   private readonly seedText: string; // graine du monde (texte)
   private readonly terrain: Terrain;
   private readonly gs: GameScene;
@@ -51,6 +53,7 @@ export class Game {
     const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
     this.day = save.day;
+    this.origin = snapOrigin(save.x, save.z); // le rendu démarre près du joueur
 
     this.gs = new GameScene(byId('stage')); // peut lever une erreur si WebGL est indisponible : main.ts l'affiche
     this.gs.applySettings(this.settings);
@@ -58,6 +61,7 @@ export class Game {
     this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, seed, (message) =>
       toast(`Le terrain a rencontré un problème (${message}). Si des trous apparaissent, recharge la page.`, 'error'),
     );
+    this.applyOrigin(); // le rendu (tuiles, grain du sol, vagues) apprend où est l'origine
     this.controls = new PlayerControls(this.gs.renderer.domElement, this.terrain, save);
     this.controls.sensitivity = this.settings.mouseSensitivity;
     this.hud.setFpsVisible(this.settings.showFps);
@@ -95,7 +99,12 @@ export class Game {
       this.hours = wrapHours(this.hours + (dt * 24) / (this.settings.dayLengthMinutes * 60)); // le temps ne passe que quand on joue
       if (this.settings.daysPass && this.hours < before) this.day = wrapDay(this.day + 1); // minuit passé : le calendrier avance d'un jour
     }
-    this.controls.update(dt, this.gs.camera);
+    const origin = updateOrigin(this.origin, this.controls.x, this.controls.z); // le joueur s'est-il trop éloigné de l'origine ?
+    if (origin !== this.origin) {
+      this.origin = origin; // oui : l'origine saute sous le joueur (invisible, tout est replacé d'un coup)
+      this.applyOrigin();
+    }
+    this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
     this.gs.updateEnvironment(sunState(this.hours, START_LAT, this.day), now / 1000);
     this.gs.render();
@@ -103,6 +112,12 @@ export class Game {
     this.updateLoading();
     window.__thyReady = true; // le jeu a dessiné une image : l'écran de secours ne se déclenchera pas
   };
+
+  // Transmet l'origine flottante à tout ce qui est dessiné.
+  private applyOrigin(): void {
+    this.chunks.setOrigin(this.origin);
+    this.gs.setOrigin(this.origin);
+  }
 
   // Compteur d'images par seconde, rafraîchi deux fois par seconde.
   private updateFps(dt: number): void {
@@ -286,6 +301,7 @@ export class Game {
       },
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),
       pending: () => this.chunks.stats().pending,
+      origin: () => ({ x: this.origin.x, z: this.origin.z, camera: [this.gs.camera.position.x, this.gs.camera.position.y, this.gs.camera.position.z] }),
       stats: () => ({ ...this.chunks.stats(), triangles: this.gs.renderer.info.render.triangles, calls: this.gs.renderer.info.render.calls }),
     };
   }

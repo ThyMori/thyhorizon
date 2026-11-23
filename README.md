@@ -65,4 +65,6 @@ Sans objet : jeu local, sans compte ni serveur.
 4. Biomes (climat → couleurs, végétation, neige, désert, glace)
 5. Voyage par coordonnées (téléportation) et carte du monde
 
-**Ensuite** : Bateau à voile · Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son · 6. Mise en ligne possible sur fait en 1.0.2 : horizon.thierry-morin.com.
+**Ensuite** : Bateau à voile · Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
+
+En ligne : https://horizon.thierry-morin.com (depuis 1.0.2).

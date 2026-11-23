@@ -1,0 +1,75 @@
+// Panneau de réglages : relie les champs de la fenêtre aux réglages du jeu.
+// Chaque changement s'applique tout de suite (on voit le résultat derrière le panneau).
+
+import { CHUNK_SIZE } from '../core/chunk';
+import { formatDistance, formatHours } from '../core/format';
+import { Quality, Settings, applyPreset, detectQuality } from '../core/settings';
+import { byId } from './dom';
+
+// Ce que le panneau a besoin de savoir faire avec le jeu.
+export interface SettingsBridge {
+  getSettings(): Settings; // réglages actuels
+  setSettings(next: Settings): void; // applique et enregistre de nouveaux réglages
+  getHours(): number; // heure du jeu
+  setHours(hours: number): void; // change l'heure du jeu
+}
+
+export class SettingsPanel {
+  private readonly quality = byId<HTMLSelectElement>('set-quality');
+  private readonly distance = byId<HTMLInputElement>('set-distance');
+  private readonly shadows = byId<HTMLInputElement>('set-shadows');
+  private readonly shadowSize = byId<HTMLSelectElement>('set-shadow-size');
+  private readonly resolution = byId<HTMLInputElement>('set-resolution');
+  private readonly fps = byId<HTMLInputElement>('set-fps');
+  private readonly hours = byId<HTMLInputElement>('set-hours');
+  private readonly dayLength = byId<HTMLSelectElement>('set-daylength');
+  private readonly sensitivity = byId<HTMLInputElement>('set-sensitivity');
+
+  constructor(private readonly bridge: SettingsBridge) {
+    // Un changement de qualité remplace d'un coup distance, ombres et netteté.
+    this.quality.addEventListener('change', () => this.apply(applyPreset(bridge.getSettings(), this.quality.value as Quality)));
+    // Les autres champs modifient un réglage ; si le résultat ne correspond plus à un préréglage, la qualité devient « Personnalisée ».
+    this.distance.addEventListener('input', () => this.change({ viewDistance: Number(this.distance.value) }));
+    this.shadows.addEventListener('change', () => this.change({ shadows: this.shadows.checked }));
+    this.shadowSize.addEventListener('change', () => this.change({ shadowSize: Number(this.shadowSize.value) }));
+    this.resolution.addEventListener('input', () => this.change({ resolution: Number(this.resolution.value) / 100 }));
+    this.fps.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showFps: this.fps.checked }));
+    this.sensitivity.addEventListener('input', () => this.apply({ ...bridge.getSettings(), mouseSensitivity: Number(this.sensitivity.value) / 100 }));
+    this.dayLength.addEventListener('change', () => this.apply({ ...bridge.getSettings(), dayLengthMinutes: Number(this.dayLength.value) }));
+    this.hours.addEventListener('input', () => {
+      bridge.setHours(Number(this.hours.value)); // l'heure change tout de suite
+      this.sync();
+    });
+  }
+
+  // Remplit les champs avec les valeurs actuelles (à appeler à l'ouverture).
+  sync(): void {
+    const s = this.bridge.getSettings();
+    this.quality.value = s.quality;
+    this.distance.value = String(s.viewDistance);
+    byId('out-distance').textContent = formatDistance(s.viewDistance, CHUNK_SIZE);
+    this.shadows.checked = s.shadows;
+    this.shadowSize.value = String(s.shadowSize);
+    this.shadowSize.disabled = !s.shadows; // inutile sans ombres
+    this.resolution.value = String(Math.round(s.resolution * 100));
+    byId('out-resolution').textContent = `${Math.round(s.resolution * 100)} %`;
+    this.fps.checked = s.showFps;
+    this.dayLength.value = String(s.dayLengthMinutes);
+    this.sensitivity.value = String(Math.round(s.mouseSensitivity * 100));
+    byId('out-sensitivity').textContent = `${Math.round(s.mouseSensitivity * 100)} %`;
+    const h = this.bridge.getHours();
+    this.hours.value = String(h);
+    byId('out-hours').textContent = formatHours(h);
+  }
+
+  // Modifie un réglage de qualité et recalcule le préréglage correspondant.
+  private change(patch: Partial<Settings>): void {
+    const next = { ...this.bridge.getSettings(), ...patch };
+    this.apply({ ...next, quality: detectQuality(next) });
+  }
+
+  private apply(next: Settings): void {
+    this.bridge.setSettings(next);
+    this.sync();
+  }
+}

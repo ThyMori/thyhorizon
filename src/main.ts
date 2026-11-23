@@ -1,0 +1,34 @@
+// Point d'entrée : démarre le jeu, et signale clairement tout échec au démarrage.
+
+import './style.css';
+import { Game } from './game';
+import { toast } from './ui/toast';
+
+// Éléments ajoutés à « window » (par l'écran de secours de index.html et par les outils de développement).
+declare global {
+  interface Window {
+    __thyReady?: boolean; // vrai dès que la première image est dessinée
+    __thyFail?: (message: string) => void; // affiche l'écran de secours avec un message
+    __thy?: {
+      teleport(x: number, z: number, yaw: number, pitch: number, fly?: boolean, y?: number): void;
+      setHours(hours: number): void;
+      hideUi(): void;
+      ready(): boolean;
+      pending(): number;
+      stats(): { tiles: number; pending: number; triangles: number; calls: number };
+    };
+  }
+}
+
+try {
+  const game = new Game(); // peut échouer (WebGL absent, par exemple)
+  game.start();
+} catch (error) {
+  const reason = error instanceof Error ? error.message : String(error);
+  window.__thyFail?.(`Démarrage impossible : ${reason}. Vérifie que l'accélération graphique est activée dans ton navigateur.`);
+}
+
+// Une erreur imprévue pendant le jeu : un message clair plutôt qu'un écran figé sans explication.
+window.addEventListener('error', (event) => {
+  if (window.__thyReady) toast(`Une erreur est survenue (${event.message}). Si le jeu se comporte bizarrement, recharge la page.`, 'error');
+});

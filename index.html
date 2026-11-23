@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d0f12" />
+    <meta name="description" content="ThyHorizon : un refuge contemplatif en 3D." />
+    <title>ThyHorizon</title>
+    <!-- Icône provisoire : un soleil bas sur la mer (SVG intégré, aucun fichier à charger). -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230d0f12'/%3E%3Ccircle cx='32' cy='36' r='12' fill='%23e8a24a'/%3E%3Crect y='36' width='64' height='28' fill='%231f4a52'/%3E%3C/svg%3E" />
+  </head>
+  <body>
+    <!-- Le canvas 3D est ajouté ici par le jeu. -->
+    <div id="stage"></div>
+
+    <!-- Affichage tête haute : compteur, version, viseur, messages d'attente. -->
+    <div id="hud">
+      <div id="fps" aria-hidden="true"></div>
+      <div id="version-badge" aria-hidden="true"></div>
+      <div id="crosshair" aria-hidden="true"></div>
+      <div id="update-dot" hidden>update en cours</div>
+      <div id="loading" role="status">Le monde se forme…</div>
+      <button id="click-hint" type="button" hidden>Clique pour reprendre</button>
+    </div>
+
+    <!-- Un seul message à la fois, quelle que soit la page ouverte. -->
+    <div id="toast" role="status" aria-live="polite" hidden></div>
+
+    <!-- Menu pause (aussi l'écran d'accueil). -->
+    <section id="pause" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+      <div class="card">
+        <h1 id="pause-title">ThyHorizon</h1>
+        <p class="tagline">Un refuge au bord de l'océan.</p>
+        <div class="stack">
+          <button id="btn-resume" type="button" class="primary">Entrer dans le monde</button>
+          <button id="btn-settings" type="button">Réglages</button>
+          <button id="btn-help" type="button"><span class="icon-i" aria-hidden="true">i</span> Aide</button>
+          <button id="btn-reset" type="button" class="subtle">Réinitialiser et recharger</button>
+        </div>
+        <p class="hint">Échap : revenir ici &nbsp;·&nbsp; H : aide</p>
+        <p class="version" id="pause-version"></p>
+      </div>
+    </section>
+
+    <!-- Réglages : panneau latéral, pour voir le monde changer en direct pendant qu'on règle. -->
+    <dialog id="dialog-settings" aria-labelledby="settings-title">
+      <header>
+        <h2 id="settings-title" tabindex="-1">Réglages</h2>
+        <button type="button" class="close" data-close aria-label="Fermer les réglages">✕</button>
+      </header>
+
+      <fieldset>
+        <legend>Image</legend>
+        <label>Qualité
+          <select id="set-quality">
+            <option value="eco">Économe</option>
+            <option value="balanced">Équilibrée</option>
+            <option value="beautiful">Belle</option>
+            <option value="custom">Personnalisée</option>
+          </select>
+        </label>
+        <label>Distance d'affichage <output id="out-distance"></output>
+          <input id="set-distance" type="range" min="6" max="28" step="1" />
+        </label>
+        <label class="check"><input id="set-shadows" type="checkbox" /> Ombres du soleil</label>
+        <label>Finesse des ombres
+          <select id="set-shadow-size">
+            <option value="1024">Normale</option>
+            <option value="2048">Fine</option>
+          </select>
+        </label>
+        <label>Netteté de l'image <output id="out-resolution"></output>
+          <input id="set-resolution" type="range" min="50" max="100" step="5" />
+        </label>
+        <label class="check"><input id="set-fps" type="checkbox" /> Afficher les images par seconde</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Temps</legend>
+        <label>Heure du jour <output id="out-hours"></output>
+          <input id="set-hours" type="range" min="0" max="23.99" step="0.05" />
+        </label>
+        <label>Durée d'une journée
+          <select id="set-daylength">
+            <option value="0">Temps arrêté</option>
+            <option value="10">10 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">1 heure</option>
+            <option value="120">2 heures</option>
+          </select>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Souris</legend>
+        <label>Sensibilité <output id="out-sensitivity"></output>
+          <input id="set-sensitivity" type="range" min="50" max="200" step="5" />
+        </label>
+      </fieldset>
+
+      <p class="hint">Les réglages sont enregistrés automatiquement sur cet ordinateur.</p>
+    </dialog>
+
+    <!-- Aide intégrée. -->
+    <dialog id="dialog-help" aria-labelledby="help-title">
+      <header>
+        <h2 id="help-title" tabindex="-1">Aide</h2>
+        <button type="button" class="close" data-close aria-label="Fermer l'aide">✕</button>
+      </header>
+      <h3>Se déplacer</h3>
+      <ul>
+        <li><kbd>Z</kbd> <kbd>Q</kbd> <kbd>S</kbd> <kbd>D</kbd> (clavier AZERTY) ou les flèches : avancer, pas de côté, reculer.</li>
+        <li><kbd>Maj</kbd> : courir. La souris : regarder autour de soi.</li>
+        <li>L'eau profonde arrête la marche : pour aller sur la mer, il faudra un bateau (à venir).</li>
+      </ul>
+      <h3>Voler</h3>
+      <ul>
+        <li><kbd>V</kbd> : active ou coupe le vol libre. Dans ce mode, tu avances là où tu regardes.</li>
+        <li><kbd>Espace</kbd> monte, <kbd>C</kbd> descend, <kbd>Maj</kbd> va très vite. Pratique pour explorer.</li>
+      </ul>
+      <h3>Menu et réglages</h3>
+      <ul>
+        <li><kbd>Échap</kbd> : ouvre le menu (la partie est enregistrée toute seule). Dans une fenêtre, Échap la ferme.</li>
+        <li><kbd>H</kbd> : ouvre cette aide. Dans <strong>Réglages</strong>, l'<strong>Heure du jour</strong> te laisse choisir la lumière.</li>
+        <li>Si l'image saccade : dans <strong>Réglages</strong>, choisis la qualité <strong>Économe</strong> ou baisse la <strong>Distance d'affichage</strong>.</li>
+      </ul>
+      <h3>Le monde</h3>
+      <ul>
+        <li>Il est généré à partir d'une graine : il est infini et toujours le même. L'océan est à l'ouest, les montagnes à l'est.</li>
+        <li>Le jeu reprend là où tu t'étais arrêté : position, heure du jour et réglages.</li>
+      </ul>
+      <p class="version" id="help-version"></p>
+    </dialog>
+
+    <!-- Écran de secours : indépendant du jeu, il s'affiche si le jeu ne démarre pas en 8 secondes. -->
+    <section id="rescue" role="alertdialog" aria-labelledby="rescue-title" hidden>
+      <div class="card">
+        <h1 id="rescue-title">Le jeu n'a pas démarré</h1>
+        <p>Quelque chose a bloqué le démarrage. Voici ce que le navigateur a signalé :</p>
+        <pre id="rescue-details"></pre>
+        <p>« Réinitialiser et recharger » vide les fichiers en cache et relance le jeu. Ta sauvegarde est conservée.</p>
+        <button id="rescue-reset" type="button" class="primary">Réinitialiser et recharger</button>
+      </div>
+    </section>
+
+    <!-- Filet de sécurité : ce petit script n'est PAS dans le jeu, il tourne même si le jeu est cassé. -->
+    <script>
+      (function () {
+        var errors = []; // erreurs relevées pendant le démarrage
+        var rescue = document.getElementById('rescue'); // l'écran de secours
+        var details = document.getElementById('rescue-details'); // zone qui affiche les erreurs
+        function show() { // affiche l'écran de secours avec ce qu'on sait
+          details.textContent = errors.length ? errors.join('\n') : "Aucune erreur précise n'a été relevée (peut-être un chargement très lent).";
+          rescue.hidden = false;
+        }
+        window.addEventListener('error', function (e) { errors.push(e.message || String(e.error || e)); }); // erreurs de code
+        window.addEventListener('unhandledrejection', function (e) { errors.push(String(e.reason)); }); // promesses refusées
+        window.__thyFail = function (message) { errors.push(String(message)); if (!window.__thyReady) show(); }; // appelé par le jeu en cas d'échec fatal
+        window.setTimeout(function () { if (!window.__thyReady) show(); }, 8000); // 8 s sans démarrage : on affiche l'écran de secours
+        document.getElementById('rescue-reset').addEventListener('click', function () {
+          var jobs = []; // opérations de nettoyage
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            jobs.push(navigator.serviceWorker.getRegistrations().then(function (list) { return Promise.all(list.map(function (r) { return r.unregister(); })); })); // désinscrit les service workers
+          }
+          if (window.caches && caches.keys) {
+            jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); })); // vide les caches
+          }
+          Promise.all(jobs).catch(function () {}).then(function () {
+            location.replace(location.pathname + '?r=' + Date.now()); // recharge avec une adresse neuve (la sauvegarde, dans localStorage, est intacte)
+          });
+        });
+      })();
+    </script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

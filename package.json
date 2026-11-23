@@ -1,0 +1,25 @@
+{
+  "name": "thyhorizon",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ThyHorizon : un refuge contemplatif en 3D (monde procédural de type Pays basque, maison, voile, JDR solo).",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "bump": "node scripts/bump-version.mjs",
+    "version:check": "node scripts/bump-version.mjs --check"
+  },
+  "dependencies": {
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1"
+  }
+}

@@ -1,0 +1,18 @@
+# Dépendances installées par npm (se refont avec « npm install »)
+node_modules/
+
+# Résultat du build
+dist/
+
+# Fichiers temporaires et journaux
+*.log
+.DS_Store
+Thumbs.db
+
+# Éditeur : on garde les réglages de VS Code propres à l'utilisateur hors du dépôt
+.vscode/*
+!.vscode/extensions.json
+
+# Captures et fichiers de test locaux
+/tmp/
+/screenshots/

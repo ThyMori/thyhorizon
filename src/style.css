@@ -1,0 +1,424 @@
+/* Style de ThyHorizon : sombre et chaud, discret pour laisser la place au monde.
+   Toutes les couleurs sont des variables : on les change à un seul endroit. */
+
+:root {
+  --bg: #0d0f12; /* fond de page */
+  --panel: #151a20; /* fond des cartes et fenêtres */
+  --panel-2: #1d242c; /* fond des boutons */
+  --line: #2b343e; /* traits fins */
+  --text: #ecebe6; /* texte principal */
+  --muted: #9aa3ad; /* texte secondaire */
+  --accent: #e8a24a; /* ambre : la lumière */
+  --accent-text: #1a1206; /* texte sur fond ambre */
+  --danger: #e5484d; /* alerte rouge */
+  --ok: #4cb782; /* succès vert */
+  --shade: rgba(8, 10, 14, 0.6); /* voile derrière les menus */
+  --radius: 12px; /* arrondi des cartes */
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box; /* la taille inclut les marges intérieures */
+}
+
+/* L'attribut « hidden » doit toujours gagner, même contre un display défini plus bas. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden; /* pas de défilement de page */
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; /* 16 px minimum partout */
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  height: 100dvh; /* hauteur réelle de l'écran, jamais 100vh seul */
+}
+
+#stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Affichage tête haute ---------- */
+
+#hud {
+  position: fixed;
+  inset: 0;
+  pointer-events: none; /* le HUD ne bloque jamais la souris */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+#fps {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #d7e3d3;
+  font: 12px/1.3 ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+#version-badge {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+  display: none; /* visible seulement quand on joue */
+}
+
+body.is-playing #crosshair {
+  display: block;
+}
+
+#update-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(13, 15, 18, 0.55);
+  color: var(--text);
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+#click-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: auto; /* le seul élément du HUD qui reçoit le clic */
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(13, 15, 18, 0.75);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ---------- Messages ---------- */
+
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: min(92vw, 560px);
+  padding: 12px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+  z-index: 60; /* au-dessus des menus et des fenêtres */
+  animation: toast-in 0.25s ease-out;
+}
+
+#toast.error {
+  border-color: var(--danger);
+}
+
+#toast.success {
+  border-color: var(--ok);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ---------- Menu pause et écran de secours ---------- */
+
+#pause,
+#rescue {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--shade);
+  z-index: 40;
+}
+
+#rescue {
+  background: var(--bg);
+  z-index: 90; /* par-dessus tout */
+}
+
+.card {
+  width: min(92vw, 420px);
+  max-height: 92dvh;
+  overflow: auto;
+  padding: 28px 24px 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+#rescue .card {
+  width: min(92vw, 560px);
+}
+
+.card h1 {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.tagline {
+  margin: 4px 0 22px;
+  color: var(--muted);
+}
+
+.stack {
+  display: grid;
+  gap: 10px;
+}
+
+pre {
+  max-height: 30dvh;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #0a0c0f;
+  color: #e7b9b9;
+  font: 12px/1.4 ui-monospace, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+/* ---------- Boutons ---------- */
+
+button {
+  min-height: 44px; /* zone tactile confortable */
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #46525f;
+}
+
+button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 650;
+}
+
+button.subtle {
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-i {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font: italic 600 13px/1 Georgia, serif;
+}
+
+/* Contour de focus net pour la navigation au clavier. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.hint {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.version {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- Fenêtres (réglages, aide) ---------- */
+
+dialog {
+  margin: 0 0 0 auto; /* collée à droite : le monde reste visible à gauche */
+  width: min(100vw, 400px);
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 18px 20px calc(20px + env(safe-area-inset-bottom));
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  overflow-y: auto;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.25); /* voile léger : on voit la lumière changer en direct */
+}
+
+dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+dialog h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+dialog h2:focus {
+  outline: none; /* le titre reçoit le focus sans contour : il évite d'ouvrir un champ pour rien */
+}
+
+dialog h3 {
+  margin: 20px 0 6px;
+  font-size: 16px;
+  color: var(--accent);
+}
+
+dialog ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+dialog li {
+  margin: 6px 0;
+}
+
+.close {
+  width: 44px;
+  padding: 0;
+}
+
+fieldset {
+  margin: 14px 0 0;
+  padding: 10px 14px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+legend {
+  padding: 0 6px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+label {
+  display: block;
+  margin-top: 12px;
+}
+
+label.check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin-top: 4px;
+}
+
+output {
+  float: right;
+  color: var(--muted);
+}
+
+select,
+input[type='range'] {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  font: inherit; /* 16 px : pas de zoom automatique sur iPhone */
+}
+
+select {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+input[type='range'] {
+  min-height: 32px;
+  accent-color: var(--accent);
+}
+
+input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel-2);
+  font: 13px ui-monospace, Consolas, monospace;
+}
+
+/* Si l'appareil demande moins d'animations, on n'en fait aucune. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.12.1 — 2026-11-23
+
+Temps réel : l'heure solaire et la latitude du soleil suivent la position du joueur (nuit à Paris, jour à Sydney)
+
 ## 1.12.0 — 2026-11-23
 
 Arbres et forêts selon le climat réel

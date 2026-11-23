@@ -5,7 +5,7 @@ import { SaveData, readSavedSeed, sanitizeSave } from './core/save';
 import { formatCount } from './core/format';
 import { hashSeed } from './core/noise';
 import { Settings, sanitizeSettings } from './core/settings';
-import { START_LAT, dayOfYearFromDate, realSolarClock, wrapDay } from './core/geo';
+import { dayOfYearFromDate, realSolarClock, wrapDay } from './core/geo';
 import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
 import { createRelief } from './core/relief';
@@ -122,7 +122,7 @@ export class Game {
     this.last = now;
     this.elapsed += dt;
     if (this.settings.realTime) {
-      const clock = realSolarClock(new Date()); // vraie heure solaire locale et vraie date
+      const clock = realSolarClock(new Date(), worldToLatLon(this.controls.x, this.controls.z).lon); // vraie heure UTC → heure solaire là où tu te trouves (nuit à Paris, jour à Sydney)
       this.hours = clock.hours;
       this.day = clock.day;
     } else if (this.controls.locked && this.settings.dayLengthMinutes > 0) {
@@ -137,7 +137,7 @@ export class Game {
     }
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
-    this.gs.updateEnvironment(sunState(this.hours, START_LAT, this.day), now / 1000);
+    this.gs.updateEnvironment(sunState(this.hours, this.playerLat(), this.day), now / 1000); // le soleil dépend de la latitude du joueur
     this.gs.render();
     this.updateFps(dt);
     this.updateLoading();
@@ -190,7 +190,7 @@ export class Game {
       relief: this.relief,
       climate: realClimate,
       getPlayer: () => worldToLatLon(this.controls.x, this.controls.z),
-      getTime: () => ({ hours: this.hours, day: this.day }),
+      getTime: () => (this.settings.realTime ? realSolarClock(new Date()) : { hours: this.hours, day: this.day }), // en temps réel, la carte reçoit l'heure de Lannion (référence de l'ombre de nuit)
       onGo: (lat, lon) => this.travelToLatLon(lat, lon),
     });
     bindDialog(this.mapDialog, () => this.onDialogClosed());
@@ -241,11 +241,16 @@ export class Game {
     this.controls.onConstellationsKey = () => this.toggleConstellations();
   }
 
+  // Latitude actuelle du joueur, en degrés (sert au soleil : sa hauteur dépend du lieu).
+  private playerLat(): number {
+    return worldToLatLon(this.controls.x, this.controls.z).lat; // converti depuis la position dans le monde
+  }
+
   // Montre ou cache les traits des constellations ; de jour, on prévient qu'ils n'apparaîtront qu'à la nuit.
   private toggleConstellations(): void {
     const on = !this.settings.constellations;
     this.applySettings({ ...this.settings, constellations: on });
-    const night = sunState(this.hours, START_LAT, this.day).starsOpacity > 0.05;
+    const night = sunState(this.hours, this.playerLat(), this.day).starsOpacity > 0.05;
     toast(on ? (night ? 'Constellations affichées.' : 'Constellations activées : elles apparaîtront à la nuit.') : 'Constellations cachées.');
   }
 

@@ -119,7 +119,7 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Limite : la vue lointaine est limitée par la distance d'affichage (on voit encore le bord du monde en vol haut).
 
 ### 1.8.1 — Temps réel
-- Réglages → Temps : case **Temps réel (vraie heure, journées de 24 h)**. L'heure et la date du jeu suivent alors la vraie horloge, au lieu de départ (Lannion). `realSolarClock` (`src/core/geo.ts`) : heure solaire = heure UTC + longitude / 15 (midi solaire ≈ 11 h 46 UTC, soit 12 h 46 en heure d'hiver de Paris et 13 h 46 en heure d'été). L'équation du temps est ignorée (± 15 min).
+- Réglages → Temps : case **Temps réel (vraie heure, journées de 24 h)**. L'heure et la date du jeu suivent alors la vraie horloge UTC, **à l'endroit où tu te trouves** (nuit à Paris = jour à Sydney ; depuis 1.12.1 l'heure et la latitude du soleil suivent ta position). `realSolarClock` (`src/core/geo.ts`) : heure solaire = heure UTC + longitude / 15 (midi solaire ≈ 11 h 46 UTC, soit 12 h 46 en heure d'hiver de Paris et 13 h 46 en heure d'été). L'équation du temps est ignorée (± 15 min).
 - Tant que la case est cochée, les réglages date, heure, « les jours passent » et durée de journée sont grisés. En la décochant, le jeu repart de l'heure courante.
 - Vérifié : tests (159), capture : un midi forcé est bien remplacé par la vraie heure (nuit). Pas testé : sur ton téléphone, ni le lever/coucher en vrai.
 

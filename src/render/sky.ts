@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { smoothstep } from '../core/math';
-import { StarRow, buildStarBuffers } from '../core/stars';
+import { MAX_STAR_MAGNITUDE, StarRow, buildStarBuffers } from '../core/stars';
 import type { SunState } from '../core/sun';
 import catalog from '../data/stars.json';
 
@@ -25,6 +25,7 @@ uniform vec3 uGlow; // couleur du halo autour du soleil
 uniform float uSunVis; // visibilité du disque solaire
 uniform vec3 uMoonDir; // direction de la lune
 uniform float uMoonVis; // visibilité de la lune
+uniform float uMaxLight; // plafond de lumière (le soleil est plafonné quand le bloom est actif, sinon son halo noie l'écran)
 varying vec3 vDir;
 void main() {
   vec3 d = normalize(vDir); // direction du regard
@@ -32,10 +33,14 @@ void main() {
   vec3 col = mix(uHorizon, uTop, pow(max(y, 0.0), 0.5)); // dégradé horizon → zénith
   float sd = max(dot(d, uSunDir), 0.0); // alignement avec le soleil
   col += uGlow * (pow(sd, 6.0) * 0.25 + pow(sd, 40.0) * 0.45 + pow(sd, 400.0) * 1.4); // halo en trois couches
-  col += uSunColor * smoothstep(0.99965, 0.99985, sd) * 6.0 * uSunVis; // disque solaire
+  vec3 bright = uSunColor * smoothstep(0.99965, 0.99985, sd) * 6.0 * uSunVis; // disque solaire
   float md = max(dot(d, uMoonDir), 0.0); // alignement avec la lune
-  col += vec3(0.75, 0.82, 1.0) * smoothstep(0.9996, 0.9998, md) * 1.6 * uMoonVis; // disque lunaire
-  gl_FragColor = vec4(col, 1.0);
+  bright += vec3(0.75, 0.82, 1.0) * smoothstep(0.9996, 0.9998, md) * 1.6 * uMoonVis; // disque lunaire
+  if (uMaxLight < 100.0) { // bloom actif : le ciel lui-même ne dépasse jamais 0,95 (il ne « brille » pas en entier), seuls les disques du soleil et de la lune dépassent
+    col = min(col, vec3(0.95));
+    bright = min(bright, vec3(uMaxLight));
+  }
+  gl_FragColor = vec4(col + bright, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -58,10 +63,13 @@ void main() {
 }
 `;
 const STAR_FRAGMENT = /* glsl */ `
+uniform float uBoost; // surbrillance du cœur quand le bloom est actif (1 sinon)
 varying vec3 vColor;
 void main() {
   float d = length(gl_PointCoord - vec2(0.5)) * 2.0; // distance au centre du point (0 centre, 1 bord)
-  float a = smoothstep(1.0, 0.15, d); // disque doux
+  float core = exp(-d * d * 30.0); // cœur très fin et lumineux
+  float halo = exp(-d * d * 4.5) * 0.5; // halo doux autour
+  float a = (core * uBoost + halo) * smoothstep(1.0, 0.8, d); // la bordure s'éteint (pas de carré visible)
   gl_FragColor = vec4(vColor * a, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -94,6 +102,7 @@ export class SkyDome {
         uSunVis: { value: 1 },
         uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
         uMoonVis: { value: 0 },
+        uMaxLight: { value: 1000 }, // sans bloom : pas de plafond
       },
       toneMapped: false, // pas de « rendu cinéma » sur le ciel : sa couleur d'horizon doit être EXACTEMENT celle de la brume (qui, elle, n'est pas retouchée)
       side: THREE.BackSide, // on voit l'intérieur de la sphère
@@ -108,7 +117,7 @@ export class SkyDome {
 
     // Les vraies étoiles du catalogue Hipparcos (magnitude ≤ 6), placées dans le repère équatorial :
     // la rotation du ciel (latitude, saison, heure) est appliquée à tout le nuage par une matrice.
-    const buffers = buildStarBuffers(catalog.stars as unknown as StarRow[], STAR_RADIUS);
+    const buffers = buildStarBuffers(catalog.stars as unknown as StarRow[], STAR_RADIUS, MAX_STAR_MAGNITUDE);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.BufferAttribute(buffers.positions, 3));
     geometry.setAttribute('aSize', new THREE.BufferAttribute(buffers.sizes, 1));
@@ -117,7 +126,7 @@ export class SkyDome {
     this.starMaterial = new THREE.ShaderMaterial({
       vertexShader: STAR_VERTEX,
       fragmentShader: STAR_FRAGMENT,
-      uniforms: { uPixelRatio: { value: 1 }, uOpacity: { value: 0 } },
+      uniforms: { uPixelRatio: { value: 1 }, uOpacity: { value: 0 }, uBoost: { value: 1 } },
       blending: THREE.AdditiveBlending, // la lumière des étoiles s'ajoute à celle du ciel
       transparent: false, // dessiné AVANT le terrain (file des objets opaques) : le sol et l'eau les cachent
       depthTest: false, // pas de test de profondeur : l'ordre de dessin suffit
@@ -150,6 +159,12 @@ export class SkyDome {
     this.stars.matrix.set(r[0]!, r[1]!, r[2]!, camera.position.x, r[3]!, r[4]!, r[5]!, camera.position.y, r[6]!, r[7]!, r[8]!, camera.position.z, 0, 0, 0, 1); // rotation + suit la caméra
     this.stars.matrixWorldNeedsUpdate = true; // la matrice a changé
     this.dome.position.copy(camera.position); // le ciel suit la caméra : on ne s'en approche jamais
+  }
+
+  // Surbrillance du cœur des étoiles : 1 normalement, plus quand le bloom est actif (il en fait un vrai halo).
+  setGlowBoost(boost: number, sunCap = 1000): void {
+    this.starMaterial.uniforms.uBoost!.value = boost;
+    this.material.uniforms.uMaxLight!.value = sunCap; // plafond du ciel (soleil compris)
   }
 
   // Densité de pixels de l'écran (pour que les étoiles gardent la même taille sur un écran très fin).

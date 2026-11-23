@@ -37,6 +37,9 @@ Format x.y.z (z = correction, y = fonction, x = majeur). Ne JAMAIS éditer à la
 - `public/sw.js` (réseau d'abord, repli cache) : sa constante `VERSION` est gérée par `npm run bump`, ne pas l'éditer. Une nouvelle icône ou un fichier à garder hors ligne s'ajoute à la liste `SHELL` du service worker (le reste est mis en cache à l'usage).
 - Logique pure : `src/core/install.ts` (invitation, report 7 jours, 3 fois) ; `src/pwa/` : service worker, bandeau, invitation. Inactif avec `npm run dev`.
 
+## Qualité visuelle
+- Le bloom (`render/scene.ts`) utilise EffectComposer avec des cibles marquées `isXRRenderTarget` pour garder le rendu identique à l'écran direct (astuce dépendante de la version de Three.js : revérifier après une mise à jour). Le ciel (`render/sky.ts`) est plafonné quand le bloom est actif.
+
 ## Particularités
 - Le contrôle visuel se fait avec Chrome sans GPU (SwiftShader, ~10 i/s) : non représentatif des performances.
 - `?debug` dans l'URL expose `window.__thy` (téléportation, heure, stats).

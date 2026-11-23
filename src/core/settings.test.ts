@@ -97,3 +97,21 @@ describe('réglage « les jours passent »', () => {
     expect(sanitizeSettings({ daysPass: 'non' }).daysPass).toBe(true);
   });
 });
+
+describe('bloom', () => {
+  it('est coupé par défaut et seul le préréglage Beau l\'allume', () => {
+    expect(DEFAULT_SETTINGS.bloom).toBe(false);
+    expect(PRESETS.eco.bloom).toBe(false);
+    expect(PRESETS.balanced.bloom).toBe(false);
+    expect(PRESETS.beautiful.bloom).toBe(true);
+  });
+  it('est nettoyé à la lecture', () => {
+    expect(sanitizeSettings({ bloom: true }).bloom).toBe(true);
+    expect(sanitizeSettings({ bloom: 'oui' }).bloom).toBe(false);
+  });
+  it('rend la qualité « personnalisée » si on le change seul', () => {
+    const s = applyPreset(DEFAULT_SETTINGS, 'beautiful');
+    expect(detectQuality(s)).toBe('beautiful');
+    expect(detectQuality({ ...s, bloom: false })).toBe('custom');
+  });
+});

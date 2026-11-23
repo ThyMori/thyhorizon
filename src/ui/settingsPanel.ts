@@ -21,6 +21,7 @@ export class SettingsPanel {
   private readonly quality = byId<HTMLSelectElement>('set-quality');
   private readonly distance = byId<HTMLInputElement>('set-distance');
   private readonly shadows = byId<HTMLInputElement>('set-shadows');
+  private readonly bloom = byId<HTMLInputElement>('set-bloom');
   private readonly shadowSize = byId<HTMLSelectElement>('set-shadow-size');
   private readonly resolution = byId<HTMLInputElement>('set-resolution');
   private readonly fps = byId<HTMLInputElement>('set-fps');
@@ -36,6 +37,7 @@ export class SettingsPanel {
     // Les autres champs modifient un réglage ; si le résultat ne correspond plus à un préréglage, la qualité devient « Personnalisée ».
     this.distance.addEventListener('input', () => this.change({ viewDistance: Number(this.distance.value) }));
     this.shadows.addEventListener('change', () => this.change({ shadows: this.shadows.checked }));
+    this.bloom.addEventListener('change', () => this.change({ bloom: this.bloom.checked }));
     this.shadowSize.addEventListener('change', () => this.change({ shadowSize: Number(this.shadowSize.value) }));
     this.resolution.addEventListener('input', () => this.change({ resolution: Number(this.resolution.value) / 100 }));
     this.fps.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showFps: this.fps.checked }));
@@ -59,6 +61,7 @@ export class SettingsPanel {
     this.distance.value = String(s.viewDistance);
     byId('out-distance').textContent = formatDistance(s.viewDistance, CHUNK_SIZE);
     this.shadows.checked = s.shadows;
+    this.bloom.checked = s.bloom;
     this.shadowSize.value = String(s.shadowSize);
     this.shadowSize.disabled = !s.shadows; // inutile sans ombres
     this.resolution.value = String(Math.round(s.resolution * 100));

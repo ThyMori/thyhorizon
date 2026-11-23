@@ -94,6 +94,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Vérifié en simulation de téléphone 360 px (doigts simulés) : marche, regard, les deux ensemble, Vol, ▲▼, menu, Retour. Pas testé : un vrai téléphone (confort du pouce, tailles, Firefox Android), un vrai iPhone.
 - Pas encore : gyroscope (option B, à ajouter plus tard), réglage de sensibilité tactile distincte de la souris.
 
+### 1.6.0 — Étoiles lumineuses et halo lumineux (bloom)
+- **Étoiles** : on ne garde que les plus brillantes (magnitude ≤ 4, soit ≈ 520 sur 5 044), mais chacune a un cœur lumineux et un halo doux, d'autant plus grand qu'elle est brillante. Le catalogue complet reste dans `stars.json` (réglage `MAX_STAR_MAGNITUDE` dans `src/core/stars.ts`).
+- **Réglage « Halo lumineux (soleil, étoiles) »** (bloom) : actif seulement dans le préréglage **Beau** (case modifiable à part dans Réglages, qui passe alors la qualité en « Personnalisée »). Il passe par une chaîne d'effets (`render/scene.ts`) : image en haute dynamique, 4 échantillons d'anticrénelage, halo autour des zones plus lumineuses que le seuil, recopie à l'écran.
+- L'image avec bloom est volontairement **identique** à celle sans bloom (couleurs du ciel, brume, rendu cinéma) : seul le halo s'ajoute. Pour cela, les deux cibles de rendu sont déclarées « XR » (astuce Three.js ; à revérifier si on change de version de Three.js). Le ciel y est plafonné à 0,95 (hors disques du soleil et de la lune) pour que seuls le soleil, la lune et les étoiles brillent.
+- **Anticrénelage** : déjà actif partout (MSAA natif du navigateur) ; avec bloom il est conservé (4 échantillons).
+- Pas testé : le coût réel sur ta carte graphique et sur téléphone (mon navigateur de test n'a pas de GPU : ~10 i/s dans tous les cas), la compatibilité de la chaîne d'effets sur Firefox Android.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

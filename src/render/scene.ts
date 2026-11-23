@@ -7,11 +7,21 @@ import { lerpRgb } from '../core/math';
 import { GRAIN_FREQUENCIES, GRAIN_PERIOD, Origin, grainShift } from '../core/origin';
 import type { Settings } from '../core/settings';
 import type { SunState } from '../core/sun';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { CopyShader } from 'three/addons/shaders/CopyShader.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Ocean } from './ocean';
 import { SkyDome, toColor } from './sky';
 
 const SHADOW_EXTENT = 90; // demi-largeur de la zone ombrée autour du joueur, en mètres
 const FOG_DENSITY_FACTOR = 2; // densité de brume ≈ 2 / distance d'affichage (le bord du monde disparaît dans la brume)
+const BLOOM_STRENGTH = 0.8; // force du halo
+const BLOOM_RADIUS = 1.0; // étendue du halo
+const BLOOM_THRESHOLD = 1.0; // seules les zones plus lumineuses que ça brillent
+const SUN_CAP = 1.2; // plafond de lumière du ciel avec bloom (sinon le disque du soleil, très lumineux, noie l'écran)
+const STAR_BOOST = 5; // le cœur des étoiles dépasse ce seuil quand le bloom est actif
 const LIGHT_SCALE = Math.PI; // Three.js divise l'éclairage diffus par π : on le compense pour que les valeurs de sun.ts restent lisibles
 const NIGHT_FILL: [number, number, number] = [0.3, 0.4, 0.7]; // teinte bleutée de la lumière ambiante la nuit
 
@@ -61,6 +71,8 @@ export class GameScene {
   private readonly tmpUp = new THREE.Vector3();
   private readonly tmpTarget = new THREE.Vector3();
   private readonly grainUniforms = [new THREE.Uniform(new THREE.Vector2()), new THREE.Uniform(new THREE.Vector2()), new THREE.Uniform(new THREE.Vector2())]; // décalages du grain (uShiftA/B/C)
+  private composer: EffectComposer | null = null; // chaîne d'effets (bloom), créée seulement si le réglage l'exige
+  private bloomPass: UnrealBloomPass | null = null;
   private shadowSize = 0; // taille actuelle de la carte d'ombres
   private radiusMeters = 800; // distance d'affichage en mètres
 
@@ -109,6 +121,7 @@ export class GameScene {
     this.renderer.setPixelRatio(pixelRatio);
     this.sky.setPixelRatio(pixelRatio); // les étoiles gardent leur taille apparente
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.setBloom(settings.bloom, pixelRatio);
     const wantShadows = settings.shadows;
     if (this.renderer.shadowMap.enabled !== wantShadows) {
       this.renderer.shadowMap.enabled = wantShadows;
@@ -126,6 +139,39 @@ export class GameScene {
     this.fog.density = FOG_DENSITY_FACTOR / this.radiusMeters;
   }
 
+  // Active ou coupe le bloom (halo lumineux). Il passe par une chaîne d'effets : image calculée en haute dynamique et anticrénelée (4 échantillons),
+  // halo autour des zones très lumineuses, puis « rendu cinéma » et conversion de couleur en dernier.
+  private setBloom(on: boolean, pixelRatio: number): void {
+    if (on && !this.composer) {
+      const w = window.innerWidth * pixelRatio;
+      const h = window.innerHeight * pixelRatio;
+      const target = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 }); // 4 échantillons : bords lissés comme sans bloom
+      this.composer = new EffectComposer(this.renderer, target);
+      this.bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
+      this.composer.addPass(new RenderPass(this.scene, this.camera));
+      this.composer.addPass(this.bloomPass);
+      this.composer.addPass(new ShaderPass(CopyShader)); // recopie finale à l'écran (couleurs déjà prêtes, voir plus haut)
+      // Astuce : Three.js ne retouche les couleurs (rendu cinéma, sRGB) que sur l'écran, ou sur une cible « XR ».
+      // En déclarant nos deux cibles ainsi, chaque matériau fait son propre rendu cinéma et sa conversion sRGB comme à l'écran :
+      // l'image avec bloom reste donc IDENTIQUE à l'image sans bloom (ciel et brume compris), le halo s'ajoute simplement.
+      for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) {
+        (rt as unknown as { isXRRenderTarget: boolean }).isXRRenderTarget = true;
+        rt.texture.colorSpace = THREE.SRGBColorSpace;
+      }
+    }
+    if (!on && this.composer) {
+      this.composer.dispose(); // on libère la mémoire graphique
+      this.bloomPass?.dispose();
+      this.composer = null;
+      this.bloomPass = null;
+    }
+    this.sky.setGlowBoost(on ? STAR_BOOST : 1, on ? SUN_CAP : 1000); // le cœur des étoiles est plus lumineux pour déclencher le halo
+    if (this.composer) {
+      this.composer.setPixelRatio(pixelRatio);
+      this.composer.setSize(window.innerWidth, window.innerHeight);
+    }
+  }
+
   // Indique au rendu où est l'origine flottante : le grain du sol et les vagues retrouvent ainsi leur place dans le monde.
   setOrigin(origin: Origin): void {
     this.grainUniforms.forEach((u, i) => (u.value as THREE.Vector2).set(...grainShift(origin, GRAIN_FREQUENCIES[i]!))); // un décalage par échelle de bruit
@@ -137,6 +183,7 @@ export class GameScene {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer?.setSize(window.innerWidth, window.innerHeight); // la chaîne d'effets suit la taille de la fenêtre
   }
 
   // Met à jour lumières, ciel, brume et océan pour l'état du soleil donné.
@@ -181,6 +228,7 @@ export class GameScene {
   }
 
   render(): void {
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) this.composer.render(); // avec bloom
+    else this.renderer.render(this.scene, this.camera); // sans
   }
 }

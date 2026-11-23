@@ -41,9 +41,12 @@ export function starBrightness(mag: number): number {
 }
 
 // Taille d'une étoile en pixels (avant la densité de l'écran) : un point fin pour les faibles, un petit disque pour les brillantes.
+// Le sprite contient le cœur ET son halo lumineux : il est donc bien plus grand que le point visible au centre.
 export function starSize(mag: number): number {
-  return 1.5 + 0.5 * Math.max(0, 4.5 - mag);
+  return 5 + 2.6 * Math.max(0, 4 - mag); // magnitude 4 : 5 px ; Sirius (−1,4) : environ 19 px
 }
+
+export const MAX_STAR_MAGNITUDE = 4.0; // on ne garde que les étoiles les plus brillantes (≈ 520 sur 5 044) : un ciel épuré mais lumineux
 
 // Tableaux prêts pour la carte graphique : positions sur une sphère de rayon donné (repère équatorial), taille, éclat et couleur.
 export interface StarBuffers {
@@ -53,7 +56,8 @@ export interface StarBuffers {
   colors: Float32Array; // 3 nombres par étoile (linéaire)
 }
 
-export function buildStarBuffers(stars: readonly StarRow[], radius: number): StarBuffers {
+export function buildStarBuffers(allStars: readonly StarRow[], radius: number, maxMagnitude = Infinity): StarBuffers {
+  const stars = allStars.filter((s) => s[2] <= maxMagnitude); // seules les étoiles assez brillantes sont gardées
   const n = stars.length; // nombre d'étoiles
   const out: StarBuffers = { positions: new Float32Array(n * 3), sizes: new Float32Array(n), brightness: new Float32Array(n), colors: new Float32Array(n * 3) };
   stars.forEach(([ra, dec, mag, bv], i) => {

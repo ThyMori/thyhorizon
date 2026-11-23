@@ -1,7 +1,7 @@
 // Tests des étoiles : catalogue réel, couleurs, éclat, tableaux pour la carte graphique.
 import { describe, expect, it } from 'vitest';
 import catalog from '../data/stars.json';
-import { StarRow, buildStarBuffers, starBrightness, starColor, starSize } from './stars';
+import { MAX_STAR_MAGNITUDE, StarRow, buildStarBuffers, starBrightness, starColor, starSize } from './stars';
 
 const stars = catalog.stars as unknown as StarRow[]; // le JSON est typé en listes de nombres : on précise qu'il s'agit de lignes de 4 valeurs
 
@@ -49,6 +49,20 @@ describe('éclat et taille', () => {
     expect(starBrightness(2)).toBeGreaterThan(starBrightness(4));
     expect(starSize(-1.4)).toBeGreaterThan(starSize(2));
     expect(starSize(2)).toBeGreaterThan(starSize(6));
+  });
+});
+
+describe('étoiles gardées', () => {
+  it('ne garde que les plus brillantes quand on fixe une magnitude maximale', () => {
+    const all = buildStarBuffers(stars, 2500);
+    const bright = buildStarBuffers(stars, 2500, MAX_STAR_MAGNITUDE);
+    expect(bright.sizes.length).toBeLessThan(all.sizes.length);
+    expect(bright.sizes.length).toBe(stars.filter((s) => s[2] <= MAX_STAR_MAGNITUDE).length);
+    expect(bright.sizes.length).toBeGreaterThan(0);
+  });
+  it('donne aux étoiles brillantes un grand halo', () => {
+    expect(starSize(-1.4)).toBeGreaterThan(15);
+    expect(starSize(MAX_STAR_MAGNITUDE)).toBeGreaterThanOrEqual(5);
   });
 });
 

@@ -11,6 +11,7 @@ export interface Settings {
   viewDistance: number; // distance d'affichage, en tuiles de 64 m
   shadows: boolean; // ombres portées du soleil
   shadowSize: number; // finesse des ombres (1024 ou 2048)
+  bloom: boolean; // halo lumineux autour des lumières (soleil, étoiles) : plus beau, plus gourmand
   resolution: number; // netteté de l'image, de 0.5 à 1 (1 = résolution native de l'écran)
   showFps: boolean; // affiche le compteur d'images par seconde
   mouseSensitivity: number; // sensibilité de la souris, de 0.5 à 2
@@ -19,10 +20,10 @@ export interface Settings {
 }
 
 // Valeurs imposées par chaque préréglage.
-export const PRESETS: Record<Exclude<Quality, 'custom'>, Pick<Settings, 'viewDistance' | 'shadows' | 'shadowSize' | 'resolution'>> = {
-  eco: { viewDistance: 9, shadows: false, shadowSize: 1024, resolution: 0.75 }, // pour les petites configurations
-  balanced: { viewDistance: 14, shadows: true, shadowSize: 1024, resolution: 1 }, // par défaut
-  beautiful: { viewDistance: 20, shadows: true, shadowSize: 2048, resolution: 1 }, // plus beau, plus gourmand
+export const PRESETS: Record<Exclude<Quality, 'custom'>, Pick<Settings, 'viewDistance' | 'shadows' | 'shadowSize' | 'resolution' | 'bloom'>> = {
+  eco: { viewDistance: 9, shadows: false, shadowSize: 1024, resolution: 0.75, bloom: false }, // pour les petites configurations
+  balanced: { viewDistance: 14, shadows: true, shadowSize: 1024, resolution: 1, bloom: false }, // par défaut
+  beautiful: { viewDistance: 20, shadows: true, shadowSize: 2048, resolution: 1, bloom: true }, // plus beau, plus gourmand
 };
 
 // Réglages par défaut.
@@ -57,7 +58,7 @@ export function applyPreset(s: Settings, quality: Quality): Settings {
 export function detectQuality(s: Settings): Quality {
   for (const q of ['eco', 'balanced', 'beautiful'] as const) {
     const p = PRESETS[q];
-    if (p.viewDistance === s.viewDistance && p.shadows === s.shadows && p.shadowSize === s.shadowSize && p.resolution === s.resolution) return q;
+    if (p.viewDistance === s.viewDistance && p.shadows === s.shadows && p.shadowSize === s.shadowSize && p.resolution === s.resolution && p.bloom === s.bloom) return q;
   }
   return 'custom';
 }
@@ -73,6 +74,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     viewDistance: Math.round(clamp(num(r.viewDistance, d.viewDistance), LIMITS.viewDistance.min, LIMITS.viewDistance.max)),
     shadows: bool(r.shadows, d.shadows),
     shadowSize: num(r.shadowSize, d.shadowSize) >= 2048 ? 2048 : 1024, // seules deux tailles existent
+    bloom: bool(r.bloom, d.bloom),
     resolution: clamp(num(r.resolution, d.resolution), LIMITS.resolution.min, LIMITS.resolution.max),
     showFps: bool(r.showFps, d.showFps),
     mouseSensitivity: clamp(num(r.mouseSensitivity, d.mouseSensitivity), LIMITS.mouseSensitivity.min, LIMITS.mouseSensitivity.max),

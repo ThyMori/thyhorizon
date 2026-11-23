@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.6.0 — 2026-11-23
+
+Étoiles moins nombreuses mais lumineuses (halo), bloom (halo lumineux) dans le préréglage Beau
+
 ## 1.5.0 — 2026-11-23
 
 Commandes tactiles : joystick, regard au doigt, boutons Courir / Vol / Menu, bouton Retour

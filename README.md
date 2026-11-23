@@ -82,6 +82,10 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Application installée : `display: fullscreen` dans le manifeste, donc ThyHorizon s'ouvre directement en plein écran, sans geste (à vérifier après réinstallation).
 - Pas testé : le plein écran réel (mon navigateur de test ne l'accorde pas).
 
+### 1.4.3 — Un seul clic pour entrer dans le monde
+- Le plein écran et la capture de la souris étaient demandés en même temps : le navigateur refusait la souris et il fallait cliquer une deuxième fois. Maintenant le plein écran est établi d'abord, puis la souris est capturée, avec un seul clic.
+- Pas testé : le comportement réel (mon navigateur de test n'accorde pas le plein écran).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.4.3 — 2026-11-23
+
+Un seul clic pour entrer dans le monde (plein écran puis capture de la souris)
+
 ## 1.4.2 — 2026-11-23
 
 Souris : plus de message d'erreur (nouvelle tentative silencieuse) ; plein écran permanent, application installée en plein écran

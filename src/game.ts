@@ -39,6 +39,7 @@ export class Game {
   private readonly helpDialog = byId<HTMLDialogElement>('dialog-help');
   private readonly installDialog = byId<HTMLDialogElement>('dialog-install');
   private readonly settingsPanel: SettingsPanel;
+  private fullscreenPending: Promise<void> | null = null; // demande de plein écran en cours
   private wantsLock = false; // a-t-on demandé la capture de la souris (et attend-on la réponse) ?
   private lockRetries = 0; // nouvelles tentatives silencieuses déjà faites
   private lockTimer = 0; // minuteur de la prochaine tentative
@@ -209,8 +210,10 @@ export class Game {
     this.lockRetries = 0;
     this.hidePause();
     this.hud.setHint(false);
-    this.enterFullscreen(); // plein écran d'abord (le clic de l'utilisateur sert aux deux demandes)
-    this.controls.requestLock(); // la souris est capturée : on joue
+    // Plein écran d'abord ; la souris n'est capturée qu'une fois le plein écran établi (sinon le navigateur refuse et il faut cliquer deux fois).
+    void this.enterFullscreen().then(() => {
+      if (this.wantsLock && !this.controls.locked) this.controls.requestLock(); // la souris est capturée : on joue
+    });
   }
 
   // Le navigateur a refusé la capture (souvent : plein écran en cours d'installation, ou Échap pressé il y a un instant).
@@ -231,17 +234,26 @@ export class Game {
 
   // Rétablit le plein écran (appelé sur un geste de l'utilisateur) quand on joue sur un écran sans plein écran.
   private restoreFullscreen(): void {
-    if (!document.fullscreenElement) this.enterFullscreen();
+    if (!document.fullscreenElement) void this.enterFullscreen();
   }
 
-  // Passe la page en plein écran si elle ne l'est pas déjà (doit venir d'un clic ou d'une touche).
-  private enterFullscreen(): void {
-    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return; // déjà en plein écran, ou non géré par ce navigateur
+  // Passe la page en plein écran si elle ne l'est pas déjà (doit venir d'un clic ou d'une touche de l'utilisateur).
+  // Renvoie une promesse qui se termine quand le plein écran est établi, refusé, ou inutile ; une demande déjà en cours est partagée.
+  private enterFullscreen(): Promise<void> {
+    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return Promise.resolve(); // déjà en plein écran, ou non géré
+    if (this.fullscreenPending) return this.fullscreenPending; // une demande est déjà en route
     try {
-      void Promise.resolve(document.documentElement.requestFullscreen()).catch(() => undefined); // refus possible : on joue alors en fenêtre
+      this.fullscreenPending = Promise.resolve(document.documentElement.requestFullscreen())
+        .catch(() => undefined) // refus possible : on jouera en fenêtre
+        .then(() => new Promise<void>((done) => window.setTimeout(done, 80))) // petite pause : laisse le navigateur finir sa transition
+        .finally(() => {
+          this.fullscreenPending = null;
+        });
     } catch {
-      /* le navigateur a refusé : le jeu reste en fenêtre, sans gravité */
+      this.fullscreenPending = null; // le navigateur a refusé : le jeu reste en fenêtre, sans gravité
+      return Promise.resolve();
     }
+    return this.fullscreenPending;
   }
 
   private showPause(): void {

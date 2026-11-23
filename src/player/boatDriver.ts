@@ -6,7 +6,7 @@ import { findLandingSpot, findLaunchSpot } from '../core/boarding';
 import { worldToLatLon } from '../core/geo';
 import { EYE_HEIGHT } from '../core/movement';
 import type { Origin } from '../core/origin';
-import { BoatInput, BoatState, CRUISER, Readout, apparentWind, createBoat, readout, startHeading, stepBoat } from '../core/sailing';
+import { BoatInput, BoatState, CRUISER, MAX_REEFS, Readout, apparentWind, createBoat, readout, startHeading, stepBoat } from '../core/sailing';
 import type { Terrain } from '../core/terrain';
 import { waveHeight } from '../core/waves';
 import { Wind, windAt } from '../core/wind';
@@ -20,6 +20,10 @@ const BOARD_DISTANCE = 45; // distance maximale pour remonter sur son bateau (m)
 export class BoatDriver {
   state: BoatState | null = null; // le bateau (null tant qu'on n'en a pas mis un à l'eau)
   aboard = false; // le joueur est-il à bord ?
+  private lastMain: 0 | 1 = 1; // dernières valeurs annoncées
+  private lastJib: 0 | 1 = 1;
+  private lastReef = 0;
+  private readonly held = new Set<string>(); // touches de manœuvre déjà enfoncées (pour ne réagir qu'au premier appui)
   private view: BoatView | null = null;
   private shore: { x: number; z: number; yaw: number } | null = null; // où le joueur a embarqué (sert à la sauvegarde)
   private lastGround = 0; // dernier message « tu touches le fond »
@@ -65,6 +69,9 @@ export class BoatDriver {
     const c = this.controls;
     boat.side = apparentWind(boat, this.wind).angle >= 0 ? 1 : -1; // le côté de la voile correspond au vent actuel (pas de faux « empannage »)
     this.shore = { x: c.x, z: c.z, yaw: c.yaw };
+    this.lastMain = boat.mainTarget; // pas d'annonce pour l'état des voiles trouvé en montant à bord
+    this.lastJib = boat.jibTarget;
+    this.lastReef = boat.reef;
     c.setFly(false);
     c.aboard = true;
     c.yaw = boat.yaw; // on regarde vers l'avant
@@ -149,17 +156,47 @@ export class BoatDriver {
     const left = c.down('KeyA') ? 1 : 0; // A (ou Q sur AZERTY, même touche physique) : à gauche
     const ease = c.down('KeyS') ? 1 : 0; // S : choquer
     const pull = c.down('KeyW') ? 1 : 0; // W (Z sur AZERTY) : border
-    return { helm: right - left, trim: ease - pull, center: c.down('Space') };
+    const input: BoatInput = { helm: right - left, trim: ease - pull, center: c.down('Space') };
+    // Manœuvres de voiles : un appui (pas une touche maintenue) déclenche l'action.
+    const edge = (code: string): boolean => {
+      const now = c.down(code);
+      const was = this.held.has(code);
+      if (now) this.held.add(code);
+      else this.held.delete(code);
+      return now && !was;
+    };
+    if (edge('KeyY')) input.toggleMain = true; // Y : hisser / affaler la grand-voile
+    if (edge('KeyU')) input.toggleJib = true; // U : dérouler / rouler le foc
+    if (edge('KeyX')) input.reef = 1; // X : prendre un ris
+    if (edge('KeyC')) input.reef = -1; // C : larguer un ris
+    return input;
   }
 
   // Messages d'événements (virement, empannage, fond).
   private report(boat: BoatState): void {
+    this.announceSails(boat);
     if (boat.event === 'tack') toast('Virement de bord : la voile change de côté.');
     else if (boat.event === 'gybe') toast('Empannage ! La bôme est passée de l’autre côté : fais attention à sa vitesse.');
     boat.event = null;
     if (boat.aground && performance.now() - this.lastGround > 8000) {
       this.lastGround = performance.now();
       toast('Tu touches le fond. Barre dans l’autre sens pour retrouver de l’eau profonde.', 'error');
+    }
+  }
+
+  // Dit à voix haute (message) ce que les manœuvres de voiles viennent de décider.
+  private announceSails(boat: BoatState): void {
+    if (boat.mainTarget !== this.lastMain) {
+      toast(boat.mainTarget === 1 ? 'On hisse la grand-voile (environ 20 s). Y pour l’affaler.' : 'On affale la grand-voile. Y pour la hisser.');
+      this.lastMain = boat.mainTarget;
+    }
+    if (boat.jibTarget !== this.lastJib) {
+      toast(boat.jibTarget === 1 ? 'On déroule le foc. U pour le rouler.' : 'On roule le foc sur l’étai. U pour le dérouler.');
+      this.lastJib = boat.jibTarget;
+    }
+    if (boat.reef !== this.lastReef) {
+      toast(boat.reef === 0 ? 'Plus de ris.' : `${boat.reef} ris pris${boat.reef === MAX_REEFS ? ' (le maximum)' : ''}. X : un ris de plus · C : en larguer un.`);
+      this.lastReef = boat.reef;
     }
   }
 

@@ -27,6 +27,7 @@ Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousi
 - Repère du bateau : avant (f) et tribord (r). `omega` > 0 = le bateau tourne à tribord, donc son `yaw` DIMINUE. `heel` > 0 = penché à tribord. Angle de vent `angle` > 0 = vient de tribord. Vent : `from` = direction d'OÙ il vient (0 = nord, sens horaire).
 - Le calcul de la houle `waveHeight` (core/waves.ts) est la même formule que le shader de l'océan : si on change une vague, ça change les deux (un seul tableau `WAVE_DEFS`).
 - Le bateau n'est simulé que quand le joueur est à bord ET que la souris est capturée. Quand on débarque, il reste amarré (vitesse 0).
+- Voilure (1.15) : `mainUp`/`reef`/`jibOut` dans `BoatState` ; `sailPlan` donne surface, centre de voilure avant/arrière et hauteur. Les ordres Y/U/X/C sont des impulsions dans `BoatInput` (`toggleMain`, `toggleJib`, `reef`).
 - Vent simulé : tout local (1.13). Le vent réel (Open-Meteo) arrive en 1.15 : il faudra alors adapter la règle « tout est local » ci-dessus.
 
 ## Rendu et grandes coordonnées

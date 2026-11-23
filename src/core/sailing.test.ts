@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRUISER, BoatInput, penonFlow, BoatState, apparentWind, createBoat, hullResistance, pointOfSail, readout, rightingArm, sailCoefficients, sheetAngle, startHeading, stepBoat, wrapPi } from './sailing';
+import { CRUISER, BoatInput, mainHeight, penonFlow, sailPlan, BoatState, apparentWind, createBoat, hullResistance, pointOfSail, readout, rightingArm, sailCoefficients, sheetAngle, startHeading, stepBoat, wrapPi } from './sailing';
 import { msToKnots } from './wind';
 import type { Wind } from './wind';
 
@@ -237,5 +237,88 @@ describe('penons', () => {
   it('sans vent, les penons pendent (flow ≈ 0)', () => {
     const s = createBoat(0, 0, 0);
     expect(penonFlow(s, { speed: 0, from: 0 }).flow).toBeLessThan(0.05);
+  });
+});
+
+describe('manœuvres de voiles', () => {
+  const WIND22 = { speed: 22 * 0.5144, from: Math.PI / 2 }; // 22 nœuds de l'est
+  // Tient le cap compas 45° avec la barre ; écoute fixe. Renvoie le bateau après 40 s.
+  const hold = (setup: (s: BoatState) => void): BoatState => {
+    const s = createBoat(0, 0, -45 * DEG);
+    s.u = 3;
+    setup(s);
+    s.mainUp = s.mainTarget;
+    s.jibOut = s.jibTarget;
+    s.reefLevel = s.reef;
+    s.sheet = 0.35;
+    sail(s, WIND22, 40, 45, false);
+    return s;
+  };
+  it('le plan de voilure : pleine, 3 ris, sans voile', () => {
+    const full = createBoat(0, 0, 0);
+    expect(sailPlan(full, CRUISER).area).toBeCloseTo(48, 5);
+    const reefed = createBoat(0, 0, 0);
+    reefed.reef = 3;
+    reefed.reefLevel = 3;
+    expect(sailPlan(reefed, CRUISER).area).toBeLessThan(sailPlan(full, CRUISER).area * 0.7);
+    expect(sailPlan(reefed, CRUISER).ceHeight).toBeLessThan(sailPlan(full, CRUISER).ceHeight); // centre de voilure plus bas
+    const bare = createBoat(0, 0, 0);
+    bare.mainUp = 0;
+    bare.jibOut = 0;
+    expect(sailPlan(bare, CRUISER).area).toBe(0);
+  });
+  it('les ris réduisent la gîte dans la brise', () => {
+    const full = hold(() => undefined);
+    const reefed = hold((s) => {
+      s.reef = 3;
+    });
+    expect(Math.abs(reefed.heel)).toBeLessThan(Math.abs(full.heel));
+  });
+  it('affaler et hisser prennent du temps (affaler plus vite)', () => {
+    const calm = { speed: 0, from: 0 };
+    const run = (s: BoatState, seconds: number): void => {
+      for (let t = 0; t < seconds; t += 0.2) stepBoat(s, CRUISER, calm, NO_INPUT, 0.2, DEEP); // pas de 0,2 s (stepBoat borne un pas à 0,25 s)
+    };
+    const s = createBoat(0, 0, 0);
+    stepBoat(s, CRUISER, calm, { helm: 0, trim: 0, center: false, toggleMain: true }, 0.2, DEEP); // appui : affaler
+    expect(s.mainTarget).toBe(0);
+    run(s, 1);
+    expect(s.mainUp).toBeGreaterThan(0.7); // une seconde ne suffit pas
+    run(s, 8);
+    expect(s.mainUp).toBe(0); // affalée au bout d'environ 7 s
+    stepBoat(s, CRUISER, calm, { helm: 0, trim: 0, center: false, toggleMain: true }, 0.2, DEEP); // appui : hisser
+    run(s, 10);
+    expect(s.mainUp).toBeLessThan(1); // hisser est plus lent : 10 s ne suffisent pas
+    run(s, 10);
+    expect(s.mainUp).toBe(1);
+  });
+  it('ris : un appui prend un ris, jamais plus de 3, et on peut les larguer', () => {
+    const s = createBoat(0, 0, 0);
+    for (let i = 0; i < 5; i++) stepBoat(s, CRUISER, { speed: 0, from: 0 }, { helm: 0, trim: 0, center: false, reef: 1 }, 0.1, DEEP);
+    expect(s.reef).toBe(3);
+    stepBoat(s, CRUISER, { speed: 0, from: 0 }, { helm: 0, trim: 0, center: false, reef: -1 }, 0.1, DEEP);
+    expect(s.reef).toBe(2);
+    for (let i = 0; i < 150; i++) stepBoat(s, CRUISER, { speed: 0, from: 0 }, NO_INPUT, 0.2, DEEP);
+    expect(mainHeight(s)).toBeCloseTo(0.56, 2); // 2 ris
+  });
+  it('sans grand-voile le bateau abat (barre sous le vent) ; sans foc il lofe', () => {
+    const jibOnly = hold((s) => {
+      s.mainTarget = 0;
+    });
+    const mainOnly = hold((s) => {
+      s.jibTarget = 0;
+    });
+    // vent de l'est, bateau au 45° : la barre pour tenir le cap est « sous le vent » (positive = à tribord) avec le foc seul
+    expect(jibOnly.rudder).toBeGreaterThan(mainOnly.rudder + 0.05);
+    expect(jibOnly.rudder).toBeGreaterThan(0.05);
+    expect(mainOnly.rudder).toBeLessThan(-0.03);
+  });
+  it('sans aucune voile, pas de poussée : le bateau ralentit', () => {
+    const s = createBoat(0, 0, -45 * DEG);
+    s.u = 3;
+    s.mainTarget = s.jibTarget = 0;
+    s.mainUp = s.jibOut = 0;
+    sail(s, WIND22, 30, 45, false);
+    expect(s.u).toBeLessThan(1.5);
   });
 });

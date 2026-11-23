@@ -178,6 +178,10 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Trois paires de **penons** (rubans rouge côté tribord, vert côté bâbord) cousus sur la grand-voile. Droits vers l'arrière : voile bien réglée. Ruban du côté du vent qui se soulève : trop choqué (borde). Ruban sous le vent qui flotte : trop bordé, la voile décroche (choque). Sans vent, ils pendent.
 - Touche **I** (et case dans Réglages) : cache ou montre les instruments, pour naviguer comme sur un vrai bateau. Logique pure : `penonFlow` dans `src/core/sailing.ts` (testée) ; dessin : `src/render/penons.ts`.
 
+### 1.15.0 — Manœuvres de voiles : affaler, ris, foc roulé
+- **Y** hisse (≈ 18 s) ou affale (≈ 7 s) la grand-voile ; **U** déroule ou roule le foc ; **X** prend un ris (jusqu'à 3), **C** en largue un. Les manœuvres sont progressives, la voile se déforme et descend sous tes yeux (paquet de toile sur la bôme, foc enroulé sur l'étai).
+- Physique : surface et centre de voilure changent (`sailPlan` dans `src/core/sailing.ts`, testé). Moins de voile = moins de gîte ; sans grand-voile le bateau abat, sans foc il lofe. Nouvelle ligne « Voilure » dans les instruments (GV = grand-voile) et conseils (« prends un ris »).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

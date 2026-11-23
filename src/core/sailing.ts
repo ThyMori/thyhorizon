@@ -30,6 +30,12 @@ export interface BoatSpec {
   waterline: number; // longueur à la flottaison (m) : fixe la vitesse de coque
   mass: number; // masse (kg)
   sailArea: number; // surface de voile (m²) : grand-voile + foc
+  mainArea: number; // surface de la grand-voile pleine (m²)
+  jibArea: number; // surface du foc déroulé (m²)
+  mainCeX: number; // position avant/arrière du centre de voilure de la grand-voile pleine (m)
+  jibCeX: number; // idem pour le foc
+  mainCeHeight: number; // hauteur du centre de voilure de la grand-voile pleine (m)
+  jibCeHeight: number; // idem pour le foc
   ceHeight: number; // hauteur du centre de voilure au-dessus du centre de dérive (m) : bras de levier de la gîte
   ceX: number; // position avant/arrière du centre de voilure (m, + vers l'avant)
   gm: number; // hauteur métacentrique (m) : la raideur du bateau à la gîte
@@ -54,6 +60,12 @@ export const CRUISER: BoatSpec = {
   waterline: 8.2,
   mass: 4800,
   sailArea: 48,
+  mainArea: 27,
+  jibArea: 21,
+  mainCeX: -1.2, // la grand-voile est derrière le centre de dérive…
+  jibCeX: 1.3, // …le foc devant : leur équilibre donne la barre (sans foc, le bateau « lofe »)
+  mainCeHeight: 5.5,
+  jibCeHeight: 4.3,
   ceHeight: 5,
   ceX: -0.1,
   gm: 0.6,
@@ -83,6 +95,12 @@ export interface BoatState {
   rudder: number; // braquage de la barre (rad), positif = le bateau tourne à tribord
   sheet: number; // écoute : 0 = bordée à bloc, 1 = complètement choquée
   boom: number; // angle visible de la bôme (rad), positif = vers tribord
+  mainTarget: 0 | 1; // grand-voile demandée : 1 = hissée, 0 = affalée
+  mainUp: number; // hauteur hissée de la grand-voile, 0 (affalée sur la bôme) à 1 (en tête de mât)
+  reef: number; // ris pris (0 à 3), cible
+  reefLevel: number; // ris pris, en cours de manœuvre (continu)
+  jibTarget: 0 | 1; // foc demandé : 1 = déroulé, 0 = roulé
+  jibOut: number; // part du foc déroulée (0 = roulé sur l'étai, 1 = plein)
   luff: number; // 0 à 1 : la voile faseye (bat) d'autant plus que c'est proche de 1
   aground: boolean; // le bateau touche le fond ?
   side: 1 | -1; // côté d'où vient le vent apparent (1 = tribord)
@@ -94,7 +112,17 @@ export interface BoatInput {
   helm: number; // -1 = barre à gauche (le bateau tourne à bâbord), +1 = à droite
   trim: number; // +1 = choquer (relâcher), -1 = border (tirer)
   center: boolean; // remettre la barre au milieu
+  toggleMain?: boolean; // appui : hisser ou affaler la grand-voile
+  toggleJib?: boolean; // appui : dérouler ou rouler le foc
+  reef?: -1 | 0 | 1; // appui : +1 prendre un ris, −1 larguer un ris
 }
+
+export const MAX_REEFS = 3; // nombre de ris de la grand-voile
+export const REEF_HEIGHTS = [1, 0.76, 0.56, 0.4] as const; // hauteur utile de la grand-voile selon le nombre de ris
+const HOIST_RATE = 1 / 18; // hisser : environ 18 s au winch
+const LOWER_RATE = 1 / 7; // affaler : environ 7 s
+const REEF_RATE = 1 / 4; // un ris : environ 4 s
+const JIB_RATE = 1 / 7; // dérouler ou rouler le foc : environ 7 s
 
 export const SHEET_MIN_ANGLE = 4 * DEG; // angle de la bôme avec l'écoute bordée à bloc
 export const SHEET_MAX_ANGLE = 86 * DEG; // angle de la bôme avec l'écoute toute choquée
@@ -107,7 +135,31 @@ export const wrapPi = (a: number): number => a - 2 * Math.PI * Math.round(a / (2
 
 // Crée un bateau à l'arrêt, voile à moitié choquée.
 export function createBoat(x: number, z: number, yaw: number): BoatState {
-  return { x, z, yaw, u: 0, v: 0, omega: 0, heel: 0, heelRate: 0, rudder: 0, sheet: 0.55, boom: 0, luff: 0, aground: false, side: 1, event: null };
+  return { x, z, yaw, u: 0, v: 0, omega: 0, heel: 0, heelRate: 0, rudder: 0, sheet: 0.55, boom: 0, mainTarget: 1, mainUp: 1, reef: 0, reefLevel: 0, jibTarget: 1, jibOut: 1, luff: 0, aground: false, side: 1, event: null };
+}
+
+// Hauteur utile de la grand-voile (0 à 1) : hissée ET réduite par les ris. Interpolée entre deux ris pendant la manœuvre.
+export function mainHeight(s: BoatState): number {
+  const i = clamp(Math.floor(s.reefLevel), 0, MAX_REEFS - 1);
+  const t = clamp(s.reefLevel - i, 0, 1);
+  return s.mainUp * lerp(REEF_HEIGHTS[i]!, REEF_HEIGHTS[i + 1]!, t);
+}
+
+// Le plan de voilure du moment : surface, position avant/arrière et hauteur du centre de voilure.
+export function sailPlan(s: BoatState, spec: BoatSpec): { area: number; ceX: number; ceHeight: number; main: number; jib: number } {
+  const h = mainHeight(s);
+  const am = spec.mainArea * h; // la surface de la grand-voile suit sa hauteur
+  const aj = spec.jibArea * s.jibOut;
+  const area = am + aj;
+  if (area < 0.5) return { area, ceX: 0, ceHeight: 2, main: am, jib: aj }; // plus de voile : aucune poussée
+  const cmH = 1.2 + (spec.mainCeHeight - 1.2) * h; // le centre de la grand-voile descend quand on la réduit
+  return {
+    area,
+    ceX: (am * spec.mainCeX + aj * spec.jibCeX) / area,
+    ceHeight: (am * cmH + aj * spec.jibCeHeight) / area,
+    main: am,
+    jib: aj,
+  };
 }
 
 // Vecteurs unitaires du bateau dans le monde (x vers l'est, z vers le sud).
@@ -174,6 +226,10 @@ const BOOM_RATE = 2.2; // vitesse maximale de balayage visible de la bôme (rad/
 
 // Fait avancer le bateau de dt secondes. depthAt(x, z) donne la profondeur d'eau (m, négative à terre).
 export function stepBoat(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt: number, depthAt: (x: number, z: number) => number): void {
+  // Les appuis (une seule fois par image) : hisser/affaler, dérouler/rouler, ris.
+  if (input.toggleMain) s.mainTarget = s.mainTarget === 1 ? 0 : 1;
+  if (input.toggleJib) s.jibTarget = s.jibTarget === 1 ? 0 : 1;
+  if (input.reef) s.reef = clamp(s.reef + input.reef, 0, MAX_REEFS);
   let left = Math.min(dt, 0.25); // on borne : pas de bond après une longue pause
   while (left > 1e-6) {
     const h = Math.min(SUB_STEP, left);
@@ -189,6 +245,12 @@ function stepOnce(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt
   else if (input.helm !== 0) s.rudder = moveToward(s.rudder, input.helm * rudMax, RUDDER_RATE * dt);
   else s.rudder = moveToward(s.rudder, 0, RUDDER_RETURN * dt);
   s.sheet = clamp(s.sheet + input.trim * SHEET_RATE * dt, 0, 1);
+
+  // --- Manœuvres de voiles (lentes : on ne hisse pas une voile en une seconde) ---
+  s.mainUp = moveToward(s.mainUp, s.mainTarget, (s.mainTarget === 1 ? HOIST_RATE : LOWER_RATE) * dt);
+  s.reefLevel = moveToward(s.reefLevel, s.reef, REEF_RATE * dt);
+  s.jibOut = moveToward(s.jibOut, s.jibTarget, JIB_RATE * dt);
+  const plan = sailPlan(s, spec);
 
   // --- Vent apparent et voile ---
   const aw = apparentWind(s, wind);
@@ -211,8 +273,8 @@ function stepOnce(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt
     const dr = (aw.r / aw.speed) * side; // idem tribord, dans le repère « miroir » où le vent vient de tribord
     const liftF = -dr; // la portance est perpendiculaire à l'écoulement…
     const liftR = df; // …du côté de la voile
-    const fPrime = q * spec.sailArea * heelFactor * (cl * liftF + cd * df);
-    const rPrime = q * spec.sailArea * heelFactor * (cl * liftR + cd * dr);
+    const fPrime = q * plan.area * heelFactor * (cl * liftF + cd * df);
+    const rPrime = q * plan.area * heelFactor * (cl * liftR + cd * dr);
     sailF = fPrime;
     sailR = rPrime * side; // on revient au vrai repère
   }
@@ -239,9 +301,9 @@ function stepOnce(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt
   const my = spec.mass * 1.6; // masse + eau entraînée sur le côté (plus grande)
   const forceF = sailF - resistance - induced * Math.sign(s.u || 1);
   const forceR = sailR + keelY + rudderY;
-  const yCe = spec.ceHeight * Math.sin(s.heel); // décalage latéral de la voile quand le bateau gîte
+  const yCe = plan.ceHeight * Math.sin(s.heel); // décalage latéral de la voile quand le bateau gîte
   const yawMoment =
-    spec.ceX * sailR + // voile devant ou derrière le centre de dérive
+    plan.ceX * sailR + // voile devant ou derrière le centre de dérive
     spec.keelX * keelY + // quille
     spec.rudderX * rudderY + // safran
     -yCe * sailF - // gîte : la poussée est décalée sous le vent, donc le bateau « lofe » (barre au vent)
@@ -252,7 +314,7 @@ function stepOnce(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt
   s.omega += (yawMoment / spec.yawInertia) * dt;
 
   // --- Gîte ---
-  const heelMoment = sailR * spec.ceHeight; // la voile pousse en haut : couple de gîte
+  const heelMoment = sailR * plan.ceHeight; // la voile pousse en haut : couple de gîte
   const rightMoment = -spec.mass * G * rightingArm(spec, s.heel); // le poids de la quille redresse
   const heelDamping = -16000 * s.heelRate; // la carène freine le roulis
   s.heelRate += ((heelMoment + rightMoment + heelDamping) / spec.rollInertia) * dt;
@@ -347,6 +409,9 @@ export interface Readout {
   rudderDeg: number; // braquage de barre en degrés (+ tribord)
   leewayDeg: number; // dérive en degrés
   point: string; // allure
+  mainPct: number; // grand-voile hissée, en % (0 à 100)
+  reef: number; // ris pris
+  jibPct: number; // foc déroulé, en %
   hint: string; // conseil court (vide si tout va bien)
 }
 
@@ -363,7 +428,9 @@ export function readout(s: BoatState, wind: Wind): Readout {
   else if (Math.abs(twa) < 35 * DEG && speed < 1.2) hint = 'Face au vent : le bateau ne peut pas avancer. Barre pour faire tomber l’étrave de côté.';
   else if (s.luff > 0.6 && Math.abs(twa) > 35 * DEG) hint = 'La voile faseye : borde (W) jusqu’à ce qu’elle se tende.';
   else if (alpha > 24 * DEG && awaAbs < 100 * DEG) hint = 'Voile décrochée : choque (S) un peu.';
-  else if (Math.abs(s.heel) > 28 * DEG) hint = 'Trop de gîte : choque (S) ou abats (barre sous le vent).';
+  else if (Math.abs(s.heel) > 28 * DEG) hint = s.reef < MAX_REEFS ? 'Trop de gîte : choque (S), abats, ou prends un ris (X).' : 'Trop de gîte : choque (S) ou abats (barre sous le vent).';
+  else if (aw.speed > 11 && s.reef === 0 && s.mainUp > 0.9 && s.jibOut > 0.9) hint = 'Le vent monte : pense à prendre un ris (X) ou à rouler un peu de foc (U).';
+  else if (s.mainTarget === 0 && s.jibTarget === 0 && speed < 0.5) hint = 'Plus de voile : Y hisse la grand-voile, U déroule le foc.';
   return {
     bearing,
     speed,
@@ -377,6 +444,9 @@ export function readout(s: BoatState, wind: Wind): Readout {
     rudderDeg: s.rudder / DEG,
     leewayDeg: Math.abs(s.u) > 0.3 ? Math.abs(Math.atan2(s.v, Math.abs(s.u))) / DEG : 0, // dérive : toujours positive (le côté se voit au vent)
     point: pointOfSail(Math.abs(twa)),
+    mainPct: Math.round(s.mainUp * 100),
+    reef: s.reef,
+    jibPct: Math.round(s.jibOut * 100),
     hint,
   };
 }

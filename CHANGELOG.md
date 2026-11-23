@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.15.0 — 2026-11-23
+
+Manœuvres de voiles : hisser/affaler la grand-voile, ris, foc roulé
+
 ## 1.14.0 — 2026-11-23
 
 Penons sur la grand-voile et touche I pour cacher les instruments

@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { LAYOUT, bottomHeight, deckHeight, roofHeight, stationOf } from '../core/hull';
-import { penonFlow } from '../core/sailing';
+import { mainHeight, penonFlow } from '../core/sailing';
 import type { BoatSpec, BoatState } from '../core/sailing';
 import type { Wind } from '../core/wind';
 import { Penons } from './penons';
@@ -132,6 +132,10 @@ export class BoatView {
   private readonly mainsail: SailMesh;
   private readonly jib: SailMesh;
   private readonly penons = new Penons(); // rubans de la grand-voile
+  private readonly mainBundle: THREE.Mesh; // grand-voile affalée, pliée sur la bôme
+  private readonly jibRoll: THREE.Mesh; // foc roulé sur l'étai
+  private readonly tmpA = new THREE.Vector3(); // vecteurs de travail
+  private readonly tmpB = new THREE.Vector3();
   private readonly mainsheet: THREE.Mesh; // l'écoute de grand-voile : suit la bôme
   private bellyDir = 1;
   private lastTime = 0;
@@ -218,9 +222,16 @@ export class BoatView {
     this.boomPivot.add(this.mainsail.mesh);
     if (this.mainsail.battens) this.boomPivot.add(this.mainsail.battens);
     this.boomPivot.add(this.penons.group);
+    this.mainBundle = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 10), sailMat);
+    this.mainBundle.rotation.x = Math.PI / 2; // couché le long de la bôme
+    this.mainBundle.castShadow = true;
+    this.boomPivot.add(this.mainBundle);
     this.group.add(this.boomPivot);
     this.jib = new SailMesh(sailMat, false);
     this.group.add(this.jib.mesh);
+    this.jibRoll = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 8), sailMat);
+    this.jibRoll.castShadow = true;
+    this.group.add(this.jibRoll);
     // enrouleur de foc à l'étrave
     const drum = new THREE.CylinderGeometry(0.07, 0.07, 0.12, 10);
     drum.translate(0, deckHeight(0.97) + 0.25, -(spec.length / 2 - 0.45));
@@ -309,8 +320,17 @@ export class BoatView {
     const belly = 0.1 * (1 - 0.6 * flutter);
     const L = this.spec.length;
     const roof = roofHeight(this.spec, LAYOUT.mastU);
-    const headLocal = new THREE.Vector3(0, LAYOUT.mastHeight - LAYOUT.boomHeight - 0.45, 0.06);
+    const h = mainHeight(s); // hauteur utile de la grand-voile : hissée et réduite par les ris
+    const headLocal = new THREE.Vector3(0, 0.1 + (LAYOUT.mastHeight - LAYOUT.boomHeight - 0.45 - 0.1) * h, 0.06 * h);
+    this.mainsail.mesh.visible = h > 0.04;
     this.mainsail.fill(new THREE.Vector3(0, 0.1, 0.05), headLocal, new THREE.Vector3(0, 0.12, LAYOUT.boomLength - 0.12), belly, this.bellyDir, flutter, timeSeconds);
+    // grand-voile affalée : un paquet de toile sur la bôme (il grossit quand la voile descend)
+    const folded = Math.min(1, Math.max(0, (0.5 - h) / 0.5));
+    this.mainBundle.visible = folded > 0.02;
+    const radius = 0.03 + 0.14 * folded;
+    this.mainBundle.scale.set(radius, (LAYOUT.boomLength - 0.5) * (0.5 + 0.5 * folded), radius * 1.4);
+    this.mainBundle.position.set(0, 0.07 + radius, 0.25 + (LAYOUT.boomLength - 0.5) * (0.25 + 0.25 * folded));
+    this.penons.group.visible = h > 0.25; // pas de penons sur une voile presque affalée
 
     this.penons.update((q, p, out) => this.mainsail.sample(q, p, out), penonFlow(s, wind), s.side, timeSeconds);
 
@@ -319,8 +339,23 @@ export class BoatView {
     const head = P(LAYOUT.mastU + 0.05, roof + LAYOUT.mastHeight - 0.9, 0);
     const clewAngle = s.boom * 0.95;
     const sheetLength = 3.9;
-    const clew = P(L / 2 - 0.5 - Math.cos(clewAngle) * sheetLength, deckHeight(0.55) + 0.9, Math.sin(clewAngle) * sheetLength);
+    const clewFull = P(L / 2 - 0.5 - Math.cos(clewAngle) * sheetLength, deckHeight(0.55) + 0.9, Math.sin(clewAngle) * sheetLength);
+    // foc roulé : l'écoute remonte vers l'étai ; la toile s'enroule autour de l'étai (le guindant garde sa longueur)
+    const tClew = (clewFull.y - tack.y) / (head.y - tack.y); // hauteur relative du point d'écoute sur l'étai
+    const luffAtClew = tack.clone().lerp(head, tClew);
+    const jibOut = Math.min(1, Math.max(0, s.jibOut));
+    const clew = luffAtClew.clone().lerp(clewFull, jibOut);
+    this.jibRoll.visible = true;
+    this.jib.mesh.visible = jibOut > 0.03;
     this.jib.fill(tack, head, clew, belly * 1.1, this.bellyDir, flutter, timeSeconds + 1.7);
+    // le rouleau de toile le long de l'étai
+    const rollR = 0.035 + 0.07 * (1 - jibOut);
+    this.tmpA.copy(head).sub(tack);
+    const rollLen = this.tmpA.length();
+    this.tmpB.copy(tack).addScaledVector(this.tmpA, 0.5);
+    this.jibRoll.position.copy(this.tmpB);
+    this.jibRoll.scale.set(rollR, rollLen * 0.96, rollR);
+    this.jibRoll.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.tmpA.normalize());
 
     // Écoute de grand-voile : de l'extrémité de la bôme au chariot, devant la roue.
     const boomEnd = P(LAYOUT.mastU, roof + LAYOUT.boomHeight, 0).add(new THREE.Vector3(Math.sin(s.boom) * (LAYOUT.boomLength - 0.3), -0.05, Math.cos(s.boom) * (LAYOUT.boomLength - 0.3)));

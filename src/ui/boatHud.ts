@@ -20,6 +20,7 @@ export class BoatHud {
   private readonly aw = byId('bh-aw');
   private readonly heel = byId('bh-heel');
   private readonly sheet = byId('bh-sheet');
+  private readonly sails = byId('bh-sails');
   private readonly point = byId('bh-point');
   private readonly hint = byId('bh-hint');
   private readonly colors = { accent: '#e8a24a', text: '#ecebe6', muted: '#9aa3ad', line: '#2b343e', ok: '#4cb782', danger: '#e5484d' };
@@ -51,6 +52,8 @@ export class BoatHud {
     this.aw.textContent = `${Math.round(msToKnots(r.aws))} nd · ${side(deg(r.awa))}`;
     this.heel.textContent = side(r.heelDeg);
     this.sheet.textContent = `${Math.round((1 - r.sheet) * 100)} % bordée`;
+    this.sails.textContent = r.mainPct === 0 ? 'GV affalée' : `GV ${r.mainPct < 100 ? `${r.mainPct} %` : r.reef > 0 ? `${r.reef} ris` : 'pleine'}`;
+    this.sails.textContent += r.jibPct === 0 ? ' · foc roulé' : r.jibPct < 100 ? ` · foc ${r.jibPct} %` : ' · foc plein';
     this.point.textContent = r.point;
     this.hint.textContent = r.hint;
     this.hint.hidden = r.hint === '';

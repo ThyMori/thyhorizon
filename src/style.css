@@ -717,3 +717,67 @@ body.is-touch .keys-only {
 body.is-touch #fps {
   top: 76px;
 }
+
+/* Instruments du voilier : en bas à droite, ne gênent pas la vue. */
+#boat-hud {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 232px;
+  padding: 10px;
+  border-radius: var(--radius);
+  background: var(--shade);
+  color: var(--text);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+#boat-rose {
+  display: block;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 6px;
+}
+
+.bh-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.bh-grid dt {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bh-grid dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+}
+
+#bh-point {
+  margin: 6px 0 0;
+  color: var(--accent);
+  text-align: center;
+}
+
+#bh-hint {
+  margin: 6px 0 0;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.bh-keys {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}

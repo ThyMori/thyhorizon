@@ -17,11 +17,14 @@ export class PlayerControls {
   yaw: number; // cap
   pitch: number; // inclinaison du regard
   fly: boolean; // vol libre actif ?
+  aboard = false; // à bord du bateau ? (le bateau pose lui-même la position ; le joueur ne marche plus)
+  roll = 0; // roulis de la caméra (rad), donné par la gîte du bateau
   sensitivity = 1; // sensibilité de la souris
   onBlocked: (() => void) | null = null; // appelé quand l'eau profonde bloque le chemin
   onFlyChange: ((on: boolean) => void) | null = null; // appelé quand on active/désactive le vol
   onConstellationsKey: (() => void) | null = null; // appelé quand on appuie sur L (constellations)
   onMapKey: (() => void) | null = null; // appelé quand on appuie sur M (carte du monde)
+  onBoatKey: (() => void) | null = null; // appelé quand on appuie sur B (monter à bord / débarquer)
   onHelpKey: (() => void) | null = null; // appelé quand on appuie sur la touche d'aide
   touchActive = false; // joue-t-on au doigt (sans capture de souris) ?
   touchMove = { forward: 0, right: 0 }; // intention du joystick virtuel, de -1 à 1
@@ -105,7 +108,9 @@ export class PlayerControls {
       const [dYaw, dPitch] = keyLookDelta(this.axis('ArrowLeft'), this.axis('ArrowRight'), this.axis('ArrowUp'), this.axis('ArrowDown'), this.sensitivity, dt); // flèches : regard
       this.yaw += dYaw; // les flèches tournent le cap, en même temps que le déplacement
       this.pitch = clamp(this.pitch + dPitch, -MAX_PITCH, MAX_PITCH);
-      if (this.fly) {
+      if (this.aboard) {
+        // À bord : pas de marche, le bateau place la caméra (les touches A/D/W/S servent à barrer et régler la voile).
+      } else if (this.fly) {
         const up = clamp(this.axis('Space') - (this.keys.has('KeyC') || this.keys.has('ControlLeft') ? 1 : 0) + this.touchUp, -1, 1); // Espace monte, C/Ctrl descend
         const [dx, dy, dz] = flyDelta(this.yaw, this.pitch, { ...input, up }, dt);
         this.x += dx;
@@ -122,12 +127,17 @@ export class PlayerControls {
         }
       }
     }
-    if (!this.fly) {
+    if (!this.fly && !this.aboard) {
       const target = this.terrain.heightAt(this.x, this.z) + EYE_HEIGHT; // hauteur des yeux voulue
       this.y = this.y > target ? smoothTo(this.y, target, 5, dt) : smoothTo(this.y, target, 14, dt); // descente douce, relief suivi vite
     }
     camera.position.set(this.x - originX, this.y, this.z - originZ); // la caméra est placée relativement à l'origine flottante
-    camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ'); // d'abord le cap, puis l'inclinaison
+    camera.rotation.set(this.pitch, this.yaw, this.roll, 'YXZ'); // d'abord le cap, puis l'inclinaison, puis le roulis (gîte du bateau)
+  }
+
+  // Une touche physique est-elle enfoncée en ce moment ? (utilisé par le bateau pour la barre et l'écoute)
+  down(code: string): boolean {
+    return this.keys.has(code);
   }
 
   // 1 si l'une des deux touches est enfoncée, sinon 0.
@@ -143,7 +153,8 @@ export class PlayerControls {
       return;
     }
     this.keys.add(e.code);
-    if (e.code === 'KeyV') this.setFly(!this.fly); // V : vol libre
+    if (e.code === 'KeyV' && !this.aboard) this.setFly(!this.fly); // V : vol libre (pas à bord)
+    if (e.code === 'KeyB') this.onBoatKey?.(); // B : monter à bord / débarquer
     if (e.code === 'KeyH') this.onHelpKey?.(); // H : aide
     if (e.code === 'KeyM') this.onMapKey?.(); // M : carte du monde
     if (e.code === 'KeyL') this.onConstellationsKey?.(); // L : traits des constellations

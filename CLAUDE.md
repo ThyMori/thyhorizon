@@ -23,6 +23,12 @@ Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousi
 - `src/data/climate.json` : classification climatique réelle (Köppen-Geiger, grille 0,5°), générée par `scripts/build-climate.mjs`. Ne pas modifier à la main. Importée par `src/world/climateData.ts` (worker et jeu), lue par `src/core/climate.ts`.
 - `src/data/stars.json` : catalogue d'étoiles réel (généré par `scripts/build-stars.mjs`, licence dans `src/data/STARS-LICENSE.txt`). Ne pas modifier à la main.
 
+## Voilier (src/core/sailing.ts, wind.ts, waves.ts, hull.ts, boarding.ts)
+- Repère du bateau : avant (f) et tribord (r). `omega` > 0 = le bateau tourne à tribord, donc son `yaw` DIMINUE. `heel` > 0 = penché à tribord. Angle de vent `angle` > 0 = vient de tribord. Vent : `from` = direction d'OÙ il vient (0 = nord, sens horaire).
+- Le calcul de la houle `waveHeight` (core/waves.ts) est la même formule que le shader de l'océan : si on change une vague, ça change les deux (un seul tableau `WAVE_DEFS`).
+- Le bateau n'est simulé que quand le joueur est à bord ET que la souris est capturée. Quand on débarque, il reste amarré (vitesse 0).
+- Vent simulé : tout local (1.13). Le vent réel (Open-Meteo) arrive en 1.15 : il faudra alors adapter la règle « tout est local » ci-dessus.
+
 ## Rendu et grandes coordonnées
 Ne jamais envoyer une coordonnée du monde à la carte graphique (shader, position d'objet, caméra) : tout est relatif à l'origine flottante (`Game.origin`, `core/origin.ts`). Un shader qui a besoin de la position dans le monde (bruit, vagues) reçoit un décalage calculé en JavaScript (`grainShift`, `wavePhase`).
 

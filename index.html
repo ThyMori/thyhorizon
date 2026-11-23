@@ -32,6 +32,20 @@
       <div id="version-badge" aria-hidden="true"></div>
       <div id="crosshair" aria-hidden="true"></div>
       <div id="update-dot" hidden>update en cours</div>
+      <div id="boat-hud" hidden aria-label="Instruments du voilier">
+        <canvas id="boat-rose" width="132" height="132" aria-hidden="true"></canvas>
+        <dl class="bh-grid">
+          <div><dt>Cap</dt><dd id="bh-cap"></dd></div>
+          <div><dt>Vitesse</dt><dd id="bh-speed"></dd></div>
+          <div><dt>Vent vrai</dt><dd id="bh-tw"></dd></div>
+          <div><dt>Vent apparent</dt><dd id="bh-aw"></dd></div>
+          <div><dt>Gîte</dt><dd id="bh-heel"></dd></div>
+          <div><dt>Voile</dt><dd id="bh-sheet"></dd></div>
+        </dl>
+        <p id="bh-point"></p>
+        <p id="bh-hint" hidden></p>
+        <p class="bh-keys">A / D barre · W borde · S choque · Espace barre au milieu · B débarquer</p>
+      </div>
       <div id="loading" role="status">Le monde se forme…</div>
       <button id="click-hint" type="button" hidden>Clique pour reprendre</button>
     </div>
@@ -77,6 +91,7 @@
           <button id="btn-resume" type="button" class="primary">Entrer dans le monde</button>
           <button id="btn-settings" type="button">Réglages</button>
           <button id="btn-map" type="button">Carte du monde (M)</button>
+          <button id="btn-boat" type="button">Voilier : monter à bord (B)</button>
           <button id="btn-places" type="button">Lieux du monde</button>
           <button id="btn-help" type="button"><span class="icon-i" aria-hidden="true">i</span> Aide</button>
           <button id="btn-install" type="button" class="subtle" hidden>Installer l'application</button>
@@ -201,7 +216,7 @@
         <li><kbd>Z</kbd> <kbd>Q</kbd> <kbd>S</kbd> <kbd>D</kbd> (clavier AZERTY) (ou W A S D) : avancer, pas de côté, reculer.</li>
         <li><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> : tourner la tête, en même temps que tu marches (comme la souris).</li>
         <li><kbd>Maj</kbd> : courir. La souris : regarder autour de soi.</li>
-        <li>L'eau profonde arrête la marche : pour aller sur la mer, il faudra un bateau (à venir).</li>
+        <li>L'eau profonde arrête la marche : pour aller sur la mer, prends le voilier (<kbd>B</kbd>, voir plus bas).</li>
       </ul>
       <h3>Voler</h3>
       <ul>
@@ -209,6 +224,14 @@
         <li><kbd>L</kbd> : montre ou cache les traits des constellations (la nuit seulement). Sur téléphone, touche <strong>✦</strong>.</li>
         <li><kbd>V</kbd> : active ou coupe le vol libre. Dans ce mode, tu avances là où tu regardes.</li>
         <li><kbd>Espace</kbd> monte, <kbd>C</kbd> descend, <kbd>Maj</kbd> va très vite. Pratique pour explorer.</li>
+      </ul>
+      <h3>Le voilier</h3>
+      <ul>
+        <li><kbd>B</kbd> : près de l'eau, met ton voilier à l'eau et te fait monter à bord. Au bord d'une côte (moins de 18 m), <kbd>B</kbd> te fait débarquer ; le bateau reste amarré.</li>
+        <li><kbd>A</kbd> / <kbd>D</kbd> (ou <kbd>Q</kbd> / <kbd>D</kbd> en AZERTY) : barre à gauche / à droite. Sans vitesse, la barre ne dirige pas : il faut que l'eau passe sur le safran. <kbd>Espace</kbd> remet la barre au milieu.</li>
+        <li><kbd>W</kbd> (<kbd>Z</kbd> en AZERTY) borde la voile, <kbd>S</kbd> la choque (la relâche). Règle l'écoute jusqu'à ce que la voile soit tendue, sans qu'elle batte (faseye).</li>
+        <li>Le vent vient de la flèche verte (vent apparent, celui que tu sens). Au près (vers le vent), borde ; au largue (vent de côté ou de dos), choque. Tu ne peux pas aller droit dans le vent : zigzague (virements de bord).</li>
+        <li>Le vent est simulé d'après les grandes ceintures de la Terre (alizés, vents d'ouest) : il change avec le lieu et l'heure, avec des rafales.</li>
       </ul>
       <h3>Menu et réglages</h3>
       <ul>

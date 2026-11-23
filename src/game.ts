@@ -13,6 +13,8 @@ import { realClimate } from './world/climateData';
 import type { ReliefGrid } from './core/relief';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
+import { BoatDriver } from './player/boatDriver';
+import { BoatHud } from './ui/boatHud';
 import { TouchUi } from './player/touchUi';
 import { PlacesPanel } from './ui/placesPanel';
 import { WorldMap } from './ui/worldMap';
@@ -43,6 +45,8 @@ export class Game {
   private readonly gs: GameScene;
   private readonly chunks: ChunkManager;
   private readonly controls: PlayerControls;
+  private readonly boat: BoatDriver; // le voilier (physique, rendu, commandes)
+  private readonly boatHud = new BoatHud(); // instruments du voilier
   private readonly hud = new Hud();
   private readonly pause = byId('pause');
   private readonly settingsDialog = byId<HTMLDialogElement>('dialog-settings');
@@ -88,6 +92,11 @@ export class Game {
     this.applyOrigin(); // le rendu (tuiles, grain du sol, vagues) apprend où est l'origine
     this.controls = new PlayerControls(this.gs.renderer.domElement, this.terrain, save);
     this.controls.sensitivity = this.settings.mouseSensitivity;
+    this.boat = new BoatDriver(this.gs.scene, this.terrain, this.controls);
+    this.boat.onChange = (aboard) => {
+      this.boatHud.setVisible(aboard); // instruments visibles seulement à bord
+      byId('btn-boat').textContent = aboard ? 'Voilier : débarquer (B)' : 'Voilier : monter à bord (B)';
+    };
     this.hud.setFpsVisible(this.settings.showFps);
     this.settingsPanel = new SettingsPanel({
       getSettings: () => this.settings,
@@ -135,7 +144,9 @@ export class Game {
       this.origin = origin; // oui : l'origine saute sous le joueur (invisible, tout est replacé d'un coup)
       this.applyOrigin();
     }
+    this.boat.update(dt, now / 1000, this.origin); // le bateau avance et pose la caméra sur le pont (s'il y a lieu)
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
+    if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
     this.gs.updateEnvironment(sunState(this.hours, this.playerLat(), this.day), now / 1000); // le soleil dépend de la latitude du joueur
     this.gs.render();
@@ -181,6 +192,11 @@ export class Game {
 
   private wireEvents(): void {
     byId('btn-resume').addEventListener('click', () => this.resume());
+    byId('btn-boat').addEventListener('click', () => {
+      const wasAboard = this.boat.aboard;
+      this.boat.toggle(); // monte à bord ou débarque
+      if (!wasAboard && this.boat.aboard) this.resume(); // à bord : on entre directement dans le jeu
+    });
     byId('click-hint').addEventListener('click', () => this.resume());
     byId('btn-settings').addEventListener('click', () => this.openSettings());
     byId('btn-help').addEventListener('click', () => this.openHelp());
@@ -238,6 +254,7 @@ export class Game {
     };
     this.controls.onHelpKey = () => this.openHelp();
     this.controls.onMapKey = () => this.openMap();
+    this.controls.onBoatKey = () => this.boat.toggle();
     this.controls.onConstellationsKey = () => this.toggleConstellations();
   }
 
@@ -416,6 +433,7 @@ export class Game {
 
   // Place le joueur au sol, face au nord.
   private teleport(x: number, z: number, message: string): void {
+    this.boat.leave(); // le voyage nous sort du bateau (il reste là où il est)
     this.controls.x = x;
     this.controls.z = z;
     this.controls.yaw = 0;
@@ -463,17 +481,18 @@ export class Game {
   }
 
   private saveNow(): void {
+    const shore = this.boat.savedPose(); // à bord : on enregistre le point d'embarquement, pas la pleine mer
     const data: SaveData = {
       version: 2,
       seed: this.seedText,
-      x: this.controls.x,
-      z: this.controls.z,
-      y: this.controls.y,
-      yaw: this.controls.yaw,
+      x: shore ? shore.x : this.controls.x,
+      z: shore ? shore.z : this.controls.z,
+      y: shore ? this.terrain.heightAt(shore.x, shore.z) + 1.7 : this.controls.y,
+      yaw: shore ? shore.yaw : this.controls.yaw,
       pitch: this.controls.pitch,
       hours: this.hours,
       day: this.day,
-      fly: this.controls.fly,
+      fly: shore ? false : this.controls.fly,
     };
     saveJson(SAVE_KEY, data);
   }
@@ -483,6 +502,7 @@ export class Game {
   private exposeDebug(): void {
     window.__thy = {
       teleport: (x, z, yaw, pitch, fly = false, y) => {
+        this.boat.leave();
         this.controls.x = x;
         this.controls.z = z;
         this.controls.yaw = yaw;
@@ -503,6 +523,8 @@ export class Game {
       },
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),
       pending: () => this.chunks.stats().pending,
+      boat: () => ({ aboard: this.boat.aboard, state: this.boat.state as unknown as Record<string, unknown> | null, wind: this.boat.wind, board: () => this.boat.toggle() }),
+      play: (on) => this.controls.setTouchActive(on),
       pose: () => ({ x: this.controls.x, z: this.controls.z, yaw: this.controls.yaw, pitch: this.controls.pitch, fly: this.controls.fly, playing: this.controls.locked }),
       origin: () => ({ x: this.origin.x, z: this.origin.z, camera: [this.gs.camera.position.x, this.gs.camera.position.y, this.gs.camera.position.z] }),
       stats: () => ({ ...this.chunks.stats(), triangles: this.gs.renderer.info.render.triangles, calls: this.gs.renderer.info.render.calls }),

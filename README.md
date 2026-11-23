@@ -156,6 +156,16 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Vérifié : 204 tests (placement par climat, règles de terrain, forme, indices 16 bits), captures en forêt bretonne, au Congo (forêt dense avec ombres) et au Sahel (acacias). Pas testé : les performances sur ta carte graphique (jusqu'à ~12 000 arbres à l'écran en forêt dense), la taïga en capture, les montagnes boisées.
 - Limites : pas de buissons ni d'herbes, pas de saisons (feuilles toujours vertes), les arbres lointains disparaissent d'un coup au-delà de ~11 tuiles (la couleur du sol reste verte).
 
+### 1.13.0 — Le voilier jouable (simulation maritime, étape 1)
+- **B** près de l'eau : met un voilier de croisière de 9,5 m à l'eau (l'eau profonde la plus proche, côté regard) et te fait monter à bord. **B** à moins de 18 m d'une côte : tu débarques, le bateau reste amarré (remonte avec **B** à moins de 45 m). Aussi : bouton « Voilier » du menu.
+- Première personne sur le pont, au poste de barre. **A/D** : barre (elle revient au milieu quand on lâche ; **Espace** la recentre). **W** borde l'écoute, **S** la choque. Flèches et souris : regarder autour. Le pont tourne avec le bateau, la caméra gîte avec lui.
+- **Le vent** (`src/core/wind.ts`) est simulé d'après les grandes ceintures de la Terre (alizés, vents d'ouest, vents d'est polaires) + météo lente (variation avec le lieu et l'heure) + rafales. Même lieu + même instant = même vent. Au large de Lannion on obtient typiquement 10 à 20 nœuds d'ouest-sud-ouest.
+- **La physique** (`src/core/sailing.ts`, tests dans `sailing.test.ts`) : vent apparent = vent vrai − vitesse du bateau ; voile = aile (portance, traînée, décrochage à ~18°) ; l'angle de la bôme est min(écoute, angle du vent) donc une écoute trop choquée fait faseyer la voile ; quille = aile verticale (dérive 1 à 9°) ; résistance de coque avec vagues qui explosent vers 7 nœuds (vitesse de coque) ; gîte (couple de la voile contre redressement) qui crée de la barre au vent ; safran qui ne dirige que si le bateau avance ; échouage quand la coque touche le fond (profondeur < 1,6 m). Réglages mesurés par tests (12 nœuds de vent) : ≈ 5,3 nœuds au travers, ≈ 4,2 nœuds à 45° du vent vrai, ≈ 4,8 nœuds vent arrière, gîte ≈ 15° au près, impossible d'avancer face au vent.
+- **Instruments** (en bas à droite) : rose (bateau, voile, vent vrai fin, vent apparent épais), cap compas, vitesse en nœuds, vent vrai et apparent (force + angle + bord), gîte, écoute, allure (au près, au travers, au largue…) et un conseil quand ça ne va pas (voile qui faseye, décrochée, trop de gîte, face au vent, échoué).
+- Le bateau monte et descend avec les vagues visibles (`src/core/waves.ts`, partagé avec le shader de l'océan). Voiles recalculées à chaque image : creux côté sous le vent, battement quand elles faseyent.
+- Limites connues (étapes suivantes) : pas de tangage ni de roulis dû à la houle ni de sillage (1.14), pas de vent réel (1.15), le bateau n'apparaît pas sur la carte (1.16), pas de sauvegarde du bateau (au rechargement, tu repars à l'endroit où tu as embarqué), la carte (M) ou un voyage te fait quitter le bateau (il reste en mer).
+- Sauvegarde : à bord, c'est le point d'embarquement qui est enregistré (sinon on rechargerait en pleine mer).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -173,6 +183,8 @@ Sans objet : jeu local, sans compte ni serveur.
 4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) ✅ arbres par biome (1.12.0)
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
-**Ensuite** : Bateau à voile · Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
+**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. houle (tangage, roulis, sillage, mer qui se forme avec le vent) ; 3. vent réel Open-Meteo avec repli sur le vent simulé ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
+
+**Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 
 En ligne : https://horizon.thierry-morin.com (depuis 1.0.2).

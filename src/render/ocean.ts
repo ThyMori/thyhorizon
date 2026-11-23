@@ -5,20 +5,9 @@
 import * as THREE from 'three';
 import { Origin, NO_ORIGIN, wavePhase } from '../core/origin';
 import { buildPolarGrid } from '../core/polar';
+import { LOW_WAVES, WAVE_DEFS } from '../core/waves'; // les vagues sont définies dans la logique pure (partagées avec le bateau)
 import type { SunState } from '../core/sun';
 import { toColor } from './sky';
-
-// Vagues : somme de sinusoïdes dans des directions différentes (houle large + petites rides).
-// Chaque vague : direction (dx, dz), nombre d'onde k (rad/m), vitesse w (rad/s), amplitude (m).
-const WAVE_DEFS = [
-  { dx: 0.8, dz: 0.6, k: 0.09, w: 0.9, amp: 0.35 }, // houle principale (~70 m)
-  { dx: -0.55, dz: 0.83, k: 0.14, w: 1.2, amp: 0.22 },
-  { dx: 0.95, dz: -0.31, k: 0.26, w: 1.6, amp: 0.12 },
-  { dx: -0.2, dz: -0.98, k: 0.47, w: 2.1, amp: 0.07 },
-  { dx: 0.6, dz: -0.8, k: 0.9, w: 2.9, amp: 0.035 },
-  { dx: 0.3, dz: 0.95, k: 1.7, w: 3.7, amp: 0.018 }, // petites rides
-] as const;
-const LOW_WAVES = 3; // les trois premières déforment la surface ; toutes servent au calcul des reflets
 
 // Texte GLSL d'une somme de vagues. Les positions sont relatives à l'origine flottante : uPh[i] rend à chaque vague sa phase dans le monde.
 const waveSum = (count: number): string =>

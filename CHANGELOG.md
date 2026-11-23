@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.13.0 — 2026-11-23
+
+Voilier jouable : vent simulé, physique de voile (vent apparent, décrochage, quille, gîte, barre), pont à la première personne, instruments, touche B
+
 ## 1.12.1 — 2026-11-23
 
 Temps réel : l'heure solaire et la latitude du soleil suivent la position du joueur (nuit à Paris, jour à Sydney)

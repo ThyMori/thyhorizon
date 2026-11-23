@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.5.0 — 2026-11-23
+
+Commandes tactiles : joystick, regard au doigt, boutons Courir / Vol / Menu, bouton Retour
+
 ## 1.4.3 — 2026-11-23
 
 Un seul clic pour entrer dans le monde (plein écran puis capture de la souris)

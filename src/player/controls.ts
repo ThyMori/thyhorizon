@@ -21,6 +21,10 @@ export class PlayerControls {
   onBlocked: (() => void) | null = null; // appelé quand l'eau profonde bloque le chemin
   onFlyChange: ((on: boolean) => void) | null = null; // appelé quand on active/désactive le vol
   onHelpKey: (() => void) | null = null; // appelé quand on appuie sur la touche d'aide
+  touchActive = false; // joue-t-on au doigt (sans capture de souris) ?
+  touchMove = { forward: 0, right: 0 }; // intention du joystick virtuel, de -1 à 1
+  touchRun = false; // bouton « Courir » enfoncé (ou joystick à fond)
+  touchUp = 0; // vol au doigt : +1 monte, -1 descend, 0 stable
   private readonly keys = new Set<string>(); // touches physiques actuellement enfoncées
   private blockedCooldown = 0; // évite d'afficher le message d'eau à chaque image
 
@@ -44,7 +48,23 @@ export class PlayerControls {
 
   // La souris est-elle capturée (= on joue) ?
   get locked(): boolean {
-    return document.pointerLockElement === this.element;
+    return this.touchActive || document.pointerLockElement === this.element; // au doigt, « on joue » = mode tactile actif
+  }
+
+  // Tourne le regard d'un delta (utilisé par le glissement du doigt).
+  look(dYaw: number, dPitch: number): void {
+    this.yaw += dYaw;
+    this.pitch = clamp(this.pitch + dPitch, -MAX_PITCH, MAX_PITCH);
+  }
+
+  // Active ou coupe le mode tactile ; en le coupant, le joystick est relâché.
+  setTouchActive(on: boolean): void {
+    this.touchActive = on;
+    if (!on) {
+      this.touchMove = { forward: 0, right: 0 };
+      this.touchRun = false;
+      this.touchUp = 0;
+    }
   }
 
   // Demande la capture de la souris (doit venir d'un clic ou d'une touche de l'utilisateur).
@@ -76,15 +96,15 @@ export class PlayerControls {
     this.blockedCooldown = Math.max(0, this.blockedCooldown - dt);
     if (this.locked) {
       const input: MoveInput = {
-        forward: this.axis('KeyW') - this.axis('KeyS'), // W/Z avance, S recule (touches physiques)
-        right: this.axis('KeyD') - this.axis('KeyA'), // D droite, A/Q gauche
-        run: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
+        forward: clamp(this.axis('KeyW') - this.axis('KeyS') + this.touchMove.forward, -1, 1), // W/Z avance, S recule (touches physiques)
+        right: clamp(this.axis('KeyD') - this.axis('KeyA') + this.touchMove.right, -1, 1), // D droite, A/Q gauche
+        run: this.touchRun || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
       };
       const [dYaw, dPitch] = keyLookDelta(this.axis('ArrowLeft'), this.axis('ArrowRight'), this.axis('ArrowUp'), this.axis('ArrowDown'), this.sensitivity, dt); // flèches : regard
       this.yaw += dYaw; // les flèches tournent le cap, en même temps que le déplacement
       this.pitch = clamp(this.pitch + dPitch, -MAX_PITCH, MAX_PITCH);
       if (this.fly) {
-        const up = this.axis('Space') - (this.keys.has('KeyC') || this.keys.has('ControlLeft') ? 1 : 0); // Espace monte, C/Ctrl descend
+        const up = clamp(this.axis('Space') - (this.keys.has('KeyC') || this.keys.has('ControlLeft') ? 1 : 0) + this.touchUp, -1, 1); // Espace monte, C/Ctrl descend
         const [dx, dy, dz] = flyDelta(this.yaw, this.pitch, { ...input, up }, dt);
         this.x += dx;
         this.y += dy;

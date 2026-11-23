@@ -36,6 +36,20 @@
       <button id="click-hint" type="button" hidden>Clique pour reprendre</button>
     </div>
 
+    <!-- Commandes tactiles : visibles seulement au doigt, pendant qu'on joue. -->
+    <div id="touch-ui" aria-label="Commandes tactiles">
+      <div id="touch-move-zone"></div>
+      <div id="touch-look-zone"></div>
+      <div id="joy" aria-hidden="true"><div id="joy-knob"></div></div>
+      <button type="button" id="touch-menu" class="touch-btn" aria-label="Menu">☰</button>
+      <div id="touch-buttons">
+        <button type="button" id="touch-up" class="touch-btn" aria-label="Monter" hidden>▲</button>
+        <button type="button" id="touch-down" class="touch-btn" aria-label="Descendre" hidden>▼</button>
+        <button type="button" id="touch-run" class="touch-btn" aria-pressed="false">Courir</button>
+        <button type="button" id="touch-fly" class="touch-btn" aria-pressed="false">Vol</button>
+      </div>
+    </div>
+
     <!-- Un seul message à la fois, quelle que soit la page ouverte. -->
     <div id="toast" role="status" aria-live="polite" hidden></div>
 
@@ -66,7 +80,7 @@
           <button id="btn-update" type="button" class="subtle">À jour ? Recharger</button>
           <button id="btn-reset" type="button" class="subtle">Réinitialiser et recharger</button>
         </div>
-        <p class="hint">Échap : revenir ici &nbsp;·&nbsp; H : aide</p>
+        <p class="hint keys-only">Échap : revenir ici &nbsp;·&nbsp; H : aide</p>
         <p class="version" id="pause-version"></p>
       </div>
     </section>
@@ -141,7 +155,13 @@
         <h2 id="help-title" tabindex="-1">Aide</h2>
         <button type="button" class="close" data-close aria-label="Fermer l'aide">✕</button>
       </header>
-      <h3>Se déplacer</h3>
+      <h3>Au doigt (téléphone, tablette)</h3>
+      <ul>
+        <li><strong>Moitié gauche</strong> de l'écran : pose le pouce et glisse pour marcher (le joystick apparaît sous ton doigt). À fond, tu cours.</li>
+        <li><strong>Moitié droite</strong> : glisse pour regarder autour de toi.</li>
+        <li><strong>Courir</strong> et <strong>Vol</strong> sont des boutons à droite ; en vol, ▲ et ▼ montent et descendent. <strong>☰</strong> (en haut à droite) ouvre le menu, comme le bouton Retour du téléphone.</li>
+      </ul>
+      <h3>Se déplacer (clavier et souris)</h3>
       <ul>
         <li><kbd>Z</kbd> <kbd>Q</kbd> <kbd>S</kbd> <kbd>D</kbd> (clavier AZERTY) (ou W A S D) : avancer, pas de côté, reculer.</li>
         <li><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd> : tourner la tête, en même temps que tu marches (comme la souris).</li>

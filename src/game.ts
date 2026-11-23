@@ -10,6 +10,7 @@ import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
+import { TouchUi } from './player/touchUi';
 import { GameScene } from './render/scene';
 import { SAVE_KEY, SETTINGS_KEY, loadJson, saveJson } from './storage';
 import { byId } from './ui/dom';
@@ -39,6 +40,8 @@ export class Game {
   private readonly helpDialog = byId<HTMLDialogElement>('dialog-help');
   private readonly installDialog = byId<HTMLDialogElement>('dialog-install');
   private readonly settingsPanel: SettingsPanel;
+  private touchUi!: TouchUi; // commandes tactiles (créées avec les contrôles)
+  private touchMode = false; // joue-t-on au doigt ?
   private fullscreenPending: Promise<void> | null = null; // demande de plein écran en cours
   private wantsLock = false; // a-t-on demandé la capture de la souris (et attend-on la réponse) ?
   private lockRetries = 0; // nouvelles tentatives silencieuses déjà faites
@@ -84,6 +87,8 @@ export class Game {
         this.day = wrapDay(d);
       },
     });
+    this.touchUi = new TouchUi(this.controls, () => this.pauseTouch());
+    this.setTouchMode(window.matchMedia?.('(pointer: coarse)').matches ?? false); // écran tactile principal : commandes au doigt dès le départ
     this.wireEvents();
     this.showPause(); // on démarre sur l'écran d'accueil
     if (new URLSearchParams(location.search).has('debug')) this.exposeDebug(); // outils de développement
@@ -170,6 +175,10 @@ export class Game {
       if (!this.controls.locked && !anyDialogOpen() && this.pause.hidden) this.resume(); // clic direct sur le monde (invitation affichée)
     });
     document.addEventListener('pointerlockchange', () => this.onLockChange());
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.controls.locked && (e.pointerType === 'touch' || e.pointerType === 'mouse')) this.setTouchMode(e.pointerType === 'touch'); // le dernier pointeur utilisé décide
+    }, true);
+    window.addEventListener('popstate', () => this.pauseTouch()); // Retour du téléphone : menu
     document.addEventListener('pointerlockerror', () => this.onLockError());
     // Plein écran permanent : s'il est perdu (Échap, F11…), le prochain clic ou la prochaine touche sur le menu le rétablit.
     document.addEventListener('pointerdown', () => this.restoreFullscreen(), true);
@@ -188,8 +197,10 @@ export class Game {
       toast('L\'affichage 3D a été interrompu par le navigateur. Recharge la page pour reprendre.', 'error');
     });
     this.controls.onBlocked = () => toast('L\'eau est trop profonde pour y marcher. Il faudra un bateau pour aller plus loin.');
-    this.controls.onFlyChange = (on) =>
-      toast(on ? 'Vol libre activé. Appuie sur V pour revenir à pied.' : 'Vol libre coupé : tu retombes doucement au sol.');
+    this.controls.onFlyChange = (on) => {
+      this.touchUi.setFly(on); // boutons ▲ ▼ visibles seulement en vol
+      toast(on ? `Vol libre activé. ${this.touchMode ? 'Touche Vol' : 'Appuie sur V'} pour revenir à pied.` : 'Vol libre coupé : tu retombes doucement au sol.');
+    };
     this.controls.onHelpKey = () => this.openHelp();
   }
 
@@ -206,6 +217,10 @@ export class Game {
 
   private resume(): void {
     this.started = true;
+    if (this.touchMode) {
+      this.resumeTouch(); // au doigt : pas de capture de souris
+      return;
+    }
     this.wantsLock = true;
     this.lockRetries = 0;
     this.hidePause();
@@ -214,6 +229,30 @@ export class Game {
     void this.enterFullscreen().then(() => {
       if (this.wantsLock && !this.controls.locked) this.controls.requestLock(); // la souris est capturée : on joue
     });
+  }
+
+  // Entrée dans le monde au doigt : plein écran, puis mode tactile (le bouton Retour du téléphone ramène au menu).
+  private resumeTouch(): void {
+    this.hidePause();
+    this.hud.setHint(false);
+    void this.enterFullscreen();
+    this.controls.setTouchActive(true);
+    this.onLockChange(); // même effet qu'une capture de souris réussie : on joue
+    if (!(history.state && (history.state as { play?: boolean }).play)) history.pushState({ play: true }, ''); // une entrée d'historique pour que Retour ouvre le menu
+  }
+
+  // Menu pause au doigt (bouton ☰ ou Retour).
+  private pauseTouch(): void {
+    if (!this.controls.touchActive) return;
+    this.controls.setTouchActive(false);
+    this.touchUi.reset();
+    this.onLockChange(); // enregistre et affiche le menu
+  }
+
+  // Bascule entre commandes au doigt et à la souris (suit le dernier type de pointeur utilisé).
+  private setTouchMode(on: boolean): void {
+    this.touchMode = on;
+    document.body.classList.toggle('is-touch', on);
   }
 
   // Le navigateur a refusé la capture (souvent : plein écran en cours d'installation, ou Échap pressé il y a un instant).
@@ -356,6 +395,7 @@ export class Game {
       },
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),
       pending: () => this.chunks.stats().pending,
+      pose: () => ({ x: this.controls.x, z: this.controls.z, yaw: this.controls.yaw, pitch: this.controls.pitch, fly: this.controls.fly, playing: this.controls.locked }),
       origin: () => ({ x: this.origin.x, z: this.origin.z, camera: [this.gs.camera.position.x, this.gs.camera.position.y, this.gs.camera.position.z] }),
       stats: () => ({ ...this.chunks.stats(), triangles: this.gs.renderer.info.render.triangles, calls: this.gs.renderer.info.render.calls }),
     };

@@ -8,7 +8,7 @@ git pull        # récupérer la dernière version
 npm install     # une seule fois (et après chaque changement de dépendances)
 npm run dev     # lance le jeu ; ouvre l'adresse affichée (http://localhost:5173) dans Chrome ou Edge
 ```
-Clique sur « Entrer dans le monde ». Commandes : ZQSD (déplacement), flèches (regard, comme la souris), souris, Maj = courir, V = vol, H = aide, Échap = pause.
+Clique sur « Entrer dans le monde ». Commandes (clavier) : ZQSD (déplacement), flèches (regard, comme la souris), souris, Maj = courir, V = vol, H = aide, Échap = pause.
 
 ## Jouer en ligne (sans rien installer)
 Adresse : https://horizon.thierry-morin.com (CNAME chez Squarespace vers thymori.github.io, fichier public/CNAME, HTTPS forcé) ; ancienne adresse https://thymori.github.io/ThyHorizon/ (mise à jour automatiquement à chaque livraison, environ 1 à 2 minutes).
@@ -85,6 +85,14 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 ### 1.4.3 — Un seul clic pour entrer dans le monde
 - Le plein écran et la capture de la souris étaient demandés en même temps : le navigateur refusait la souris et il fallait cliquer une deuxième fois. Maintenant le plein écran est établi d'abord, puis la souris est capturée, avec un seul clic.
 - Pas testé : le comportement réel (mon navigateur de test n'accorde pas le plein écran).
+
+### 1.5.0 — Commandes tactiles (téléphone, tablette)
+- **Moitié gauche** de l'écran : un joystick flottant apparaît sous le pouce (zone morte, vitesse proportionnelle, à fond = course). **Moitié droite** : glisser pour regarder. Les deux se font en même temps (multi-doigts).
+- Boutons à droite : **Courir** (bascule), **Vol** (bascule) ; en vol, ▲ et ▼ (maintenir) montent et descendent. **☰** (haut droite) ouvre le menu ; le bouton **Retour** du téléphone aussi.
+- Détection automatique : écran tactile principal au démarrage, puis le dernier type de pointeur utilisé (doigt ou souris) décide quand on est dans un menu.
+- Logique pure et testée : `src/core/touch.ts` ; interface : `src/player/touchUi.ts`. Plein écran demandé à l'entrée dans le monde ; pas de capture de souris au doigt.
+- Vérifié en simulation de téléphone 360 px (doigts simulés) : marche, regard, les deux ensemble, Vol, ▲▼, menu, Retour. Pas testé : un vrai téléphone (confort du pouce, tailles, Firefox Android), un vrai iPhone.
+- Pas encore : gyroscope (option B, à ajouter plus tard), réglage de sensibilité tactile distincte de la souris.
 
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.

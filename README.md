@@ -144,6 +144,11 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Vérifié : 189 tests, carte dessinée et vérifiée sur capture (continents, déserts, forêts, calottes), clic en mer au large du Sénégal → posé sur la côte, fermeture de la carte. Pas testé : au doigt, sur ta carte graphique, l'atterrissage dans des endroits très escarpés.
 - Limites : pas de noms de pays ni de villes, pas de zoom au doigt (pincer), la mer ne montre pas la profondeur (relief marin plafonné à −200 m).
 
+### 1.11.0 — Jour et nuit sur la carte
+- La carte (M) assombrit la **nuit** d'après l'heure et la date du jeu (crépuscule en dégradé), avec un point jaune là où le soleil est au zénith. Bouton **Nuit** pour l'afficher ou le cacher. `subsolarPoint`, `sunElevationAt`, `nightAlpha` dans `src/core/worldmap.ts` : testés contre le vrai ciel du jeu (même hauteur de soleil à Lannion et ailleurs).
+- L'ombre est calculée à chaque ouverture de la carte (le temps est figé tant qu'elle est ouverte). Elle ne montre pas la lune ni les saisons autrement que par la position du soleil.
+- Vérifié : 195 tests, capture à 23 h 30 solaire en novembre (nuit sur l'Europe et l'Afrique, soleil dans le Pacifique sud). Pas testé : en « Temps réel » avec ton horloge.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

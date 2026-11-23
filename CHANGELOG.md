@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.11.0 — 2026-11-23
+
+Jour et nuit sur la carte du monde
+
 ## 1.10.0 — 2026-11-23
 
 Carte du monde (touche M) avec voyage

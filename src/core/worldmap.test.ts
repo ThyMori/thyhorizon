@@ -1,7 +1,8 @@
 // Tests de la carte du monde : projection, zoom, couleurs, recherche de terre.
 import { describe, expect, it } from 'vitest';
 import { realClimate } from '../world/climateData';
-import { MAX_SCALE, MapView, clampView, latLonToScreen, mapColor, minScale, panBy, renderMapRows, screenToLatLon, snapToLand, wrapLon, zoomAt } from './worldmap';
+import { sunPosition } from './geo';
+import { MAX_SCALE, nightAlpha, NIGHT_ALPHA, renderNightRows, subsolarPoint, sunElevationAt, MapView, clampView, latLonToScreen, mapColor, minScale, panBy, renderMapRows, screenToLatLon, snapToLand, wrapLon, zoomAt } from './worldmap';
 import { fakeRelief, loadRealRelief } from './relief.testutil';
 
 const W = 900;
@@ -88,5 +89,46 @@ describe('terre la plus proche', () => {
   });
   it('renvoie null quand il n\'y a aucune terre à moins de 6°', () => {
     expect(snapToLand(fakeRelief(() => -100), 0, 0)).toBeNull();
+  });
+});
+
+describe('jour et nuit', () => {
+  it('place le soleil au sud de Lannion à midi solaire', () => {
+    const sub = subsolarPoint(12, 172);
+    expect(sub.lon).toBeCloseTo(-3.46, 5);
+    expect(sub.lat).toBeGreaterThan(20); // solstice de juin
+  });
+  it('le point subsolaire a le soleil au zénith et le point opposé en pleine nuit', () => {
+    const sub = subsolarPoint(15, 80);
+    expect(sunElevationAt(sub.lat, sub.lon, sub)).toBeCloseTo(90, 3);
+    expect(sunElevationAt(-sub.lat, sub.lon + 180, sub)).toBeCloseTo(-90, 3);
+  });
+  it('donne la même hauteur de soleil que le ciel du jeu à Lannion', () => {
+    for (const [hours, day] of [[9, 100], [15.5, 200], [20, 330]] as const) {
+      const game = sunPosition(48.73, day, hours).elevationDeg;
+      expect(sunElevationAt(48.73, -3.46, subsolarPoint(hours, day))).toBeCloseTo(game, 1);
+    }
+  });
+  it('donne la même hauteur de soleil que le ciel du jeu ailleurs (heure solaire locale)', () => {
+    const lon = 100; // en Asie : l'heure solaire locale avance de 15° par heure vers l'est
+    const local = 12 + (lon - -3.46) / 15; // quand il est 12 h à Lannion
+    const game = sunPosition(30, 172, local % 24).elevationDeg;
+    expect(sunElevationAt(30, lon, subsolarPoint(12, 172))).toBeCloseTo(game, 1);
+  });
+  it('assombrit la nuit, pas le jour, en douceur', () => {
+    expect(nightAlpha(30)).toBe(0);
+    expect(nightAlpha(-30)).toBeCloseTo(NIGHT_ALPHA);
+    expect(nightAlpha(-1)).toBeGreaterThan(0);
+    expect(nightAlpha(-1)).toBeLessThan(NIGHT_ALPHA);
+  });
+  it('dessine l\'ombre sur toute la carte', () => {
+    const w = 72;
+    const out = new Uint8ClampedArray(w * (w / 2) * 4);
+    renderNightRows(out, w, subsolarPoint(12, 80));
+    let dark = 0;
+    let light = 0;
+    for (let k = 3; k < out.length; k += 4) out[k] > 100 ? dark++ : out[k] === 0 ? light++ : 0;
+    expect(dark).toBeGreaterThan(300);
+    expect(light).toBeGreaterThan(300);
   });
 });

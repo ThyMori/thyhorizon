@@ -3,6 +3,7 @@
 // Projection « équirectangulaire » : la longitude et la latitude vont directement en x et y (1° = le même nombre de pixels dans les deux sens).
 
 import type { Climate } from './climate';
+import { START_LON, declinationDeg } from './geo';
 import { terrainColor } from './palette';
 import { clamp } from './math';
 import type { Relief } from './relief';
@@ -114,4 +115,44 @@ export function snapToLand(relief: Relief, lat: number, lon: number): { lat: num
     }
   }
   return null;
+}
+
+// ---------- Jour et nuit ----------
+
+const DEG = Math.PI / 180;
+
+// Point de la Terre où le soleil est au zénith (« point subsolaire ») à l'heure solaire de Lannion et au jour de l'année donnés.
+// À 12 h solaire, le soleil est au sud de Lannion : il passe plus à l'ouest ensuite (15° par heure).
+export function subsolarPoint(hours: number, day: number): { lat: number; lon: number } {
+  return { lat: declinationDeg(day), lon: wrapLon(START_LON + (12 - hours) * 15) };
+}
+
+// Hauteur du soleil (degrés au-dessus de l'horizon) en un lieu, connaissant le point subsolaire.
+export function sunElevationAt(lat: number, lon: number, sub: { lat: number; lon: number }): number {
+  const h = (lon - sub.lon) * DEG; // angle horaire local
+  const sin = Math.sin(lat * DEG) * Math.sin(sub.lat * DEG) + Math.cos(lat * DEG) * Math.cos(sub.lat * DEG) * Math.cos(h);
+  return Math.asin(clamp(sin, -1, 1)) / DEG;
+}
+
+// Opacité de l'ombre de la nuit (0 = plein jour, NIGHT_ALPHA = nuit noire) : douce autour du lever et du coucher (crépuscule).
+export const NIGHT_ALPHA = 0.62;
+export function nightAlpha(elevationDeg: number): number {
+  const t = clamp((elevationDeg - -8) / (6 - -8), 0, 1); // −8° et en dessous : nuit ; +6° et au-dessus : jour
+  return NIGHT_ALPHA * (1 - t * t * (3 - 2 * t));
+}
+
+// Dessine l'ombre de la nuit sur le monde entier (width × width/2 pixels, RGBA : bleu nuit avec une opacité variable).
+export function renderNightRows(out: Uint8ClampedArray, width: number, sub: { lat: number; lon: number }): void {
+  const height = width / 2;
+  const deg = 360 / width;
+  for (let y = 0; y < height; y++) {
+    const lat = 90 - (y + 0.5) * deg;
+    for (let x = 0; x < width; x++) {
+      const k = (y * width + x) * 4;
+      out[k] = 8;
+      out[k + 1] = 12;
+      out[k + 2] = 38;
+      out[k + 3] = Math.round(255 * nightAlpha(sunElevationAt(lat, -180 + (x + 0.5) * deg, sub)));
+    }
+  }
 }

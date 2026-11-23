@@ -190,6 +190,7 @@ export class Game {
       relief: this.relief,
       climate: realClimate,
       getPlayer: () => worldToLatLon(this.controls.x, this.controls.z),
+      getTime: () => ({ hours: this.hours, day: this.day }),
       onGo: (lat, lon) => this.travelToLatLon(lat, lon),
     });
     bindDialog(this.mapDialog, () => this.onDialogClosed());

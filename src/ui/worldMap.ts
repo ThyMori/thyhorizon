@@ -3,7 +3,7 @@
 
 import type { Climate } from '../core/climate';
 import { formatCoords } from '../core/format';
-import { latLonToScreen, MapView, minScale, panBy, renderMapRows, screenToLatLon, zoomAt, clampView } from '../core/worldmap';
+import { latLonToScreen, MapView, minScale, panBy, renderMapRows, renderNightRows, screenToLatLon, subsolarPoint, zoomAt, clampView } from '../core/worldmap';
 import type { Relief } from '../core/relief';
 import { byId } from './dom';
 
@@ -14,6 +14,7 @@ export interface WorldMapDeps {
   relief: Relief;
   climate: Climate;
   getPlayer: () => { lat: number; lon: number }; // où est le joueur
+  getTime: () => { hours: number; day: number }; // heure solaire de Lannion et jour de l'année du jeu
   onGo: (lat: number, lon: number) => void; // voyage demandé
 }
 
@@ -23,6 +24,9 @@ export class WorldMap {
   private readonly info = byId('map-info');
   private readonly goBtn = byId<HTMLButtonElement>('map-go');
   private readonly image = document.createElement('canvas'); // le monde entier, dessiné une fois
+  private readonly night = document.createElement('canvas'); // l'ombre de la nuit (1° par pixel), refaite à chaque ouverture
+  private showNight = true; // ombre affichée ?
+  private sun = { lat: 0, lon: 0 }; // où le soleil est au zénith
   private ready = false; // l'image est-elle terminée ?
   private building = false;
   private view: MapView = { lat: 20, lon: 0, scale: 1 };
@@ -38,6 +42,8 @@ export class WorldMap {
   constructor(private readonly deps: WorldMapDeps) {
     this.image.width = MAP_W;
     this.image.height = MAP_H;
+    this.night.width = 360;
+    this.night.height = 180;
     const c = this.canvas;
     c.addEventListener('pointerdown', (e) => {
       c.setPointerCapture(e.pointerId);
@@ -61,6 +67,12 @@ export class WorldMap {
     byId('map-zoom-out').addEventListener('click', () => this.zoomCenter(1 / 1.6));
     byId('map-here').addEventListener('click', () => this.centerOnPlayer());
     this.goBtn.addEventListener('click', () => this.go());
+    const nightBtn = byId<HTMLButtonElement>('map-night');
+    nightBtn.addEventListener('click', () => {
+      this.showNight = !this.showNight; // jour / nuit : afficher ou cacher l'ombre
+      nightBtn.setAttribute('aria-pressed', String(this.showNight));
+      this.draw();
+    });
     window.addEventListener('resize', () => {
       if (byId('dialog-map').hasAttribute('open')) this.resize();
     });
@@ -70,6 +82,7 @@ export class WorldMap {
   open(): void {
     this.target = null;
     this.goBtn.disabled = true;
+    this.updateNight();
     this.resize();
     this.centerOnPlayer();
     this.setInfo('Glisse pour te déplacer, molette pour zoomer, clique pour choisir un lieu.');
@@ -79,6 +92,16 @@ export class WorldMap {
   // Touche Entrée : voyage vers le lieu choisi (si la carte est ouverte).
   go(): void {
     if (this.target) this.deps.onGo(this.target.lat, this.target.lon);
+  }
+
+  // Calcule l'ombre de la nuit pour l'heure et la date du jeu.
+  private updateNight(): void {
+    const { hours, day } = this.deps.getTime();
+    this.sun = subsolarPoint(hours, day);
+    const ctx = this.night.getContext('2d')!;
+    const data = ctx.createImageData(360, 180);
+    renderNightRows(data.data, 360, this.sun);
+    ctx.putImageData(data, 0, 0);
   }
 
   private setInfo(text: string): void {
@@ -167,6 +190,7 @@ export class WorldMap {
         const x0 = width / 2 + (-180 - view.lon + 360 * k) * view.scale; // trois copies côte à côte : le monde se referme sur lui-même
         if (x0 > width || x0 + w < 0) continue;
         ctx.drawImage(this.image, x0, y0, w, 180 * view.scale);
+        if (this.showNight) ctx.drawImage(this.night, x0, y0, w, 180 * view.scale); // l'ombre de la nuit par-dessus
       }
     }
     // Quadrillage léger tous les 30°.
@@ -196,6 +220,16 @@ export class WorldMap {
     ctx.arc(me.x, me.y, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    if (this.showNight) {
+      const s = latLonToScreen(view, width, height, this.sun.lat, this.sun.lon); // le soleil au zénith
+      ctx.fillStyle = '#ffe58a';
+      ctx.strokeStyle = '#7a5a00';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
     if (this.target) {
       const t = latLonToScreen(view, width, height, this.target.lat, this.target.lon);
       ctx.strokeStyle = '#ffffff';

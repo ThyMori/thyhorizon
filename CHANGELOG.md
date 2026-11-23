@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.1.0 — 2026-11-23
+
+Plein écran à l'entrée dans le monde et à la reprise.
+
 ## 1.0.2 — 2026-11-23
 
 Fichier CNAME (horizon.thierry-morin.com) ajouté au dépôt pour que le domaine survive aux déploiements.

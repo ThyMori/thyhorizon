@@ -171,7 +171,18 @@ export class Game {
     this.started = true;
     this.hidePause();
     this.hud.setHint(false);
+    this.enterFullscreen(); // plein écran d'abord (le clic de l'utilisateur sert aux deux demandes)
     this.controls.requestLock(); // la souris est capturée : on joue
+  }
+
+  // Passe la page en plein écran si elle ne l'est pas déjà (doit venir d'un clic ou d'une touche).
+  private enterFullscreen(): void {
+    if (document.fullscreenElement || !document.documentElement.requestFullscreen) return; // déjà en plein écran, ou non géré par ce navigateur
+    try {
+      void Promise.resolve(document.documentElement.requestFullscreen()).catch(() => undefined); // refus possible : on joue alors en fenêtre
+    } catch {
+      /* le navigateur a refusé : le jeu reste en fenêtre, sans gravité */
+    }
   }
 
   private showPause(): void {

@@ -37,6 +37,9 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Réglages de qualité (éco / équilibré / beau, distance, ombres, résolution), compteur d'images par seconde.
 - Sauvegarde automatique locale (position, heure), écran de secours « Réinitialiser et recharger ».
 
+### 1.1.0 — Plein écran à l'entrée
+- « Entrer dans le monde » et « Reprendre » passent le jeu en plein écran et capturent la souris. Échap quitte les deux ; « Reprendre » les remet.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

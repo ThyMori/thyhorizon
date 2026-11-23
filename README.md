@@ -133,6 +133,10 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Pas encore : arbres et végétation (étape 4b, version suivante), saisons qui changent les couleurs.
 - Limites : le climat est moyen sur 55 km (une vallée alpine et son sommet partagent la même classe ; seule l'altitude les distingue), pas de lacs ni de fleuves.
 
+### 1.9.1 — Menu « Lieux du monde »
+- Menu pause → **Lieux du monde** : 17 lieux (un par grand climat : Lannion, Provence, Alpes, Sahara, Sahel, Gobi, Atacama, Outback, Congo, Amazonie, Mékong, Pampa, Kazakhstan, Sibérie, Tibet, Groenland, Antarctique). Un appui = voyage au sol, face au nord. Liste dans `src/core/places.ts` (testée : sur la terre ferme, bon climat), fenêtre dans `src/ui/placesPanel.ts`.
+- Vérifié : 176 tests, clic réel sur « Sahara » (position et fermeture), pas de débordement à 360 px. Pas vérifié visuellement : le rendu de la fenêtre (les captures du navigateur sans GPU n'affichent pas les fenêtres).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

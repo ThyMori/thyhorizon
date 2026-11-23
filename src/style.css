@@ -222,6 +222,19 @@ body.is-playing #crosshair {
   gap: 10px;
 }
 
+/* Bouton d'un lieu : nom en gras, climat en petit dessous. */
+button.place {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  min-height: 48px;
+}
+
+button.place span {
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
 pre {
   max-height: 30dvh;
   overflow: auto;

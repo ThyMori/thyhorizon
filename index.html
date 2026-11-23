@@ -76,6 +76,7 @@
         <div class="stack">
           <button id="btn-resume" type="button" class="primary">Entrer dans le monde</button>
           <button id="btn-settings" type="button">Réglages</button>
+          <button id="btn-places" type="button">Lieux du monde</button>
           <button id="btn-help" type="button"><span class="icon-i" aria-hidden="true">i</span> Aide</button>
           <button id="btn-install" type="button" class="subtle" hidden>Installer l'application</button>
           <button id="btn-update" type="button" class="subtle">À jour ? Recharger</button>
@@ -154,6 +155,16 @@
     </dialog>
 
     <!-- Aide intégrée. -->
+    <!-- Lieux : un point de chaque grand climat de la Terre. -->
+    <dialog id="dialog-places" aria-labelledby="places-title">
+      <header>
+        <h2 id="places-title" tabindex="-1">Lieux du monde</h2>
+        <button type="button" class="close" data-close aria-label="Fermer la liste des lieux">✕</button>
+      </header>
+      <p class="hint">Touche un lieu pour t'y rendre tout de suite. Le terrain met quelques secondes à apparaître.</p>
+      <div id="places-list" class="stack"></div>
+    </dialog>
+
     <dialog id="dialog-help" aria-labelledby="help-title">
       <header>
         <h2 id="help-title" tabindex="-1">Aide</h2>

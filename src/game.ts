@@ -14,6 +14,8 @@ import type { ReliefGrid } from './core/relief';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
 import { TouchUi } from './player/touchUi';
+import { PlacesPanel } from './ui/placesPanel';
+import { Place, placePosition } from './core/places';
 import { GameScene } from './render/scene';
 import { SAVE_KEY, SETTINGS_KEY, loadJson, saveJson } from './storage';
 import { byId } from './ui/dom';
@@ -40,6 +42,7 @@ export class Game {
   private readonly hud = new Hud();
   private readonly pause = byId('pause');
   private readonly settingsDialog = byId<HTMLDialogElement>('dialog-settings');
+  private readonly placesDialog = byId<HTMLDialogElement>('dialog-places');
   private readonly helpDialog = byId<HTMLDialogElement>('dialog-help');
   private readonly installDialog = byId<HTMLDialogElement>('dialog-install');
   private readonly settingsPanel: SettingsPanel;
@@ -173,6 +176,9 @@ export class Game {
     byId('click-hint').addEventListener('click', () => this.resume());
     byId('btn-settings').addEventListener('click', () => this.openSettings());
     byId('btn-help').addEventListener('click', () => this.openHelp());
+    byId('btn-places').addEventListener('click', () => this.openPlaces());
+    new PlacesPanel((place) => this.travelTo(place)); // liste des lieux (boutons)
+    bindDialog(this.placesDialog, () => this.onDialogClosed());
     byId('btn-reset').addEventListener('click', () => byId('rescue-reset').click()); // réutilise la remise à zéro de l'écran de secours
     bindDialog(this.settingsDialog, () => this.onDialogClosed());
     bindDialog(this.helpDialog, () => this.onDialogClosed());
@@ -342,6 +348,26 @@ export class Game {
     this.hidePause(); // on libère l'écran pour voir le monde pendant qu'on règle
     this.settingsPanel.sync();
     openDialog(this.settingsDialog);
+  }
+
+  private openPlaces(): void {
+    this.hidePause();
+    openDialog(this.placesDialog);
+  }
+
+  // Voyage instantané vers un lieu : on se pose au sol, face au nord, et on ferme la liste.
+  private travelTo(place: Place): void {
+    const { x, z } = placePosition(place);
+    this.controls.x = x;
+    this.controls.z = z;
+    this.controls.yaw = 0; // face au nord
+    this.controls.pitch = 0.04;
+    this.controls.y = this.terrain.heightAt(x, z) + 1.7; // au sol (le terrain est calculé par formule : pas besoin d'attendre les tuiles)
+    this.controls.fly = false;
+    this.touchUi.setFly(false);
+    this.placesDialog.close(); // retour au menu : « Entrer dans le monde »
+    toast(`${place.name} : le terrain apparaît en quelques secondes. Touche « Entrer dans le monde ».`);
+    this.saveNow();
   }
 
   private openHelp(): void {

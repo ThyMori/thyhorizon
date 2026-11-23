@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.9.1 — 2026-11-23
+
+Menu Lieux du monde pour visiter chaque climat
+
 ## 1.9.0 — 2026-11-23
 
 Biomes : le sol suit le vrai climat de la Terre (Köppen-Geiger)

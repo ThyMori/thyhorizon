@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.4.1 — 2026-11-23
+
+Flèches = regard (en même temps que la marche), souris brute sans accélération
+
 ## 1.4.0 — 2026-11-23
 
 Application installable (PWA) : bandeau de mise à jour, invitation à installer, icônes, hors ligne

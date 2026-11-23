@@ -8,7 +8,7 @@ git pull        # récupérer la dernière version
 npm install     # une seule fois (et après chaque changement de dépendances)
 npm run dev     # lance le jeu ; ouvre l'adresse affichée (http://localhost:5173) dans Chrome ou Edge
 ```
-Clique sur « Entrer dans le monde ». Commandes : ZQSD / flèches, souris, Maj = courir, V = vol, H = aide, Échap = pause.
+Clique sur « Entrer dans le monde ». Commandes : ZQSD (déplacement), flèches (regard, comme la souris), souris, Maj = courir, V = vol, H = aide, Échap = pause.
 
 ## Jouer en ligne (sans rien installer)
 Adresse : https://horizon.thierry-morin.com (CNAME chez Squarespace vers thymori.github.io, fichier public/CNAME, HTTPS forcé) ; ancienne adresse https://thymori.github.io/ThyHorizon/ (mise à jour automatiquement à chaque livraison, environ 1 à 2 minutes).
@@ -70,6 +70,11 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - `public/sw.js` : service worker « réseau d'abord » (dernière version si en ligne, copie en cache hors ligne). Sa version est mise à jour par `npm run bump`. Il n'est pas actif avec `npm run dev`, seulement sur la version construite/en ligne.
 - Icônes PNG + ICO + SVG (`public/icons/`), `public/manifest.webmanifest`.
 - Pas testé : l'invite d'installation réelle de ton navigateur, l'installation sur ton Android, et l'arrivée réelle d'une mise à jour (elle se verra à la publication de la version suivante).
+
+### 1.4.1 — Regard aux flèches et souris plus directe
+- Les flèches font maintenant tourner la tête (≈ 92°/s, suit la sensibilité) et ne servent plus à marcher : on peut regarder et avancer en même temps au clavier.
+- Capture de souris « brute » (`unadjustedMovement`) : pas d'accélération Windows ; repli automatique si le navigateur ne la gère pas. Les sauts de souris aberrants (> 600 px d'un coup) sont ignorés.
+- Pas testé : le ressenti réel (pas de souris dans mon navigateur de test).
 
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.

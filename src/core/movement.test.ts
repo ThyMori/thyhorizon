@@ -1,6 +1,6 @@
 // Tests du déplacement : directions, vitesse, blocage en eau profonde.
 import { describe, expect, it } from 'vitest';
-import { RUN_SPEED, WALK_SPEED, flyDelta, isWalkable, smoothTo, stepWalk } from './movement';
+import { RUN_SPEED, WALK_SPEED, flyDelta, isWalkable, smoothTo, stepWalk, keyLookDelta } from './movement';
 import { hashSeed } from './noise';
 import { createTerrain, findSpawn } from './terrain';
 
@@ -64,5 +64,24 @@ describe('smoothTo', () => {
     const v = smoothTo(0, 10, 12, 0.016);
     expect(v).toBeGreaterThan(0);
     expect(v).toBeLessThan(10);
+  });
+});
+
+describe('keyLookDelta', () => {
+  it('tourne à gauche et à droite en sens opposés, proportionnellement au temps', () => {
+    const [l] = keyLookDelta(1, 0, 0, 0, 1, 0.5);
+    const [r] = keyLookDelta(0, 1, 0, 0, 1, 0.5);
+    expect(l).toBeGreaterThan(0);
+    expect(r).toBeCloseTo(-l);
+  });
+  it('ne bouge pas si rien n\'est pressé ou si deux flèches opposées le sont', () => {
+    expect(keyLookDelta(0, 0, 0, 0, 1, 1)).toEqual([0, 0]);
+    expect(keyLookDelta(1, 1, 1, 1, 1, 1)).toEqual([0, 0]);
+  });
+  it('lève la tête avec la flèche haut et suit la sensibilité', () => {
+    const [, p1] = keyLookDelta(0, 0, 1, 0, 1, 1);
+    const [, p2] = keyLookDelta(0, 0, 1, 0, 2, 1);
+    expect(p1).toBeGreaterThan(0);
+    expect(p2).toBeCloseTo(2 * p1);
   });
 });

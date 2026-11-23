@@ -70,3 +70,11 @@ export function flyDelta(
 // Rapproche doucement une valeur de sa cible (indépendant du nombre d'images par seconde).
 export const smoothTo = (current: number, target: number, rate: number, dt: number): number =>
   current + (target - current) * (1 - Math.exp(-rate * dt));
+
+export const KEY_LOOK_SPEED = 1.6; // rotation du regard aux flèches, en radians par seconde (≈ 92°/s) à sensibilité 1
+
+// Rotation du regard commandée par les flèches : gauche/droite tournent le cap, haut/bas inclinent. Valeurs -1, 0 ou 1.
+export const keyLookDelta = (left: number, right: number, up: number, down: number, sensitivity: number, dt: number): [number, number] => [
+  (left - right) * KEY_LOOK_SPEED * sensitivity * dt, // variation du cap (gauche = positif, comme la souris vers la gauche)
+  (up - down) * KEY_LOOK_SPEED * sensitivity * dt, // variation de l'inclinaison (haut = lever la tête)
+];

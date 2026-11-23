@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { clamp } from '../core/math';
-import { EYE_HEIGHT, MoveInput, flyDelta, smoothTo, stepWalk } from '../core/movement';
+import { EYE_HEIGHT, MoveInput, flyDelta, keyLookDelta, smoothTo, stepWalk } from '../core/movement';
 import type { SaveData } from '../core/save';
 import type { Terrain } from '../core/terrain';
 
@@ -50,7 +50,15 @@ export class PlayerControls {
   // Demande la capture de la souris (doit venir d'un clic ou d'une touche de l'utilisateur).
   requestLock(): void {
     try {
-      void Promise.resolve(this.element.requestPointerLock()).catch(() => undefined); // certains navigateurs renvoient une promesse
+      // Mouvement « brut » : sans l'accélération de souris du système (regard plus direct). Si le navigateur ne le gère pas, on redemande normalement.
+      const raw = this.element.requestPointerLock({ unadjustedMovement: true }) as unknown as Promise<void> | undefined;
+      void Promise.resolve(raw).catch(() => {
+        try {
+          void Promise.resolve(this.element.requestPointerLock()).catch(() => undefined); // repli : capture classique
+        } catch {
+          /* refus : pointerlockerror préviendra */
+        }
+      });
     } catch {
       /* le navigateur a refusé : l'événement pointerlockerror préviendra l'utilisateur */
     }
@@ -68,12 +76,15 @@ export class PlayerControls {
     this.blockedCooldown = Math.max(0, this.blockedCooldown - dt);
     if (this.locked) {
       const input: MoveInput = {
-        forward: this.axis('KeyW', 'ArrowUp') - this.axis('KeyS', 'ArrowDown'), // W/Z avance, S recule (touches physiques)
-        right: this.axis('KeyD', 'ArrowRight') - this.axis('KeyA', 'ArrowLeft'), // D droite, A/Q gauche
+        forward: this.axis('KeyW') - this.axis('KeyS'), // W/Z avance, S recule (touches physiques)
+        right: this.axis('KeyD') - this.axis('KeyA'), // D droite, A/Q gauche
         run: this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
       };
+      const [dYaw, dPitch] = keyLookDelta(this.axis('ArrowLeft'), this.axis('ArrowRight'), this.axis('ArrowUp'), this.axis('ArrowDown'), this.sensitivity, dt); // flèches : regard
+      this.yaw += dYaw; // les flèches tournent le cap, en même temps que le déplacement
+      this.pitch = clamp(this.pitch + dPitch, -MAX_PITCH, MAX_PITCH);
       if (this.fly) {
-        const up = this.axis('Space', 'Space') - (this.keys.has('KeyC') || this.keys.has('ControlLeft') ? 1 : 0); // Espace monte, C/Ctrl descend
+        const up = this.axis('Space') - (this.keys.has('KeyC') || this.keys.has('ControlLeft') ? 1 : 0); // Espace monte, C/Ctrl descend
         const [dx, dy, dz] = flyDelta(this.yaw, this.pitch, { ...input, up }, dt);
         this.x += dx;
         this.y += dy;
@@ -98,7 +109,7 @@ export class PlayerControls {
   }
 
   // 1 si l'une des deux touches est enfoncée, sinon 0.
-  private axis(a: string, b: string): number {
+  private axis(a: string, b = a): number {
     return this.keys.has(a) || this.keys.has(b) ? 1 : 0;
   }
 
@@ -116,6 +127,7 @@ export class PlayerControls {
 
   private onMouseMove(e: MouseEvent): void {
     if (!this.locked) return;
+    if (Math.abs(e.movementX) > 600 || Math.abs(e.movementY) > 600) return; // saut aberrant (bug connu de certains navigateurs) : ignoré
     this.yaw -= e.movementX * LOOK_SPEED * this.sensitivity; // droite = tourner vers la droite
     this.pitch = clamp(this.pitch - e.movementY * LOOK_SPEED * this.sensitivity, -MAX_PITCH, MAX_PITCH);
   }

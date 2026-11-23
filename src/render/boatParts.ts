@@ -187,20 +187,58 @@ export function buildCockpitWalls(spec: BoatSpec): { walls: THREE.BufferGeometry
   return { walls: merge(walls), teak: merge(teak) };
 }
 
-// Le rouf : un volume qui se rétrécit et s'abaisse vers l'avant.
+// Le rouf : un volume arrondi (flancs inclinés, toit bombé) qui se rétrécit et s'abaisse vers l'avant, avec un nez arrondi.
+// Construit par tranches : chaque tranche est une section en « dôme » dont la taille suit le plan (cabinHalfWidth, hauteur).
+const CABIN_SECTION: ReadonlyArray<readonly [number, number]> = [
+  [1, 0], [0.97, 0.25], [0.94, 0.55], [0.84, 0.8], [0.62, 0.95], [0.32, 0.995], [0, 1], // demi-section : (largeur relative, hauteur relative), du bas vers le sommet
+];
+const CABIN_NOSE = 0.75; // longueur du nez arrondi à l'avant (m)
+
 export function buildCabin(spec: BoatSpec): THREE.BufferGeometry {
   const c = LAYOUT.cabin;
-  const len = c.u1 - c.u0;
-  const g = new THREE.BoxGeometry(c.halfBack * 2, c.height + 0.06, len, 1, 1, 8);
-  const pos = g.getAttribute('position') as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) {
-    const t = Math.min(1, Math.max(0, 0.5 - pos.getZ(i) / len)); // 0 à l'arrière, 1 à l'avant
-    const u = c.u0 + t * len;
-    const x = pos.getX(i);
-    pos.setX(i, (x / c.halfBack) * cabinHalfWidth(u)); // largeur suivant le plan
-    if (pos.getY(i) > 0) pos.setY(i, pos.getY(i) - 0.14 * t); // le toit descend vers l'avant
+  const slices = 22;
+  const n = CABIN_SECTION.length;
+  const ring = 2 * n - 1; // points d'une section complète (bas bâbord → sommet → bas tribord)
+  const verts: number[] = [];
+  const idx: number[] = [];
+  for (let i = 0; i <= slices; i++) {
+    const u = lerp(c.u0, c.u1, i / slices);
+    const t = (u - c.u0) / (c.u1 - c.u0);
+    const nose = Math.max(0, (u - (c.u1 - CABIN_NOSE)) / CABIN_NOSE); // 0 puis 1 au bout : le nez
+    const w = cabinHalfWidth(u) * (1 - 0.55 * nose * nose);
+    const base = deckHeight(stationOf(spec, u)) - 0.05; // le pied du rouf s'enfonce un peu dans le pont
+    const h = (c.height + 0.06 - 0.14 * t) * (1 - 0.5 * nose * nose);
+    for (let k = -(n - 1); k <= n - 1; k++) {
+      const [rw, rh] = CABIN_SECTION[Math.abs(k)]!;
+      const p = P(u, base + rh * h, Math.sign(k) * rw * w);
+      verts.push(p.x, p.y, p.z);
+    }
   }
-  g.translate(0, deckHeight(stationOf(spec, (c.u0 + c.u1) / 2)) + (c.height + 0.06) / 2 - 0.05, -(c.u0 + c.u1) / 2);
+  for (let i = 0; i < slices; i++) {
+    for (let k = 0; k < ring - 1; k++) {
+      const a = i * ring + k;
+      const d = a + ring;
+      idx.push(a, a + 1, d, a + 1, d + 1, d);
+    }
+  }
+  // Faces avant (nez) et arrière : éventails fermant les deux bouts.
+  const cap = (sliceIndex: number, flip: boolean): void => {
+    const first = sliceIndex * ring;
+    const center = verts.length / 3;
+    let sx = 0, sy = 0, sz = 0;
+    for (let k = 0; k < ring; k++) {
+      sx += verts[(first + k) * 3]!;
+      sy += verts[(first + k) * 3 + 1]!;
+      sz += verts[(first + k) * 3 + 2]!;
+    }
+    verts.push(sx / ring, sy / ring, sz / ring);
+    for (let k = 0; k < ring - 1; k++) idx.push(center, flip ? first + k + 1 : first + k, flip ? first + k : first + k + 1);
+  };
+  cap(0, false);
+  cap(slices, true);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  g.setIndex(idx);
   g.computeVertexNormals();
   return g;
 }
@@ -225,7 +263,7 @@ export function cabinWindow(spec: BoatSpec, side: 1 | -1, u: number, w = 0.46, h
   const half = cabinHalfWidth(u);
   const slope = (cabinHalfWidth(u + 0.1) - cabinHalfWidth(u - 0.1)) / 0.2; // le flanc se rapproche de l'axe vers l'avant
   const normal = new THREE.Vector3(side, 0, 0).add(new THREE.Vector3(0, 0, -slope * side * -1)).normalize(); // normale sortante
-  const p = P(u, y, side * (half + 0.012));
+  const p = P(u, y, side * (half * 0.945 + 0.012)); // le flanc est incliné : à 30 cm du pont il est un peu rentré
   mesh.position.copy(p);
   mesh.rotation.y = Math.atan2(normal.x, normal.z);
   return mesh;

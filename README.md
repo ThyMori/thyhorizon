@@ -171,6 +171,9 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Poste de barre à roue (la roue tourne avec le safran) ; tes yeux sont dans le cockpit derrière elle.
 - Le plan du bateau est dans `LAYOUT` (`src/core/hull.ts`, testé) : il servira aux collisions pour marcher sur le pont (prochaine étape) et à la cabine intérieure ensuite.
 
+### 1.13.2 — Rouf arrondi
+- Le rouf n'est plus une boîte : flancs inclinés, toit bombé, nez arrondi vers l'avant (`buildCabin`, `src/render/boatParts.ts`).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

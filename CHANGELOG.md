@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.13.2 — 2026-11-23
+
+Rouf du voilier arrondi (flancs inclinés, toit bombé, nez)
+
 ## 1.13.1 — 2026-11-23
 
 Nouveau voilier 3D plus détaillé (coque, cockpit teck, rouf, roue, gréement, voiles à lattes)

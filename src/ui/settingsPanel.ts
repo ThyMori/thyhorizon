@@ -2,7 +2,8 @@
 // Chaque changement s'applique tout de suite (on voit le résultat derrière le panneau).
 
 import { CHUNK_SIZE } from '../core/chunk';
-import { formatDistance, formatHours } from '../core/format';
+import { formatCoords, formatDistance, formatHours } from '../core/format';
+import { DAYS_IN_YEAR, START_LAT, START_LON, START_PLACE, formatDay } from '../core/geo';
 import { Quality, Settings, applyPreset, detectQuality } from '../core/settings';
 import { byId } from './dom';
 
@@ -12,6 +13,8 @@ export interface SettingsBridge {
   setSettings(next: Settings): void; // applique et enregistre de nouveaux réglages
   getHours(): number; // heure du jeu
   setHours(hours: number): void; // change l'heure du jeu
+  getDay(): number; // jour de l'année du jeu
+  setDay(day: number): void; // change le jour de l'année
 }
 
 export class SettingsPanel {
@@ -22,6 +25,8 @@ export class SettingsPanel {
   private readonly resolution = byId<HTMLInputElement>('set-resolution');
   private readonly fps = byId<HTMLInputElement>('set-fps');
   private readonly hours = byId<HTMLInputElement>('set-hours');
+  private readonly day = byId<HTMLInputElement>('set-day');
+  private readonly daysPass = byId<HTMLInputElement>('set-dayspass');
   private readonly dayLength = byId<HTMLSelectElement>('set-daylength');
   private readonly sensitivity = byId<HTMLInputElement>('set-sensitivity');
 
@@ -36,6 +41,11 @@ export class SettingsPanel {
     this.fps.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showFps: this.fps.checked }));
     this.sensitivity.addEventListener('input', () => this.apply({ ...bridge.getSettings(), mouseSensitivity: Number(this.sensitivity.value) / 100 }));
     this.dayLength.addEventListener('change', () => this.apply({ ...bridge.getSettings(), dayLengthMinutes: Number(this.dayLength.value) }));
+    this.day.addEventListener('input', () => {
+      bridge.setDay(Number(this.day.value)); // la date change tout de suite (saison, hauteur du soleil)
+      this.sync();
+    });
+    this.daysPass.addEventListener('change', () => this.apply({ ...bridge.getSettings(), daysPass: this.daysPass.checked }));
     this.hours.addEventListener('input', () => {
       bridge.setHours(Number(this.hours.value)); // l'heure change tout de suite
       this.sync();
@@ -59,6 +69,11 @@ export class SettingsPanel {
     byId('out-sensitivity').textContent = `${Math.round(s.mouseSensitivity * 100)} %`;
     const h = this.bridge.getHours();
     this.hours.value = String(h);
+    this.day.max = String(DAYS_IN_YEAR); // le curseur couvre l'année entière
+    this.day.value = String(this.bridge.getDay());
+    byId('out-day').textContent = formatDay(this.bridge.getDay());
+    this.daysPass.checked = s.daysPass;
+    byId('out-place').textContent = `${START_PLACE} — ${formatCoords(START_LAT, START_LON)}`; // le lieu du monde
     byId('out-hours').textContent = formatHours(h);
   }
 

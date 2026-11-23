@@ -1,12 +1,11 @@
 // Le soleil, la lune et les couleurs du ciel selon l'heure.
 // Logique pure : à partir d'une heure (0 à 24) on obtient tout ce qu'il faut pour éclairer la scène.
-// Le soleil se lève à l'est (+x) vers 6 h, passe au sud (+z) à midi, se couche à l'ouest (-x) vers 18 h :
-// il se couche donc sur l'océan.
+// La position du soleil vient de la vraie astronomie (core/geo.ts) : elle dépend de la latitude, du jour de l'année
+// et de l'heure solaire locale (midi = soleil plein sud). Il se lève donc à l'est, se couche à l'ouest, et la saison
+// change sa hauteur et la durée du jour.
 
+import { sunPosition } from './geo';
 import { Rgb, clamp, lerp, lerpRgb, smoothstep } from './math';
-
-// Hauteur maximale du soleil à midi, en degrés (équinoxe vers 43° de latitude nord).
-export const MAX_SUN_ELEVATION_DEG = 48;
 
 // Tout ce qui dépend de l'heure. Les couleurs sont en sRGB (perceptuel).
 export interface SunState {
@@ -50,15 +49,10 @@ const STOPS: readonly Stop[] = [
 // Ramène une heure dans [0 ; 24[.
 export const wrapHours = (h: number): number => ((h % 24) + 24) % 24;
 
-// Calcule tout l'état du ciel pour une heure donnée.
-export function sunState(hoursIn: number): SunState {
+// Calcule tout l'état du ciel pour une heure solaire, une latitude (degrés) et un jour de l'année (1 à 365).
+export function sunState(hoursIn: number, latDeg: number, day: number): SunState {
   const hours = wrapHours(hoursIn); // heure normalisée
-  const phi = ((hours - 6) / 12) * Math.PI; // angle horaire : 0 à 6 h (est), π/2 à midi (sud), π à 18 h (ouest)
-  const sinElev = Math.sin(phi) * Math.sin((MAX_SUN_ELEVATION_DEG * Math.PI) / 180); // sinus de la hauteur (maximal à midi)
-  const elev = Math.asin(clamp(sinElev, -1, 1)); // hauteur en radians
-  const elevationDeg = (elev * 180) / Math.PI; // et en degrés
-  const ce = Math.cos(elev); // cosinus de la hauteur
-  const sunDirection: [number, number, number] = [ce * Math.cos(phi), Math.sin(elev), ce * Math.sin(phi)]; // vers le soleil
+  const { elevationDeg, direction: sunDirection } = sunPosition(latDeg, day, hours); // vraie position du soleil
   const moonDirection: [number, number, number] = [-sunDirection[0], -sunDirection[1], -sunDirection[2]]; // la lune est opposée
 
   // Interpolation entre les deux repères qui encadrent la hauteur du soleil.

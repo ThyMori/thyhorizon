@@ -14,6 +14,7 @@ export interface Settings {
   resolution: number; // netteté de l'image, de 0.5 à 1 (1 = résolution native de l'écran)
   showFps: boolean; // affiche le compteur d'images par seconde
   mouseSensitivity: number; // sensibilité de la souris, de 0.5 à 2
+  daysPass: boolean; // le calendrier avance-t-il (un jour de plus à chaque minuit du jeu) ?
   dayLengthMinutes: number; // durée d'une journée du jeu en minutes réelles (0 = le temps est arrêté)
 }
 
@@ -30,6 +31,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ...PRESETS.balanced,
   showFps: true, // visible au début : on a besoin de mesurer la fluidité
   mouseSensitivity: 1,
+  daysPass: true, // les saisons avancent lentement tant qu'on joue
   dayLengthMinutes: 30,
 };
 
@@ -74,6 +76,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     resolution: clamp(num(r.resolution, d.resolution), LIMITS.resolution.min, LIMITS.resolution.max),
     showFps: bool(r.showFps, d.showFps),
     mouseSensitivity: clamp(num(r.mouseSensitivity, d.mouseSensitivity), LIMITS.mouseSensitivity.min, LIMITS.mouseSensitivity.max),
+    daysPass: bool(r.daysPass, d.daysPass),
     dayLengthMinutes: DAY_LENGTH_CHOICES.includes(num(r.dayLengthMinutes, d.dayLengthMinutes) as (typeof DAY_LENGTH_CHOICES)[number])
       ? num(r.dayLengthMinutes, d.dayLengthMinutes)
       : d.dayLengthMinutes,

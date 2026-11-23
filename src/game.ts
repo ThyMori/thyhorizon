@@ -5,6 +5,7 @@ import { SaveData, readSavedSeed, sanitizeSave } from './core/save';
 import { formatCount } from './core/format';
 import { hashSeed } from './core/noise';
 import { Settings, sanitizeSettings } from './core/settings';
+import { START_LAT, dayOfYearFromDate, wrapDay } from './core/geo';
 import { sunState, wrapHours } from './core/sun';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
@@ -21,7 +22,8 @@ const LOADING_TIMEOUT_S = 15; // au-delà, on arrête d'attendre le terrain et o
 
 export class Game {
   private settings: Settings; // réglages courants
-  private hours: number; // heure du jeu
+  private hours: number; // heure solaire locale du jeu
+  private day: number; // jour de l'année du jeu (1 à 365)
   private readonly seedText: string; // graine du monde (texte)
   private readonly terrain: Terrain;
   private readonly gs: GameScene;
@@ -46,8 +48,9 @@ export class Game {
     this.seedText = readSavedSeed(rawSave);
     const seed = hashSeed(this.seedText);
     this.terrain = createTerrain(seed);
-    const save = sanitizeSave(rawSave, this.terrain, this.seedText); // position valable, sinon départ sur la plage
+    const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
+    this.day = save.day;
 
     this.gs = new GameScene(byId('stage')); // peut lever une erreur si WebGL est indisponible : main.ts l'affiche
     this.gs.applySettings(this.settings);
@@ -64,6 +67,10 @@ export class Game {
       getHours: () => this.hours,
       setHours: (h) => {
         this.hours = wrapHours(h);
+      },
+      getDay: () => this.day,
+      setDay: (d) => {
+        this.day = wrapDay(d);
       },
     });
     this.wireEvents();
@@ -84,11 +91,13 @@ export class Game {
     this.last = now;
     this.elapsed += dt;
     if (this.controls.locked && this.settings.dayLengthMinutes > 0) {
+      const before = this.hours; // heure avant ce pas de temps
       this.hours = wrapHours(this.hours + (dt * 24) / (this.settings.dayLengthMinutes * 60)); // le temps ne passe que quand on joue
+      if (this.settings.daysPass && this.hours < before) this.day = wrapDay(this.day + 1); // minuit passé : le calendrier avance d'un jour
     }
     this.controls.update(dt, this.gs.camera);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
-    this.gs.updateEnvironment(sunState(this.hours), now / 1000);
+    this.gs.updateEnvironment(sunState(this.hours, START_LAT, this.day), now / 1000);
     this.gs.render();
     this.updateFps(dt);
     this.updateLoading();
@@ -246,6 +255,7 @@ export class Game {
       yaw: this.controls.yaw,
       pitch: this.controls.pitch,
       hours: this.hours,
+      day: this.day,
       fly: this.controls.fly,
     };
     saveJson(SAVE_KEY, data);
@@ -265,6 +275,9 @@ export class Game {
       },
       setHours: (h) => {
         this.hours = wrapHours(h);
+      },
+      setDay: (d) => {
+        this.day = wrapDay(d);
       },
       hideUi: () => {
         this.hidePause();

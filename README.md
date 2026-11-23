@@ -40,6 +40,15 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 ### 1.1.0 — Plein écran à l'entrée
 - « Entrer dans le monde » et « Reprendre » passent le jeu en plein écran et capturent la souris. Échap quitte les deux ; « Reprendre » les remet.
 
+### 1.2.0 — Planète cousine de la Terre, étape 1 : coordonnées et vrai soleil
+- Le monde a un lieu : **Lannion, 48,73° N, 3,46° O** (là où Thierry est né). Affiché dans Réglages → Temps.
+- Le soleil suit la vraie astronomie : sa hauteur et son point de lever/coucher dépendent de la latitude, du jour de l'année et de l'heure. À Lannion : soleil à ~18° à midi le 21 décembre, ~65° le 21 juin ; jour de ~8 h en hiver, ~16 h en été.
+- L'heure du jeu est l'**heure solaire locale** (midi = soleil plein sud), pas l'heure d'horloge : pas de décalage lié au fuseau ni à l'heure d'été.
+- Nouveau : une **date** (curseur sur l'année, sauvegardée) et un réglage « Les jours passent » (actif par défaut : un jour de plus à chaque minuit du jeu).
+- Une partie neuve commence à la date réelle du jour, une heure avant le coucher du soleil.
+- Les anciennes sauvegardes sont reprises (date du jour, heure conservée).
+- Pas encore reprises du réel : la forme de la côte et du relief (le terrain reste inventé, océan à l'ouest) ; l'étape 3 apportera la vraie côte nord de Lannion (la mer y est au nord). La lune est simplement à l'opposé du soleil, sans phases.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -49,4 +58,11 @@ Sans objet : jeu local, sans compte ni serveur.
 - La souris ne se capture pas : clique dans la fenêtre du jeu ; Échap libère la souris.
 
 ## Feuille de route
-1. Bateau à voile · 2. Construction de maison · 3. Couche JDR solo (journal, oracle, dés) · 4. Sauvegardes IndexedDB (modifications du monde) · 5. Son · 6. Mise en ligne possible sur fait en 1.0.2 : horizon.thierry-morin.com.
+**Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
+1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
+2. Déplacement de l'origine du rendu (voyager loin sans tremblement)
+3. Carte réelle de relief et d'océans à basse résolution, détail inventé par-dessus
+4. Biomes (climat → couleurs, végétation, neige, désert, glace)
+5. Voyage par coordonnées (téléportation) et carte du monde
+
+**Ensuite** : Bateau à voile · Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son · 6. Mise en ligne possible sur fait en 1.0.2 : horizon.thierry-morin.com.

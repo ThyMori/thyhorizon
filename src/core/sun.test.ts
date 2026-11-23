@@ -1,6 +1,10 @@
 // Tests du soleil : bon côté du ciel, bonnes hauteurs, transitions continues.
 import { describe, expect, it } from 'vitest';
-import { MAX_SUN_ELEVATION_DEG, sunState, wrapHours } from './sun';
+import { START_LAT, dayOfYear } from './geo';
+import { sunState as sunStateAt, wrapHours } from './sun';
+
+const EQUINOX = dayOfYear(3, 21); // équinoxe : jour et nuit égaux
+const sunState = (h: number) => sunStateAt(h, START_LAT, EQUINOX); // le soleil de Lannion à l'équinoxe
 
 describe('wrapHours', () => {
   it('ramène dans [0 ; 24[', () => {
@@ -13,14 +17,14 @@ describe('wrapHours', () => {
 describe('sunState', () => {
   it('culmine à midi, au sud', () => {
     const s = sunState(12);
-    expect(s.elevationDeg).toBeCloseTo(MAX_SUN_ELEVATION_DEG, 3);
+    expect(Math.abs(s.elevationDeg - (90 - START_LAT))).toBeLessThan(1);
     expect(s.sunDirection[2]).toBeGreaterThan(0); // +z = sud
   });
   it('se lève à l\'est (+x) et se couche à l\'ouest (-x)', () => {
     expect(sunState(8).sunDirection[0]).toBeGreaterThan(0);
     expect(sunState(16).sunDirection[0]).toBeLessThan(0);
-    expect(sunState(6).elevationDeg).toBeCloseTo(0, 3);
-    expect(sunState(18).elevationDeg).toBeCloseTo(0, 3);
+    expect(Math.abs(sunState(6).elevationDeg)).toBeLessThan(1); // lever vers 6 h à l'équinoxe
+    expect(Math.abs(sunState(18).elevationDeg)).toBeLessThan(1); // coucher vers 18 h
   });
   it('est sous l\'horizon la nuit, avec étoiles et sans lumière solaire', () => {
     const s = sunState(0);
@@ -67,5 +71,15 @@ describe('sunState', () => {
   it('reste cohérent pour toute heure, même hors bornes', () => {
     expect(sunState(-3).hours).toBeCloseTo(21);
     expect(sunState(49).hours).toBeCloseTo(1);
+  });
+});
+
+describe('saisons', () => {
+  it('donne un soleil bas et un jour court en hiver, haut et long en été', () => {
+    const winter = sunStateAt(12, START_LAT, dayOfYear(12, 21));
+    const summer = sunStateAt(12, START_LAT, dayOfYear(6, 21));
+    expect(summer.elevationDeg).toBeGreaterThan(winter.elevationDeg + 40);
+    expect(sunStateAt(17, START_LAT, dayOfYear(12, 21)).daylight).toBeLessThan(0.2); // 17 h : déjà le soir en décembre
+    expect(sunStateAt(17, START_LAT, dayOfYear(6, 21)).daylight).toBe(1); // 17 h : plein jour en juin
   });
 });

@@ -12,6 +12,7 @@ declare global {
     __thy?: {
       teleport(x: number, z: number, yaw: number, pitch: number, fly?: boolean, y?: number): void;
       setHours(hours: number): void;
+      setDay(day: number): void; // change le jour de l'année (1 à 365)
       hideUi(): void;
       ready(): boolean;
       pending(): number;

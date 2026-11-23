@@ -14,7 +14,8 @@ TypeScript + Vite + Vitest + Three.js. Aucune donnée en ligne : tout est local 
 - Tout nouveau fichier de logique = un test.
 
 ## Repères du monde
-+x = est, −x = ouest (océan), +z = sud, y = haut, niveau de la mer y = 0. Yaw 0 = nord. Soleil : est à 6 h, sud à midi, ouest à 18 h.
++x = est, −x = ouest (océan), +z = sud, y = haut, niveau de la mer y = 0. Yaw 0 = nord. Soleil : vrai soleil astronomique (`src/core/geo.ts`) pour la latitude du lieu et le jour de l'année ; l'heure du jeu est l'heure SOLAIRE locale (midi = plein sud).
+Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousine de la Terre » (relief et biomes guidés par la vraie Terre, détail inventé) — voir la feuille de route du README.
 
 ## Vocabulaire
 - **Tuile (chunk)** : carré de terrain de 64 m. **LOD** : niveau de détail d'une tuile selon sa distance.

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.2.0 — 2026-11-23
+
+Planète cousine de la Terre, étape 1 : lieu de départ Lannion (48,73° N, 3,46° O), vrai soleil (latitude, jour de l'année), date et saisons, réglage « Les jours passent ».
+
 ## 1.1.0 — 2026-11-23
 
 Plein écran à l'entrée dans le monde et à la reprise.

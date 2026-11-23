@@ -76,6 +76,12 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Capture de souris « brute » (`unadjustedMovement`) : pas d'accélération Windows ; repli automatique si le navigateur ne la gère pas. Les sauts de souris aberrants (> 600 px d'un coup) sont ignorés.
 - Pas testé : le ressenti réel (pas de souris dans mon navigateur de test).
 
+### 1.4.2 — Plus de message d'erreur de souris, plein écran permanent
+- Quand le navigateur refuse la capture de la souris (typiquement juste après Échap ou pendant le passage en plein écran), le jeu réessaie sans bruit (2 fois) ; s'il échoue encore, seul le bouton « Clique pour reprendre » s'affiche, plus de message rouge.
+- Plein écran : il est repris au premier clic ou à la première touche (sauf Échap) dès qu'il a été perdu, même sur les menus. Un navigateur interdit le plein écran sans geste de l'utilisateur : le tout premier clic suffit.
+- Application installée : `display: fullscreen` dans le manifeste, donc ThyHorizon s'ouvre directement en plein écran, sans geste (à vérifier après réinstallation).
+- Pas testé : le plein écran réel (mon navigateur de test ne l'accorde pas).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

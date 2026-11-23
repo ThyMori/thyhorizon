@@ -39,6 +39,9 @@ export class Game {
   private readonly helpDialog = byId<HTMLDialogElement>('dialog-help');
   private readonly installDialog = byId<HTMLDialogElement>('dialog-install');
   private readonly settingsPanel: SettingsPanel;
+  private wantsLock = false; // a-t-on demandé la capture de la souris (et attend-on la réponse) ?
+  private lockRetries = 0; // nouvelles tentatives silencieuses déjà faites
+  private lockTimer = 0; // minuteur de la prochaine tentative
   private started = false; // a-t-on déjà joué depuis l'ouverture ? (change le texte du bouton)
   private lastUnlock = 0; // instant de la dernière libération de la souris
   private loadingDone = false; // le terrain proche est-il arrivé ?
@@ -166,9 +169,12 @@ export class Game {
       if (!this.controls.locked && !anyDialogOpen() && this.pause.hidden) this.resume(); // clic direct sur le monde (invitation affichée)
     });
     document.addEventListener('pointerlockchange', () => this.onLockChange());
-    document.addEventListener('pointerlockerror', () =>
-      toast('Le navigateur n\'a pas donné le contrôle de la souris. Clique à nouveau sur le jeu.', 'error'),
-    );
+    document.addEventListener('pointerlockerror', () => this.onLockError());
+    // Plein écran permanent : s'il est perdu (Échap, F11…), le prochain clic ou la prochaine touche sur le menu le rétablit.
+    document.addEventListener('pointerdown', () => this.restoreFullscreen(), true);
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') this.restoreFullscreen(); // Échap sert à quitter : on ne le force pas à revenir
+    }, true);
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('resize', () => this.gs.resize());
     window.addEventListener('pagehide', () => this.saveNow());
@@ -199,10 +205,33 @@ export class Game {
 
   private resume(): void {
     this.started = true;
+    this.wantsLock = true;
+    this.lockRetries = 0;
     this.hidePause();
     this.hud.setHint(false);
     this.enterFullscreen(); // plein écran d'abord (le clic de l'utilisateur sert aux deux demandes)
     this.controls.requestLock(); // la souris est capturée : on joue
+  }
+
+  // Le navigateur a refusé la capture (souvent : plein écran en cours d'installation, ou Échap pressé il y a un instant).
+  // On réessaie sans bruit deux fois ; si ça échoue encore, le bouton « Clique pour reprendre » reste là, sans message d'erreur.
+  private onLockError(): void {
+    if (!this.wantsLock || this.controls.locked) return;
+    if (this.lockRetries >= 2) {
+      this.wantsLock = false;
+      this.hud.setHint(true); // invitation discrète à cliquer
+      return;
+    }
+    this.lockRetries++;
+    window.clearTimeout(this.lockTimer);
+    this.lockTimer = window.setTimeout(() => {
+      if (this.wantsLock && !this.controls.locked) this.controls.requestLock();
+    }, 450 * this.lockRetries);
+  }
+
+  // Rétablit le plein écran (appelé sur un geste de l'utilisateur) quand on joue sur un écran sans plein écran.
+  private restoreFullscreen(): void {
+    if (!document.fullscreenElement) this.enterFullscreen();
   }
 
   // Passe la page en plein écran si elle ne l'est pas déjà (doit venir d'un clic ou d'une touche).
@@ -231,6 +260,7 @@ export class Game {
     const locked = this.controls.locked;
     this.hud.setPlaying(locked);
     if (locked) {
+      this.wantsLock = false; // la capture a réussi
       this.hidePause();
       this.hud.setHint(false);
       return;

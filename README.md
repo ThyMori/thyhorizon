@@ -11,7 +11,7 @@ npm run dev     # lance le jeu ; ouvre l'adresse affichée (http://localhost:517
 Clique sur « Entrer dans le monde ». Commandes : ZQSD / flèches, souris, Maj = courir, V = vol, H = aide, Échap = pause.
 
 ## Jouer en ligne (sans rien installer)
-Adresse : https://thymori.github.io/ThyHorizon/ (mise à jour automatiquement à chaque livraison, environ 1 à 2 minutes).
+Adresse : https://horizon.thierry-morin.com (CNAME chez Squarespace vers thymori.github.io, fichier public/CNAME, HTTPS forcé) ; ancienne adresse https://thymori.github.io/ThyHorizon/ (mise à jour automatiquement à chaque livraison, environ 1 à 2 minutes).
 Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → « Build and deployment » → Source : **GitHub Actions**. Le suivi se voit dans l'onglet Actions. Les sauvegardes restent dans ton navigateur (propres à chaque adresse).
 
 ## Commandes utiles
@@ -46,4 +46,4 @@ Sans objet : jeu local, sans compte ni serveur.
 - La souris ne se capture pas : clique dans la fenêtre du jeu ; Échap libère la souris.
 
 ## Feuille de route
-1. Bateau à voile · 2. Construction de maison · 3. Couche JDR solo (journal, oracle, dés) · 4. Sauvegardes IndexedDB (modifications du monde) · 5. Son · 6. Mise en ligne possible sur horizon.thierry-morin.com (adresse provisoire ; GitHub Pages + fichier CNAME).
+1. Bateau à voile · 2. Construction de maison · 3. Couche JDR solo (journal, oracle, dés) · 4. Sauvegardes IndexedDB (modifications du monde) · 5. Son · 6. Mise en ligne possible sur fait en 1.0.2 : horizon.thierry-morin.com.

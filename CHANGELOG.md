@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.0.2 — 2026-11-23
+
+Fichier CNAME (horizon.thierry-morin.com) ajouté au dépôt pour que le domaine survive aux déploiements.
+
 ## 1.0.1 — 2026-11-23
 
 Mise en ligne automatique sur GitHub Pages (workflow tests + build + déploiement).

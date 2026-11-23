@@ -166,6 +166,11 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Limites connues (étapes suivantes) : pas de tangage ni de roulis dû à la houle ni de sillage (1.14), pas de vent réel (1.15), le bateau n'apparaît pas sur la carte (1.16), pas de sauvegarde du bateau (au rechargement, tu repars à l'endroit où tu as embarqué), la carte (M) ou un voyage te fait quitter le bateau (il reste en mer).
 - Sauvegarde : à bord, c'est le point d'embarquement qui est enregistré (sinon on rechargerait en pleine mer).
 
+### 1.13.1 — Un bien plus beau voilier
+- Nouveau modèle 3D construit par le code (aucun fichier externe, donc aucun souci de droits) : coque galbée à étrave inclinée, carène antifouling rouge, liseré bleu et ligne de flottaison, tableau arrière, pont avec liston de teck, rambardes et balcons, cockpit creusé avec plancher et banquettes en teck, rouf aminci vers l'avant avec trois hublots par bord, entrée de descente (sombre pour l'instant), écoutille, aérateur, mât effilé avec barres de flèche, haubans, étai et pataras, bôme et écoute de grand-voile qui suit la bôme, grand-voile à lattes et rond de chute, foc sur enrouleur, quille à bulbe, safran, feux de navigation, treuils.
+- Poste de barre à roue (la roue tourne avec le safran) ; tes yeux sont dans le cockpit derrière elle.
+- Le plan du bateau est dans `LAYOUT` (`src/core/hull.ts`, testé) : il servira aux collisions pour marcher sur le pont (prochaine étape) et à la cabine intérieure ensuite.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -183,7 +188,7 @@ Sans objet : jeu local, sans compte ni serveur.
 4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) ✅ arbres par biome (1.12.0)
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
-**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. houle (tangage, roulis, sillage, mer qui se forme avec le vent) ; 3. vent réel Open-Meteo avec repli sur le vent simulé ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
+**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → houle (tangage, roulis, sillage, mer qui se forme avec le vent) ; 3. vent réel Open-Meteo avec repli sur le vent simulé ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
 
 **Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 

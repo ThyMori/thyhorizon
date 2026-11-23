@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.13.1 — 2026-11-23
+
+Nouveau voilier 3D plus détaillé (coque, cockpit teck, rouf, roue, gréement, voiles à lattes)
+
 ## 1.13.0 — 2026-11-23
 
 Voilier jouable : vent simulé, physique de voile (vent apparent, décrochage, quille, gîte, barre), pont à la première personne, instruments, touche B

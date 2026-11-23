@@ -66,8 +66,8 @@ export const CRUISER: BoatSpec = {
   rudderMax: 0.52,
   yawInertia: 4e4,
   rollInertia: 1.2e4,
-  eyeU: -2.8,
-  eyeHeight: 2.55,
+  eyeU: -3.75,
+  eyeHeight: 2.2,
 };
 
 // L'état du bateau à un instant.

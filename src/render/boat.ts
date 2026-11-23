@@ -1,296 +1,329 @@
-// Le voilier en 3D : coque, pont, cabine, mât, bôme, grand-voile, foc, barre, quille.
+// Le voilier en 3D : assemble les pièces fixes (render/boatParts.ts) et anime ce qui bouge :
+// bôme, voiles (creux, battement), barre à roue, écoute de grand-voile.
 // Repère local du bateau : +X = tribord (droite), +Y = haut, −Z = avant. Le bateau tourne avec le cap (yaw) et penche avec la gîte.
-// Les voiles sont recalculées à chaque image : elles gonflent du côté sous le vent et battent quand elles faseyent.
 
 import * as THREE from 'three';
-import { bottomHeight, deckHeight, halfBeam } from '../core/hull';
+import { LAYOUT, bottomHeight, deckHeight, roofHeight, stationOf } from '../core/hull';
 import type { BoatSpec, BoatState } from '../core/sailing';
+import { deckTexture, teakTexture } from './boatTextures';
+import { P, box, buildCabin, buildCockpitFloor, buildCockpitWalls, buildDeck, buildKeel, buildLifelines, buildMast, buildRigging, buildToeRail, cabinWindow, cylinderBetween, hullBand, merge, transom } from './boatParts';
 
-// Passe des coordonnées « bateau » (avant, haut, tribord) aux coordonnées de la scène (x = tribord, y = haut, z = −avant).
-const P = (u: number, y: number, v: number): THREE.Vector3 => new THREE.Vector3(v, y, -u);
-
-const STATIONS = 28; // tranches de la coque, de l'arrière à l'étrave
-const RING = 9; // points par demi-section
-const MAST_U = 1.1; // position du mât (m, + vers l'avant)
-const MAST_HEIGHT = 11.2; // hauteur du mât au-dessus du pont (m)
-const BOOM_HEIGHT = 1.05; // hauteur de la bôme au-dessus du pont (m)
-const BOOM_LENGTH = 3.6; // longueur de la bôme (m)
-const SAIL_ROWS = 8; // lignes du maillage d'une voile
+const SAIL_ROWS = 10; // lignes du maillage d'une voile
 const SAIL_COLS = 8; // colonnes du maillage d'une voile
+const BATTENS = [0.2, 0.4, 0.6, 0.8]; // hauteurs relatives des lattes de la grand-voile
 
 // Couleurs du bateau (matières 3D, pas de l'interface).
 const COLORS = {
-  hull: 0xe6e1d0, // coque : blanc cassé
-  deck: 0xa88a5c, // pont : teck clair
-  cabin: 0xd8d1bc, // roof de cabine
-  glass: 0x20303c, // hublots
-  mast: 0xb7bcc2, // mât et bôme : aluminium
-  sail: 0xf2ead6, // voiles : écru
-  keel: 0x2a3036, // quille et safran
-  wood: 0x6b4a2c, // barre
+  gelcoat: 0xf1eee4, // coque blanche
+  antifoul: 0x7a2c26, // carène : antifouling rouge brique
+  navy: 0x1c3452, // liserés bleu marine
+  deck: 0xece8dc, // pont
+  cabin: 0xf0ece0, // rouf
+  glass: 0x15222d, // hublots
+  alu: 0xc7ccd1, // mât, bôme
+  steel: 0xb5bbc1, // accastillage inox
+  sail: 0xf4efe0, // voiles : écru
+  keel: 0x2b3238, // quille
+  dark: 0x12171c, // intérieur sombre de l'entrée de cabine
+  batten: 0x8a8880, // lattes
 };
 
-// Un maillage de voile : triangle découpé en grille, dont les points sont recalculés à chaque image.
+// Un maillage de voile : triangle découpé en grille, recalculé à chaque image (creux et battement).
 class SailMesh {
   readonly mesh: THREE.Mesh;
+  readonly battens: THREE.LineSegments | null;
   private readonly positions: Float32Array;
+  private readonly battenPositions: Float32Array | null;
 
-  constructor(material: THREE.Material) {
-    const count = (SAIL_ROWS + 1) * (SAIL_COLS + 1); // nombre de sommets
+  constructor(material: THREE.Material, withBattens: boolean) {
+    const count = (SAIL_ROWS + 1) * (SAIL_COLS + 1);
     this.positions = new Float32Array(count * 3);
     const indices: number[] = [];
     for (let r = 0; r < SAIL_ROWS; r++) {
       for (let c = 0; c < SAIL_COLS; c++) {
-        const a = r * (SAIL_COLS + 1) + c; // sommet en bas à gauche de la case
+        const a = r * (SAIL_COLS + 1) + c;
         const b = a + 1;
         const d = a + SAIL_COLS + 1;
         const e = d + 1;
-        indices.push(a, b, d, b, e, d); // deux triangles par case
+        indices.push(a, b, d, b, e, d);
       }
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
     g.setIndex(indices);
     this.mesh = new THREE.Mesh(g, material);
-    this.mesh.frustumCulled = false; // la forme change à chaque image : pas de boîte englobante fiable
+    this.mesh.frustumCulled = false;
     this.mesh.castShadow = true;
+    if (withBattens) {
+      this.battenPositions = new Float32Array(BATTENS.length * 2 * 3);
+      const bg = new THREE.BufferGeometry();
+      bg.setAttribute('position', new THREE.BufferAttribute(this.battenPositions, 3));
+      this.battens = new THREE.LineSegments(bg, new THREE.LineBasicMaterial({ color: COLORS.batten }));
+      this.battens.frustumCulled = false;
+    } else {
+      this.battenPositions = null;
+      this.battens = null;
+    }
   }
 
-  // Remplit la voile entre ses trois coins. belly = creux (fraction de la corde), dir = côté du creux (−1..1 selon X),
-  // flutter = amplitude du battement (0 = voile tendue), time = secondes.
+  // Remplit la voile entre ses trois coins. belly = creux (fraction de la corde), dir = côté du creux,
+  // flutter = battement (0 = tendue), time = secondes.
   fill(tack: THREE.Vector3, head: THREE.Vector3, clew: THREE.Vector3, belly: number, dir: number, flutter: number, time: number): void {
     let k = 0;
     for (let r = 0; r <= SAIL_ROWS; r++) {
-      const q = r / SAIL_ROWS; // hauteur relative : 0 en bas, 1 en haut
-      const luffX = tack.x + (head.x - tack.x) * q; // point de l'envergure (bord d'attaque)
+      const q = r / SAIL_ROWS;
+      const luffX = tack.x + (head.x - tack.x) * q;
       const luffY = tack.y + (head.y - tack.y) * q;
       const luffZ = tack.z + (head.z - tack.z) * q;
-      const leechX = clew.x + (head.x - clew.x) * q; // point de la chute (bord de fuite)
-      const leechY = clew.y + (head.y - clew.y) * q;
-      const leechZ = clew.z + (head.z - clew.z) * q;
-      const chord = Math.hypot(leechX - luffX, leechZ - luffZ); // corde à cette hauteur
+      // la chute (bord de fuite) est légèrement bombée (le « rond de chute » de la grand-voile)
+      const roach = this.battens ? 0.18 * Math.sin(Math.PI * q) : 0;
+      const leechX = clewLerp(clew.x, head.x, q);
+      const leechY = clewLerp(clew.y, head.y, q);
+      const leechZ = clewLerp(clew.z, head.z, q) + roach;
+      const chord = Math.hypot(leechX - luffX, leechZ - luffZ);
       for (let c = 0; c <= SAIL_COLS; c++) {
-        const p = c / SAIL_COLS; // position le long de la corde
-        const shape = Math.sin(Math.PI * p) * (1 - 0.45 * q); // forme du creux : max au milieu, moins en haut
-        let x = luffX + (leechX - luffX) * p + dir * belly * chord * shape; // creux vers le côté sous le vent
+        const p = c / SAIL_COLS;
+        const shape = Math.sin(Math.PI * p * 0.92 + 0.12) * (1 - 0.45 * q); // creux maximal au tiers avant de la corde
+        let x = luffX + (leechX - luffX) * p + dir * belly * chord * shape;
         const y = luffY + (leechY - luffY) * p;
         const z = luffZ + (leechZ - luffZ) * p;
-        x += flutter * 0.35 * p * p * Math.sin(time * 17 + q * 7 + p * 11) * (0.4 + q); // battement : surtout vers la chute
+        x += flutter * 0.35 * p * p * Math.sin(time * 17 + q * 7 + p * 11) * (0.4 + q);
         this.positions[k++] = x;
         this.positions[k++] = y;
         this.positions[k++] = z;
       }
     }
     const attr = this.mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
-    attr.needsUpdate = true; // la carte graphique recharge les sommets
-    this.mesh.geometry.computeVertexNormals(); // lumière correcte sur les plis
+    attr.needsUpdate = true;
+    this.mesh.geometry.computeVertexNormals();
+    if (this.battenPositions && this.battens) {
+      // lattes : de la chute vers l'intérieur de la voile, aux hauteurs voulues (on lit les sommets déjà calculés)
+      BATTENS.forEach((q, i) => {
+        const row = Math.round(q * SAIL_ROWS) * (SAIL_COLS + 1);
+        const outer = (row + SAIL_COLS) * 3;
+        const inner = (row + SAIL_COLS - 2) * 3;
+        for (let a = 0; a < 3; a++) {
+          this.battenPositions![i * 6 + a] = this.positions[outer + a]!;
+          this.battenPositions![i * 6 + 3 + a] = this.positions[inner + a]!;
+        }
+      });
+      (this.battens.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+    }
   }
 }
+
+const clewLerp = (a: number, b: number, t: number): number => a + (b - a) * t; // de la mi-hauteur à la tête de la chute
 
 export class BoatView {
   readonly group = new THREE.Group();
   private readonly boomPivot = new THREE.Group(); // tourne avec la bôme
-  private readonly tiller = new THREE.Group(); // tourne avec la barre
+  private readonly wheel = new THREE.Group(); // roue de barre : tourne avec le safran
   private readonly mainsail: SailMesh;
   private readonly jib: SailMesh;
-  private bellyDir = 1; // côté du creux, lissé pour que la voile passe par « plate » en changeant de bord
+  private readonly mainsheet: THREE.Mesh; // l'écoute de grand-voile : suit la bôme
+  private bellyDir = 1;
   private lastTime = 0;
 
   constructor(scene: THREE.Scene, private readonly spec: BoatSpec) {
-    const std = (color: number, roughness = 0.75, side: THREE.Side = THREE.FrontSide): THREE.MeshStandardMaterial =>
-      new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, side });
-    const hullMat = std(COLORS.hull, 0.45, THREE.DoubleSide);
-    const deckMat = std(COLORS.deck, 0.85);
-    const sailMat = std(COLORS.sail, 0.95, THREE.DoubleSide);
+    const std = (color: number, roughness = 0.6, metalness = 0, side: THREE.Side = THREE.FrontSide): THREE.MeshStandardMaterial =>
+      new THREE.MeshStandardMaterial({ color, roughness, metalness, side });
+    const gel = std(COLORS.gelcoat, 0.28);
+    const antifoul = std(COLORS.antifoul, 0.8);
+    const navy = std(COLORS.navy, 0.3);
+    const stripePolygon = (m: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial => {
+      m.polygonOffset = true; // les liserés collés à la coque ne « clignotent » pas avec elle
+      m.polygonOffsetFactor = -2;
+      m.polygonOffsetUnits = -2;
+      return m;
+    };
+    const teakMat = new THREE.MeshStandardMaterial({ map: teakTexture(), roughness: 0.75 });
+    const plainTeak = std(0xa5733f, 0.75);
+    const deckMat = new THREE.MeshStandardMaterial({ map: deckTexture(), roughness: 0.65 });
+    const metal = std(COLORS.steel, 0.35, 0.45);
+    const aluMat = std(COLORS.alu, 0.4, 0.4);
+    const addMesh = (geometry: THREE.BufferGeometry, material: THREE.Material, cast = true, receive = true): THREE.Mesh => {
+      const m = new THREE.Mesh(geometry, material);
+      m.castShadow = cast;
+      m.receiveShadow = receive;
+      this.group.add(m);
+      return m;
+    };
 
-    // Coque (flancs + tableau arrière) et pont.
-    const hull = new THREE.Mesh(this.buildHull(), hullMat);
-    hull.castShadow = true;
-    hull.receiveShadow = true;
-    const deck = new THREE.Mesh(this.buildDeck(), deckMat);
-    deck.receiveShadow = true;
-    this.group.add(hull, deck);
+    // --- Coque : carène (antifouling), œuvres mortes (blanc), liserés, tableau arrière ---
+    addMesh(hullBand(spec, (_s, bot) => bot, () => 0, 0), antifoul, false);
+    addMesh(hullBand(spec, () => 0, (_s, _b, top) => top, 0), gel);
+    addMesh(hullBand(spec, () => 0, () => 0.07, 0.004), stripePolygon(std(COLORS.navy, 0.4)), false, false); // ligne de flottaison
+    addMesh(hullBand(spec, (_s, _b, top) => top - 0.3, (_s, _b, top) => top - 0.17, 0.004), stripePolygon(navy), false, false); // liseré de livet
+    addMesh(transom(spec, (bot) => bot, () => 0), antifoul, false);
+    addMesh(transom(spec, () => 0, (_bot, top) => top), gel);
+    addMesh(transom(spec, (_bot, top) => top - 0.3, (_bot, top) => top - 0.17, 0.004), stripePolygon(navy), false, false);
 
-    // Cabine : un volume trapézoïdal posé sur le pont, avec une rangée de hublots.
-    const cabinU0 = -0.9; // arrière de la cabine (m)
-    const cabinU1 = 2.5; // avant de la cabine (m)
-    const sCenter = (spec.length / 2 + (cabinU0 + cabinU1) / 2) / spec.length; // position relative du centre
-    const cabinBase = deckHeight(sCenter) - 0.02; // hauteur du pont sous la cabine
-    const cabinGeo = new THREE.BoxGeometry(1.9, 0.5, cabinU1 - cabinU0);
-    const cabinPos = cabinGeo.getAttribute('position') as THREE.BufferAttribute;
-    for (let i = 0; i < cabinPos.count; i++) {
-      const front = Math.min(1, Math.max(0, (-cabinPos.getZ(i) / (cabinU1 - cabinU0)) + 0.5)); // 0 à l'arrière, 1 à l'avant de la cabine
-      cabinPos.setX(i, cabinPos.getX(i) * (1 - 0.4 * front)); // la cabine se rétrécit vers l'avant
-      if (cabinPos.getY(i) > 0) cabinPos.setY(i, cabinPos.getY(i) - 0.14 * front); // et son toit descend vers l'étrave
+    // --- Pont, liston, rambardes, cockpit ---
+    addMesh(buildDeck(spec), deckMat, false, true);
+    addMesh(buildToeRail(spec), plainTeak, false, false);
+    addMesh(buildLifelines(spec), metal, false, false);
+    addMesh(buildCockpitFloor(), teakMat, false, true);
+    const cockpit = buildCockpitWalls(spec);
+    addMesh(cockpit.walls, gel, true, true);
+    addMesh(cockpit.teak, plainTeak, true, true);
+
+    // --- Rouf, hublots, entrée de descente ---
+    const cabinMat = std(COLORS.cabin, 0.5);
+    addMesh(buildCabin(spec), cabinMat);
+    const glass = std(COLORS.glass, 0.15, 0.3);
+    glass.side = THREE.DoubleSide;
+    for (const side of [-1, 1] as const) {
+      for (const u of [-0.1, 0.8, 1.7]) {
+        const w = cabinWindow(spec, side, u);
+        w.material = glass;
+        this.group.add(w);
+      }
     }
-    cabinGeo.computeVertexNormals();
-    const cabin = new THREE.Mesh(cabinGeo, std(COLORS.cabin, 0.6));
-    cabin.position.copy(P((cabinU0 + cabinU1) / 2, cabinBase + 0.25, 0));
-    cabin.castShadow = true;
-    cabin.receiveShadow = true;
-    const glassMat = std(COLORS.glass, 0.2);
-    for (const side of [-1, 1]) {
-      const window = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.2, 2.2), glassMat);
-      window.position.copy(P((cabinU0 + cabinU1) / 2, cabinBase + 0.28, side * 0.96));
-      this.group.add(window);
-    }
-    this.group.add(cabin);
+    const k = LAYOUT.cockpit;
+    const door = 0.62; // largeur de l'entrée
+    const doorTop = roofHeight(spec, LAYOUT.cabin.u0) - 0.1;
+    addMesh(box(door, doorTop - k.floor, 0.02, LAYOUT.cabin.u0 - 0.065, (doorTop + k.floor) / 2, 0), std(COLORS.dark, 0.9), false, false); // l'entrée sombre : la future cabine
+    addMesh(box(door + 0.12, 0.05, 0.08, LAYOUT.cabin.u0 - 0.06, doorTop + 0.03, 0), plainTeak, false, false); // linteau de teck
+    // écoutille de pont et aérateur
+    const hatchY = roofHeight(spec, 1.6) + 0.025;
+    addMesh(box(0.55, 0.05, 0.55, 1.6, hatchY, 0), std(0x2a3b4a, 0.2, 0.2), false, false);
+    const vent = new THREE.CylinderGeometry(0.06, 0.06, 0.14, 8);
+    vent.translate(0.45, roofHeight(spec, 0.2) + 0.07, -0.2);
+    addMesh(vent, metal, false, false);
 
-    // Mât.
-    const mastBase = deckHeight((spec.length / 2 + MAST_U) / spec.length) + 0.3; // sur le roof
-    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, MAST_HEIGHT, 8), std(COLORS.mast, 0.4));
-    mast.position.copy(P(MAST_U, mastBase + MAST_HEIGHT / 2, 0));
-    mast.castShadow = true;
-    this.group.add(mast);
-
-    // Bôme (pivote autour du mât) et grand-voile qui y est accrochée.
-    const boomY = mastBase + BOOM_HEIGHT;
-    this.boomPivot.position.copy(P(MAST_U, boomY, 0));
-    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, BOOM_LENGTH, 6), std(COLORS.mast, 0.4));
-    boom.rotation.x = Math.PI / 2; // le cylindre est couché le long de Z
-    boom.position.set(0, 0, BOOM_LENGTH / 2); // la bôme part du mât vers l'arrière (+Z)
+    // --- Mât, gréement, bôme ---
+    addMesh(buildMast(spec), aluMat);
+    addMesh(buildRigging(spec), std(0x2d3238, 0.5, 0.5), false, false);
+    const roof = roofHeight(spec, LAYOUT.mastU);
+    this.boomPivot.position.copy(P(LAYOUT.mastU, roof + LAYOUT.boomHeight, 0));
+    const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, LAYOUT.boomLength, 8), aluMat);
+    boom.rotation.x = Math.PI / 2;
+    boom.position.set(0, 0, LAYOUT.boomLength / 2);
     boom.castShadow = true;
     this.boomPivot.add(boom);
-    this.mainsail = new SailMesh(sailMat);
+    const sailMat = new THREE.MeshStandardMaterial({ color: COLORS.sail, roughness: 0.92, side: THREE.DoubleSide });
+    this.mainsail = new SailMesh(sailMat, true);
     this.boomPivot.add(this.mainsail.mesh);
+    if (this.mainsail.battens) this.boomPivot.add(this.mainsail.battens);
     this.group.add(this.boomPivot);
-
-    // Foc (dans le repère du bateau, ses coins sont recalculés à chaque image).
-    this.jib = new SailMesh(sailMat);
+    this.jib = new SailMesh(sailMat, false);
     this.group.add(this.jib.mesh);
+    // enrouleur de foc à l'étrave
+    const drum = new THREE.CylinderGeometry(0.07, 0.07, 0.12, 10);
+    drum.translate(0, deckHeight(0.97) + 0.25, -(spec.length / 2 - 0.45));
+    addMesh(drum, metal, false, false);
 
-    // Étai (câble) du mât à l'étrave.
-    const stay = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 4), std(COLORS.mast, 0.5));
-    const stayTop = P(MAST_U, mastBase + MAST_HEIGHT - 0.4, 0);
-    const stayBottom = P(spec.length / 2 - 0.3, deckHeight(0.97) + 0.05, 0);
-    stay.position.copy(stayTop.clone().add(stayBottom).multiplyScalar(0.5));
-    stay.scale.y = stayTop.distanceTo(stayBottom);
-    stay.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), stayTop.clone().sub(stayBottom).normalize());
-    this.group.add(stay);
+    // --- Écoute de grand-voile : un fil de la bôme au pied du cockpit ---
+    this.mainsheet = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 4), std(0x2a2a2a, 0.8));
+    this.group.add(this.mainsheet);
 
-    // Barre (à l'arrière) : une pièce de bois qui pivote avec le safran.
-    const tillerBar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 1.0), std(COLORS.wood, 0.7));
-    tillerBar.position.set(0, 0, -0.5); // part de l'axe de safran vers l'avant (−Z)
-    tillerBar.castShadow = true;
-    this.tiller.add(tillerBar);
-    this.tiller.position.copy(P(spec.rudderX + 0.1, deckHeight(0.06) + 0.32, 0));
-    this.group.add(this.tiller);
+    // --- Poste de barre : piédestal, roue, compas ---
+    const pedestal = new THREE.CylinderGeometry(0.07, 0.09, 0.95, 10);
+    pedestal.translate(0, k.floor + 0.475, -LAYOUT.wheelU);
+    addMesh(pedestal, metal, true, false);
+    const compass = new THREE.SphereGeometry(0.09, 10, 8);
+    compass.translate(0, k.floor + 1.0, -LAYOUT.wheelU + 0.03);
+    addMesh(compass, std(0x1b1f24, 0.3), false, false);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.02, 6, 24), std(0x2a2a2a, 0.6));
+    rim.castShadow = true;
+    const spokes: THREE.BufferGeometry[] = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      spokes.push(cylinderBetween(new THREE.Vector3(0, 0, 0), new THREE.Vector3(Math.cos(a) * 0.31, Math.sin(a) * 0.31, 0), 0.012, 4));
+    }
+    const hub = new THREE.CylinderGeometry(0.05, 0.05, 0.05, 10);
+    hub.rotateX(Math.PI / 2);
+    spokes.push(hub);
+    const spokesMesh = new THREE.Mesh(merge(spokes), metal);
+    this.wheel.add(rim, spokesMesh);
+    this.wheel.position.copy(P(LAYOUT.wheelU, k.floor + 1.0, 0));
+    const wheelBase = new THREE.Group(); // la roue est légèrement inclinée vers le barreur
+    wheelBase.position.copy(this.wheel.position);
+    wheelBase.rotation.x = -0.45;
+    this.wheel.position.set(0, 0, 0);
+    wheelBase.add(this.wheel);
+    this.group.add(wheelBase);
 
-    // Quille et safran, sous la flottaison.
+    // --- Winches sur les listons du cockpit ---
+    const winch = merge([-1, 1].map((side) => {
+      const g = new THREE.CylinderGeometry(0.06, 0.07, 0.1, 10);
+      g.translate(side * (k.half + 0.05), deckHeight(stationOf(spec, -2.6)) + 0.08, -(-2.6));
+      return g;
+    }));
+    addMesh(winch, metal, true, false);
+
+    // --- Proue : davier, treuil de mouillage, ancre simplifiée ---
+    const bowU = spec.length / 2 - 0.5;
+    const roller = merge([box(0.12, 0.05, 0.55, bowU - 0.1, deckHeight(0.98) + 0.08, 0), box(0.14, 0.12, 0.14, bowU - 1.0, deckHeight(0.9) + 0.07, 0)]);
+    addMesh(roller, metal, true, false);
+
+    // --- Feux de navigation (rouge à bâbord, vert à tribord, blanc à l'arrière) ---
+    const lamp = (color: number, u: number, y: number, v: number): void => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshBasicMaterial({ color }));
+      m.position.copy(P(u, y, v));
+      this.group.add(m);
+    };
+    const lampY = deckHeight(0.92) + 0.4;
+    lamp(0xff3030, spec.length / 2 - 0.9, lampY, -0.45);
+    lamp(0x30ff60, spec.length / 2 - 0.9, lampY, 0.45);
+    lamp(0xffffff, -spec.length / 2 + 0.2, deckHeight(0.01) + 0.75, 0);
+
+    // --- Quille et safran ---
+    const keels = buildKeel(spec);
     const keelMat = std(COLORS.keel, 0.6);
-    const keel = new THREE.Mesh(new THREE.BoxGeometry(0.1, spec.draft - 0.35, 1.5), keelMat);
-    keel.position.copy(P(spec.keelX, -(spec.draft - 0.35) / 2 - 0.35, 0));
-    const rudderBlade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.0, 0.45), keelMat);
-    rudderBlade.position.copy(P(spec.rudderX - 0.05, -0.55, 0));
-    this.group.add(keel, rudderBlade);
+    addMesh(keels.keel, keelMat, false, false);
+    addMesh(keels.rudder, keelMat, false, false);
 
-    this.group.rotation.order = 'YXZ'; // cap d'abord, puis tangage, puis gîte (roulis)
+    // Le bas de coque doit aussi masquer l'eau transparente proprement : rien de plus à faire ici.
+    void bottomHeight;
+    this.group.rotation.order = 'YXZ';
     this.group.renderOrder = 5;
     scene.add(this.group);
   }
 
-  // Place le bateau, penche et oriente ses pièces mobiles. y = hauteur de la surface de l'eau sous le bateau.
+  // Place le bateau, oriente ses pièces mobiles. y = hauteur de la surface de l'eau sous le bateau.
   update(s: BoatState, originX: number, originZ: number, y: number, timeSeconds: number): void {
     const dt = Math.min(0.1, Math.max(0, timeSeconds - this.lastTime));
     this.lastTime = timeSeconds;
     this.group.position.set(s.x - originX, y, s.z - originZ);
-    this.group.rotation.set(0, s.yaw, -s.heel, 'YXZ'); // gîte positive à tribord : la voile penche vers X>0, donc rotation Z négative
-    this.boomPivot.rotation.y = s.boom; // la bôme suit sa position (positive = vers tribord)
-    this.tiller.rotation.y = s.rudder; // la barre : le bout avant va à bâbord quand le bateau tourne à tribord
+    this.group.rotation.set(0, s.yaw, -s.heel, 'YXZ'); // gîte positive à tribord : rotation Z négative
+    this.boomPivot.rotation.y = s.boom;
+    this.wheel.rotation.z = -s.rudder * 4; // la roue tourne dans le sens du virage (plus que le safran : démultiplication)
 
     // Creux des voiles : côté sous le vent, qui change doucement au virement.
     this.bellyDir += (-s.side - this.bellyDir) * Math.min(1, dt * 4);
-    const flutter = s.luff; // 0 (tendue) à 1 (bat au vent)
-    const belly = 0.1 * (1 - 0.6 * flutter); // la voile qui bat est plus plate
-    const mastTopLocal = new THREE.Vector3(0, MAST_HEIGHT - BOOM_HEIGHT - 0.3, 0.1); // point de drisse, dans le repère de la bôme
-    this.mainsail.fill(new THREE.Vector3(0, 0.08, 0.05), mastTopLocal, new THREE.Vector3(0, 0.1, BOOM_LENGTH - 0.1), belly, this.bellyDir, flutter, timeSeconds);
-
-    // Foc : l'avant (point d'amure) est à l'étrave, la tête au sommet du mât, l'écoute suit la bôme.
+    const flutter = s.luff;
+    const belly = 0.1 * (1 - 0.6 * flutter);
     const L = this.spec.length;
-    const mastBase = deckHeight((L / 2 + MAST_U) / L) + 0.3;
-    const tack = P(L / 2 - 0.5, deckHeight(0.96) + 0.25, 0); // point d'amure, sur le pont à l'avant
-    const head = P(MAST_U + 0.05, mastBase + MAST_HEIGHT - 0.7, 0); // point de drisse, haut du mât
-    const clewAngle = s.boom * 0.95; // le foc s'ouvre comme la grand-voile, un peu moins
-    const sheetLength = 3.9; // distance entre le point d'amure et le point d'écoute (m)
+    const roof = roofHeight(this.spec, LAYOUT.mastU);
+    const headLocal = new THREE.Vector3(0, LAYOUT.mastHeight - LAYOUT.boomHeight - 0.45, 0.06);
+    this.mainsail.fill(new THREE.Vector3(0, 0.1, 0.05), headLocal, new THREE.Vector3(0, 0.12, LAYOUT.boomLength - 0.12), belly, this.bellyDir, flutter, timeSeconds);
+
+    // Foc : l'étai donne le bord d'attaque ; l'écoute suit la bôme.
+    const tack = P(L / 2 - 0.5, deckHeight(0.96) + 0.3, 0);
+    const head = P(LAYOUT.mastU + 0.05, roof + LAYOUT.mastHeight - 0.9, 0);
+    const clewAngle = s.boom * 0.95;
+    const sheetLength = 3.9;
     const clew = P(L / 2 - 0.5 - Math.cos(clewAngle) * sheetLength, deckHeight(0.55) + 0.9, Math.sin(clewAngle) * sheetLength);
     this.jib.fill(tack, head, clew, belly * 1.1, this.bellyDir, flutter, timeSeconds + 1.7);
-    this.group.updateMatrixWorld(true); // pour que eyeWorld() lise une matrice à jour
+
+    // Écoute de grand-voile : de l'extrémité de la bôme au chariot, devant la roue.
+    const boomEnd = P(LAYOUT.mastU, roof + LAYOUT.boomHeight, 0).add(new THREE.Vector3(Math.sin(s.boom) * (LAYOUT.boomLength - 0.3), -0.05, Math.cos(s.boom) * (LAYOUT.boomLength - 0.3)));
+    const traveler = P(-1.6, LAYOUT.cockpit.floor + 0.3, 0.0);
+    const dir = boomEnd.clone().sub(traveler);
+    this.mainsheet.position.copy(traveler.clone().add(boomEnd).multiplyScalar(0.5));
+    this.mainsheet.scale.y = dir.length();
+    this.mainsheet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    this.group.updateMatrixWorld(true);
   }
 
   // Position des yeux du barreur dans le monde (coordonnées absolues).
   eyeWorld(originX: number, originZ: number): THREE.Vector3 {
-    const eye = this.group.localToWorld(P(this.spec.eyeU, this.spec.eyeHeight, 0)); // position scène (relative à l'origine flottante)
-    return eye.add(new THREE.Vector3(originX, 0, originZ)); // on revient aux coordonnées du monde
+    const eye = this.group.localToWorld(P(this.spec.eyeU, this.spec.eyeHeight, 0));
+    return eye.add(new THREE.Vector3(originX, 0, originZ));
   }
 
   setVisible(visible: boolean): void {
     this.group.visible = visible;
-  }
-
-  // La coque : une peau lissée entre les sections, plus le tableau arrière.
-  private buildHull(): THREE.BufferGeometry {
-    const spec = this.spec;
-    const verts: number[] = [];
-    const idx: number[] = [];
-    const ringSize = RING * 2 + 1; // points d'une section complète (bâbord → quille → tribord)
-    for (let i = 0; i <= STATIONS; i++) {
-      const s = i / STATIONS; // arrière 0 → étrave 1
-      const u = -spec.length / 2 + s * spec.length; // position le long du bateau
-      const b = halfBeam(spec, s);
-      const top = deckHeight(s);
-      const bot = bottomHeight(s);
-      for (let j = -RING; j <= RING; j++) {
-        const t = j / RING; // -1 (bâbord, haut) → 0 (quille) → +1 (tribord, haut)
-        const theta = Math.abs(t) * (Math.PI / 2);
-        const v = Math.sign(t) * b * Math.sin(theta); // largeur : arrondie au bouchain
-        const yy = bot + (top - bot) * (1 - Math.cos(theta)); // hauteur : du fond au plat-bord
-        const p = P(u, yy, v);
-        verts.push(p.x, p.y, p.z);
-      }
-    }
-    for (let i = 0; i < STATIONS; i++) {
-      for (let j = 0; j < ringSize - 1; j++) {
-        const a = i * ringSize + j;
-        const b = a + 1;
-        const c = a + ringSize;
-        const d = c + 1;
-        idx.push(a, c, b, b, c, d); // deux triangles par case
-      }
-    }
-    // Tableau arrière : on ferme la première section avec un éventail autour de son centre.
-    const center = verts.length / 3;
-    const topMid = P(-spec.length / 2, (deckHeight(0) + bottomHeight(0)) / 2, 0);
-    verts.push(topMid.x, topMid.y, topMid.z);
-    for (let j = 0; j < ringSize - 1; j++) idx.push(center, j + 1, j);
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    return g;
-  }
-
-  // Le pont : une bande plate qui suit le plat-bord.
-  private buildDeck(): THREE.BufferGeometry {
-    const spec = this.spec;
-    const verts: number[] = [];
-    const idx: number[] = [];
-    for (let i = 0; i <= STATIONS; i++) {
-      const s = i / STATIONS;
-      const u = -spec.length / 2 + s * spec.length;
-      const b = halfBeam(spec, s) * 0.97; // un peu en retrait du plat-bord : pas de scintillement avec la coque
-      const y = deckHeight(s) + 0.005;
-      const l = P(u, y, -b);
-      const r = P(u, y, b);
-      verts.push(l.x, l.y, l.z, r.x, r.y, r.z);
-    }
-    for (let i = 0; i < STATIONS; i++) {
-      const a = i * 2;
-      idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); // sens des triangles : normale vers le haut
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    return g;
   }
 }

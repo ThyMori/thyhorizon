@@ -3,7 +3,7 @@
 // si le réseau manque, on retombe sur la copie gardée. Les fichiers du jeu (noms à empreinte, générés par Vite)
 // sont gardés au fur et à mesure qu'ils sont chargés. Aucun appel à un serveur de données : tout est local.
 
-const VERSION = "1.15.0"; // géré par scripts/bump-version.mjs : ne jamais modifier à la main
+const VERSION = "1.16.0"; // géré par scripts/bump-version.mjs : ne jamais modifier à la main
 const CACHE = `thyhorizon-shell-${VERSION}`; // nom du cache de cette version
 const SHELL = ["./", "index.html", "manifest.webmanifest", "favicon.ico", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"]; // fichiers de base à garder dès l'installation
 

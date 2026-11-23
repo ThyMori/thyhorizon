@@ -368,8 +368,8 @@ export class BoatView {
   }
 
   // Position des yeux du barreur dans le monde (coordonnées absolues).
-  eyeWorld(originX: number, originZ: number): THREE.Vector3 {
-    const eye = this.group.localToWorld(P(this.spec.eyeU, this.spec.eyeHeight, 0));
+  eyeWorld(originX: number, originZ: number, u: number = this.spec.eyeU, h: number = this.spec.eyeHeight, v = 0): THREE.Vector3 {
+    const eye = this.group.localToWorld(P(u, h, v));
     return eye.add(new THREE.Vector3(originX, 0, originZ));
   }
 

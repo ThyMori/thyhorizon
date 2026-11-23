@@ -54,7 +54,7 @@ export class BoatHud {
     this.sheet.textContent = `${Math.round((1 - r.sheet) * 100)} % bordée`;
     this.sails.textContent = r.mainPct === 0 ? 'GV affalée' : `GV ${r.mainPct < 100 ? `${r.mainPct} %` : r.reef > 0 ? `${r.reef} ris` : 'pleine'}`;
     this.sails.textContent += r.jibPct === 0 ? ' · foc roulé' : r.jibPct < 100 ? ` · foc ${r.jibPct} %` : ' · foc plein';
-    this.point.textContent = r.point;
+    this.point.textContent = r.pilot ? `${r.point} · pilote auto` : r.point;
     this.hint.textContent = r.hint;
     this.hint.hidden = r.hint === '';
   }

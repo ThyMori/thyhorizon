@@ -28,7 +28,8 @@ Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousi
 - Le calcul de la houle `waveHeight` (core/waves.ts) est la même formule que le shader de l'océan : si on change une vague, ça change les deux (un seul tableau `WAVE_DEFS`).
 - Le bateau n'est simulé que quand le joueur est à bord ET que la souris est capturée. Quand on débarque, il reste amarré (vitesse 0).
 - Voilure (1.15) : `mainUp`/`reef`/`jibOut` dans `BoatState` ; `sailPlan` donne surface, centre de voilure avant/arrière et hauteur. Les ordres Y/U/X/C sont des impulsions dans `BoatInput` (`toggleMain`, `toggleJib`, `reef`).
-- Vent simulé : tout local (1.13). Le vent réel (Open-Meteo) arrive en 1.15 : il faudra alors adapter la règle « tout est local » ci-dessus.
+- Marche à bord (1.16) : `core/deck.ts`, repère du bateau (u avant, v tribord). Le joueur n'a pas de corps physique : la caméra suit `eyeWorld(u, h, v)`. Pilote : `autopilotHelm` + `autoTrim` (core/sailing.ts), état `pilotInt` dans `BoatState`.
+- Vent simulé : tout local (1.13). Le vent réel (Open-Meteo) arrive en 1.19 : il faudra alors adapter la règle « tout est local » ci-dessus.
 
 ## Rendu et grandes coordonnées
 Ne jamais envoyer une coordonnée du monde à la carte graphique (shader, position d'objet, caméra) : tout est relatif à l'origine flottante (`Game.origin`, `core/origin.ts`). Un shader qui a besoin de la position dans le monde (bruit, vagues) reçoit un décalage calculé en JavaScript (`grainShift`, `wavePhase`).

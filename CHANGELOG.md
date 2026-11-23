@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.16.0 — 2026-11-23
+
+Marche sur le pont, pilote automatique
+
 ## 1.15.0 — 2026-11-23
 
 Manœuvres de voiles : hisser/affaler la grand-voile, ris, foc roulé

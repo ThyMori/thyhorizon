@@ -95,6 +95,7 @@ export interface BoatState {
   rudder: number; // braquage de la barre (rad), positif = le bateau tourne à tribord
   sheet: number; // écoute : 0 = bordée à bloc, 1 = complètement choquée
   boom: number; // angle visible de la bôme (rad), positif = vers tribord
+  pilotInt: number; // mémoire du pilote automatique (terme intégral)
   mainTarget: 0 | 1; // grand-voile demandée : 1 = hissée, 0 = affalée
   mainUp: number; // hauteur hissée de la grand-voile, 0 (affalée sur la bôme) à 1 (en tête de mât)
   reef: number; // ris pris (0 à 3), cible
@@ -135,7 +136,7 @@ export const wrapPi = (a: number): number => a - 2 * Math.PI * Math.round(a / (2
 
 // Crée un bateau à l'arrêt, voile à moitié choquée.
 export function createBoat(x: number, z: number, yaw: number): BoatState {
-  return { x, z, yaw, u: 0, v: 0, omega: 0, heel: 0, heelRate: 0, rudder: 0, sheet: 0.55, boom: 0, mainTarget: 1, mainUp: 1, reef: 0, reefLevel: 0, jibTarget: 1, jibOut: 1, luff: 0, aground: false, side: 1, event: null };
+  return { x, z, yaw, u: 0, v: 0, omega: 0, heel: 0, heelRate: 0, rudder: 0, sheet: 0.55, boom: 0, pilotInt: 0, mainTarget: 1, mainUp: 1, reef: 0, reefLevel: 0, jibTarget: 1, jibOut: 1, luff: 0, aground: false, side: 1, event: null };
 }
 
 // Hauteur utile de la grand-voile (0 à 1) : hissée ET réduite par les ris. Interpolée entre deux ris pendant la manœuvre.
@@ -377,6 +378,23 @@ export function startHeading(yaw: number, wind: Wind): number {
   return -newBearing;
 }
 
+// Pilote automatique : donne l'ordre de barre (−1 à 1) pour tenir le cap voulu (yaw). Régulateur PID :
+// il corrige l'écart de cap, freine la rotation (zéro zigzag) et apprend la « barre au vent » permanente du bateau (terme intégral).
+export function autopilotHelm(s: BoatState, targetYaw: number, dt: number): number {
+  const err = wrapPi(targetYaw - s.yaw); // écart de cap : > 0 = il faut que le yaw augmente (tourner à bâbord)
+  s.pilotInt = clamp(s.pilotInt + err * dt, -0.8, 0.8); // mémoire de l'écart (bornée)
+  return clamp(-(3.2 * err + 1.8 * s.omega + 0.7 * s.pilotInt), -1, 1);
+}
+
+// Réglage automatique de l'écoute (livré avec le pilote) : renvoie l'ordre d'écoute (−1 border … +1 choquer)
+// qui amène la voile à son angle d'attaque idéal. Un bon régulateur de bateau moderne fait de même.
+export function autoTrim(s: BoatState, wind: Wind): number {
+  const aw = apparentWind(s, wind);
+  const wanted = Math.abs(aw.angle) - TRIM_IDEAL; // angle de bôme voulu
+  const target = clamp((wanted - SHEET_MIN_ANGLE) / (SHEET_MAX_ANGLE - SHEET_MIN_ANGLE), 0, 1); // écoute correspondante
+  return clamp((target - s.sheet) * 6, -1, 1);
+}
+
 // Ce que montrent les penons (petits rubans cousus sur la grand-voile).
 export interface PenonFlow {
   trim: number; // −1 = voile trop choquée (le penon du côté du vent se soulève), 0 = bien réglée, +1 = trop bordée (le penon sous le vent flotte, l'écoulement décroche)
@@ -412,6 +430,7 @@ export interface Readout {
   mainPct: number; // grand-voile hissée, en % (0 à 100)
   reef: number; // ris pris
   jibPct: number; // foc déroulé, en %
+  pilot?: boolean; // le pilote automatique tient le cap (ajouté par le jeu)
   hint: string; // conseil court (vide si tout va bien)
 }
 

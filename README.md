@@ -182,6 +182,11 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - **Y** hisse (≈ 18 s) ou affale (≈ 7 s) la grand-voile ; **U** déroule ou roule le foc ; **X** prend un ris (jusqu'à 3), **C** en largue un. Les manœuvres sont progressives, la voile se déforme et descend sous tes yeux (paquet de toile sur la bôme, foc enroulé sur l'étai).
 - Physique : surface et centre de voilure changent (`sailPlan` dans `src/core/sailing.ts`, testé). Moins de voile = moins de gîte ; sans grand-voile le bateau abat, sans foc il lofe. Nouvelle ligne « Voilure » dans les instruments (GV = grand-voile) et conseils (« prends un ris »).
 
+### 1.16.0 — Marcher sur le pont et pilote automatique
+- **E** : quitte la barre et te laisse marcher sur le pont (WASD ; **R** borde, **F** choque l'écoute). **E** près de la roue la reprend. Le rouf, la roue et les filières bloquent le passage (`src/core/deck.ts`, testé) ; le sol est plus bas dans le cockpit.
+- **Pilote automatique (P)** : tient le cap du moment (régulateur PID, `autopilotHelm`) et règle l'écoute (`autoTrim`). Il s'allume tout seul quand tu quittes la barre ; A/D à la barre le coupe. Toucher R/F (ou W/S à la barre) reprend l'écoute à la main.
+- Pas encore : l'intérieur de la cabine (la porte reste fermée), marcher sur le rouf.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

@@ -6,7 +6,9 @@ import { findLandingSpot, findLaunchSpot } from '../core/boarding';
 import { worldToLatLon } from '../core/geo';
 import { EYE_HEIGHT } from '../core/movement';
 import type { Origin } from '../core/origin';
-import { BoatInput, BoatState, CRUISER, MAX_REEFS, Readout, apparentWind, createBoat, readout, startHeading, stepBoat } from '../core/sailing';
+import { HELM_POS, WALK_EYE, WALK_SPEED, deckStep, deckSurface, moveOnDeck, nearHelm } from '../core/deck';
+import type { DeckPos } from '../core/deck';
+import { BoatInput, BoatState, CRUISER, MAX_REEFS, Readout, apparentWind, autoTrim, autopilotHelm, createBoat, readout, startHeading, stepBoat } from '../core/sailing';
 import type { Terrain } from '../core/terrain';
 import { waveHeight } from '../core/waves';
 import { Wind, windAt } from '../core/wind';
@@ -20,6 +22,11 @@ const BOARD_DISTANCE = 45; // distance maximale pour remonter sur son bateau (m)
 export class BoatDriver {
   state: BoatState | null = null; // le bateau (null tant qu'on n'en a pas mis un à l'eau)
   aboard = false; // le joueur est-il à bord ?
+  walking = false; // à bord mais debout sur le pont (pas à la barre) ?
+  pilotOn = false; // le pilote automatique tient le cap ?
+  private pilotYaw = 0; // cap tenu par le pilote (yaw)
+  private deck: DeckPos = { ...HELM_POS }; // où se tient le joueur sur le pont
+  private eyeH = 0; // hauteur des yeux (adoucie)
   private lastMain: 0 | 1 = 1; // dernières valeurs annoncées
   private lastJib: 0 | 1 = 1;
   private lastReef = 0;
@@ -76,10 +83,13 @@ export class BoatDriver {
     c.aboard = true;
     c.yaw = boat.yaw; // on regarde vers l'avant
     c.pitch = -0.08;
+    this.walking = false;
+    this.pilotOn = false;
+    this.deck = { ...HELM_POS };
     this.aboard = true;
     this.view?.setAboard(true); // les penons se voient des deux côtés de la voile
     this.onChange?.(true);
-    toast('À bord ! A/D : barre · W/S : écoute (W borde, S choque) · Espace : barre au milieu · B : débarquer.');
+    toast('À bord ! A/D : barre · W/S : écoute · E : quitter la barre et marcher · P : pilote automatique · B : débarquer.');
   }
 
   // Descend à terre si le bord est proche, sinon explique quoi faire.
@@ -103,6 +113,8 @@ export class BoatDriver {
   leave(): void {
     if (!this.aboard) return;
     this.aboard = false;
+    this.walking = false;
+    this.pilotOn = false;
     this.view?.setAboard(false);
     this.controls.aboard = false;
     this.controls.roll = 0;
@@ -129,14 +141,31 @@ export class BoatDriver {
     this.wind = windAt(lat, lon, WIND_START + seconds);
     if (this.aboard && this.controls.locked) {
       const yawBefore = boat.yaw;
-      stepBoat(boat, CRUISER, this.wind, this.readInput(), dt, (x, z) => -this.terrain.heightAt(x, z));
+      stepBoat(boat, CRUISER, this.wind, this.readInput(boat, dt), dt, (x, z) => -this.terrain.heightAt(x, z));
       this.controls.yaw += boat.yaw - yawBefore; // le pont tourne avec le bateau : le regard reste dans le même sens du bateau
       this.report(boat);
     }
     const y = waveHeight(boat.x, boat.z, seconds); // le bateau suit la surface de l'eau
     this.view.update(boat, this.wind, origin.x, origin.z, y, seconds);
     if (this.aboard) {
-      const eye = this.view.eyeWorld(origin.x, origin.z); // position des yeux du barreur
+      let eye;
+      if (this.walking) {
+        // debout sur le pont : le déplacement se fait dans le repère du bateau
+        const rel = this.controls.yaw - boat.yaw; // regard relatif au bateau
+        const c = this.controls;
+        if (c.locked) {
+          const fwd = (c.down('KeyW') ? 1 : 0) - (c.down('KeyS') ? 1 : 0) + c.touchMove.forward;
+          const right = (c.down('KeyD') ? 1 : 0) - (c.down('KeyA') ? 1 : 0) + c.touchMove.right;
+          const step = deckStep(rel, Math.max(-1, Math.min(1, fwd)), Math.max(-1, Math.min(1, right)), WALK_SPEED * Math.min(dt, 0.1));
+          this.deck = moveOnDeck(CRUISER, this.deck, step.du, step.dv);
+        }
+        const target = deckSurface(CRUISER, this.deck.u, this.deck.v) + WALK_EYE;
+        this.eyeH += (target - this.eyeH) * Math.min(1, dt * 8); // on monte et descend les marches sans à-coup
+        eye = this.view.eyeWorld(origin.x, origin.z, this.deck.u, this.eyeH, this.deck.v);
+      } else {
+        this.eyeH = CRUISER.eyeHeight;
+        eye = this.view.eyeWorld(origin.x, origin.z);
+      }
       this.controls.x = eye.x;
       this.controls.y = eye.y;
       this.controls.z = eye.z;
@@ -146,17 +175,24 @@ export class BoatDriver {
 
   // Ce qu'affichent les instruments (null si on n'est pas à bord).
   getReadout(): Readout | null {
-    return this.aboard && this.state ? readout(this.state, this.wind) : null;
+    return this.aboard && this.state ? { ...readout(this.state, this.wind), pilot: this.pilotOn } : null;
   }
 
   // Les commandes du joueur lues sur le clavier.
-  private readInput(): BoatInput {
+  private readInput(boat: BoatState, dt: number): BoatInput {
     const c = this.controls;
     const right = c.down('KeyD') || c.down('ArrowRight') ? 1 : 0; // D : barre à droite (le bateau tourne à tribord)
     const left = c.down('KeyA') ? 1 : 0; // A (ou Q sur AZERTY, même touche physique) : à gauche
-    const ease = c.down('KeyS') ? 1 : 0; // S : choquer
-    const pull = c.down('KeyW') ? 1 : 0; // W (Z sur AZERTY) : border
-    const input: BoatInput = { helm: right - left, trim: ease - pull, center: c.down('Space') };
+    // Réglage de l'écoute : à la barre W/S ; debout sur le pont, R (border) et F (choquer) car W/S servent à marcher.
+    const ease = (this.walking ? c.down('KeyF') : c.down('KeyS')) ? 1 : 0;
+    const pull = (this.walking ? c.down('KeyR') : c.down('KeyW')) ? 1 : 0;
+    const input: BoatInput = { helm: this.walking ? 0 : right - left, trim: ease - pull, center: !this.walking && c.down('Space') };
+    // Le pilote : à la barre, toucher A/D le coupe ; sinon il donne l'ordre de barre.
+    if (this.pilotOn && !this.walking && (right || left || input.center)) this.setPilot(false, boat);
+    if (this.pilotOn) {
+      input.helm = autopilotHelm(boat, this.pilotYaw, dt);
+      if (input.trim === 0) input.trim = autoTrim(boat, this.wind); // le pilote règle aussi l'écoute, sauf si tu y touches toi-même
+    }
     // Manœuvres de voiles : un appui (pas une touche maintenue) déclenche l'action.
     const edge = (code: string): boolean => {
       const now = c.down(code);
@@ -165,11 +201,43 @@ export class BoatDriver {
       else this.held.delete(code);
       return now && !was;
     };
+    if (edge('KeyE')) this.toggleHelm(boat); // E : quitter la barre / la reprendre
+    if (edge('KeyP')) this.setPilot(!this.pilotOn, boat); // P : pilote automatique
     if (edge('KeyY')) input.toggleMain = true; // Y : hisser / affaler la grand-voile
     if (edge('KeyU')) input.toggleJib = true; // U : dérouler / rouler le foc
     if (edge('KeyX')) input.reef = 1; // X : prendre un ris
     if (edge('KeyC')) input.reef = -1; // C : larguer un ris
     return input;
+  }
+
+  // Pilote automatique : tient le cap du moment.
+  private setPilot(on: boolean, boat: BoatState): void {
+    if (on === this.pilotOn) return;
+    this.pilotOn = on;
+    if (on) {
+      this.pilotYaw = boat.yaw;
+      boat.pilotInt = 0;
+      toast(`Pilote automatique : cap ${Math.round(((-boat.yaw * 180) / Math.PI + 360) % 360)}° et écoute réglée seule. P ou A/D pour le couper.`);
+    } else {
+      toast('Pilote coupé : tu as la barre.');
+    }
+  }
+
+  // E : à la barre, on s'en éloigne (le pilote prend le cap) ; debout près de la roue, on la reprend.
+  private toggleHelm(boat: BoatState): void {
+    if (!this.walking) {
+      this.walking = true;
+      this.deck = { ...HELM_POS };
+      this.eyeH = CRUISER.eyeHeight;
+      if (!this.pilotOn) this.setPilot(true, boat); // on ne laisse pas le bateau sans barreur
+      toast('Tu marches sur le pont. WASD : avancer · R/F : écoute · E près de la roue : reprendre la barre.');
+    } else if (nearHelm(this.deck)) {
+      this.walking = false;
+      this.deck = { ...HELM_POS };
+      toast('Tu as repris la barre.');
+    } else {
+      toast('Trop loin de la roue : reviens dans le cockpit pour reprendre la barre (E).', 'error');
+    }
   }
 
   // Messages d'événements (virement, empannage, fond).

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CRUISER, BoatInput, mainHeight, penonFlow, sailPlan, BoatState, apparentWind, createBoat, hullResistance, pointOfSail, readout, rightingArm, sailCoefficients, sheetAngle, startHeading, stepBoat, wrapPi } from './sailing';
+import { CRUISER, BoatInput, autoTrim, autopilotHelm, mainHeight, penonFlow, sailPlan, BoatState, apparentWind, createBoat, hullResistance, pointOfSail, readout, rightingArm, sailCoefficients, sheetAngle, startHeading, stepBoat, wrapPi } from './sailing';
 import { msToKnots } from './wind';
 import type { Wind } from './wind';
 
@@ -320,5 +320,54 @@ describe('manœuvres de voiles', () => {
     s.mainUp = s.jibOut = 0;
     sail(s, WIND22, 30, 45, false);
     expect(s.u).toBeLessThan(1.5);
+  });
+});
+
+describe('pilote automatique', () => {
+  const fly = (s: BoatState, wind: Wind, target: number, seconds: number): number => {
+    let maxErr = 0;
+    for (let t = 0; t < seconds; t += 0.05) {
+      stepBoat(s, CRUISER, wind, { helm: autopilotHelm(s, target, 0.05), trim: 0, center: false }, 0.05, DEEP);
+      if (t > seconds / 2) maxErr = Math.max(maxErr, Math.abs(wrapPi(target - s.yaw)));
+    }
+    return maxErr;
+  };
+  it('tient le cap au travers, dans la brise', () => {
+    const s = createBoat(0, 0, 0);
+    s.u = 3;
+    s.sheet = 0.5;
+    const err = fly(s, { speed: 8, from: Math.PI / 2 }, 0, 120); // vent de l'est, cap nord
+    expect(err).toBeLessThan(6 * DEG);
+  });
+  it('rattrape un écart de cap de 40° sans osciller fort', () => {
+    const s = createBoat(0, 0, 0);
+    s.u = 3;
+    s.sheet = 0.5;
+    const err = fly(s, { speed: 6, from: Math.PI / 2 }, -40 * DEG, 150);
+    expect(err).toBeLessThan(6 * DEG);
+  });
+  it('ordre de barre borné, et nul quand le cap est bon et que le bateau ne tourne pas', () => {
+    const s = createBoat(0, 0, 1);
+    expect(Math.abs(autopilotHelm(s, 1, 0.05))).toBeLessThan(1e-9);
+    expect(Math.abs(autopilotHelm(s, 4, 0.05))).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('écoute automatique', () => {
+  it('au largue avec une écoute bordée : elle choque ; trop choquée au près : elle borde', () => {
+    const broad = createBoat(0, 0, 90 * DEG); // cap 270° (ouest), vent de l'est : vent arrière
+    broad.sheet = 0.1;
+    expect(autoTrim(broad, EAST_12)).toBeGreaterThan(0); // vent très ouvert, écoute bordée à bloc : il faut choquer
+    const close = createBoat(0, 0, -50 * DEG);
+    close.u = 2.5;
+    close.sheet = 1;
+    expect(autoTrim(close, EAST_12)).toBeLessThan(0); // au près, écoute toute choquée : il faut border
+  });
+  it('rien à faire quand l’écoute est déjà bien réglée', () => {
+    const s = createBoat(0, 0, 0); // cap nord, vent de l'est : travers
+    s.u = 2.5;
+    const aw = apparentWind(s, EAST_12);
+    s.sheet = (Math.abs(aw.angle) - 9 * DEG - sheetAngle(0)) / (sheetAngle(1) - sheetAngle(0));
+    expect(Math.abs(autoTrim(s, EAST_12))).toBeLessThan(0.05);
   });
 });

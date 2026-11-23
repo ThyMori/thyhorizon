@@ -1,6 +1,6 @@
 // Tests de la géographie : dates, déclinaison, position du soleil, lever et coucher.
 import { describe, expect, it } from 'vitest';
-import { START_LAT, dayOfYear, dayOfYearFromDate, declinationDeg, formatDay, startHours, sunPosition, sunriseSunset, wrapDay } from './geo';
+import { START_LAT, dayOfYear, dayOfYearFromDate, declinationDeg, formatDay, siderealAngleDeg, skyRotation, startHours, sunPosition, sunRightAscensionDeg, sunriseSunset, wrapDay } from './geo';
 
 describe('calendrier', () => {
   it('numérote les jours de l\'année', () => {
@@ -78,5 +78,53 @@ describe('lever et coucher', () => {
     const d = dayOfYear(11, 23);
     expect(startHours(START_LAT, d)).toBeCloseTo(sunriseSunset(START_LAT, d)!.sunset - 1, 9);
     expect(startHours(80, dayOfYear(6, 21))).toBe(17.5);
+  });
+});
+
+describe('rotation du ciel étoilé', () => {
+  type V3 = [number, number, number];
+  const apply = (m: number[], v: V3): V3 => [m[0]! * v[0] + m[1]! * v[1] + m[2]! * v[2], m[3]! * v[0] + m[4]! * v[1] + m[5]! * v[2], m[6]! * v[0] + m[7]! * v[1] + m[8]! * v[2]];
+  const equatorial = (raDeg: number, decDeg: number): V3 => {
+    const [a, d] = [(raDeg * Math.PI) / 180, (decDeg * Math.PI) / 180];
+    return [Math.cos(d) * Math.cos(a), Math.cos(d) * Math.sin(a), Math.sin(d)];
+  };
+  const elevation = (v: V3): number => (Math.asin(v[1]) * 180) / Math.PI;
+
+  it('est une vraie rotation (orthonormée, déterminant 1)', () => {
+    const m = skyRotation(START_LAT, 200, 9.3);
+    const rows = [m.slice(0, 3), m.slice(3, 6), m.slice(6, 9)];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) expect(rows[i]!.reduce((s, v, k) => s + v * rows[j]![k]!, 0)).toBeCloseTo(i === j ? 1 : 0, 9);
+    const det = m[0]! * (m[4]! * m[8]! - m[5]! * m[7]!) - m[1]! * (m[3]! * m[8]! - m[5]! * m[6]!) + m[2]! * (m[3]! * m[7]! - m[4]! * m[6]!);
+    expect(det).toBeCloseTo(1, 9);
+  });
+  it('place le soleil exactement là où le calcul du soleil le met (même ciel, mêmes jour et heure)', () => {
+    for (const [day, h] of [[327, 15.3], [172, 20], [355, 12], [80, 6.5]] as const) {
+      const sun = equatorial(sunRightAscensionDeg(day), declinationDeg(day));
+      const viaSky = apply(skyRotation(START_LAT, day, h), sun);
+      const direct = sunPosition(START_LAT, day, h).direction;
+      for (let k = 0; k < 3; k++) expect(viaSky[k]!).toBeCloseTo(direct[k]!, 6);
+    }
+  });
+  it('garde l\'étoile Polaire à une hauteur égale à la latitude, au nord, à toute heure', () => {
+    for (const h of [0, 5, 12, 19]) {
+      const polaris = apply(skyRotation(START_LAT, 327, h), equatorial(37.95, 89.26));
+      expect(Math.abs(elevation(polaris) - START_LAT)).toBeLessThan(1.5);
+      expect(polaris[2]).toBeLessThan(0); // z < 0 : au nord
+    }
+  });
+  it('fait culminer Sirius au sud à 90° − latitude + déclinaison quand l\'angle sidéral égale son ascension droite', () => {
+    // on cherche l'heure solaire où l'angle sidéral vaut l'ascension droite de Sirius (101,29°)
+    const day = 327;
+    const h = 12 + (((101.287 - sunRightAscensionDeg(day)) % 360) + 360) % 360 / 15;
+    const sirius = apply(skyRotation(START_LAT, day, h % 24), equatorial(101.287, -16.716));
+    expect(elevation(sirius)).toBeCloseTo(90 - START_LAT - 16.716, 1);
+    expect(sirius[2]).toBeGreaterThan(0); // au sud
+    expect(Math.abs(sirius[0])).toBeLessThan(0.02); // exactement sur le méridien
+  });
+  it('tourne en un jour sidéral : 15° par heure environ, et le ciel avance de ~1° par jour', () => {
+    expect(siderealAngleDeg(100, 13) - siderealAngleDeg(100, 12)).toBeCloseTo(15, 6);
+    const drift = (siderealAngleDeg(101, 12) - siderealAngleDeg(100, 12) + 360) % 360;
+    expect(drift).toBeGreaterThan(0.9);
+    expect(drift).toBeLessThan(1.1);
   });
 });

@@ -93,7 +93,9 @@ export class GameScene {
 
   // Applique les réglages de qualité.
   applySettings(settings: Settings): void {
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2) * settings.resolution); // netteté
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2) * settings.resolution; // netteté
+    this.renderer.setPixelRatio(pixelRatio);
+    this.sky.setPixelRatio(pixelRatio); // les étoiles gardent leur taille apparente
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     const wantShadows = settings.shadows;
     if (this.renderer.shadowMap.enabled !== wantShadows) {

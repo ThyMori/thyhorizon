@@ -4,7 +4,7 @@
 // et de l'heure solaire locale (midi = soleil plein sud). Il se lève donc à l'est, se couche à l'ouest, et la saison
 // change sa hauteur et la durée du jour.
 
-import { sunPosition } from './geo';
+import { skyRotation, sunPosition } from './geo';
 import { Rgb, clamp, lerp, lerpRgb, smoothstep } from './math';
 
 // Tout ce qui dépend de l'heure. Les couleurs sont en sRGB (perceptuel).
@@ -22,6 +22,7 @@ export interface SunState {
   moonIntensity: number; // intensité de la lumière de la lune
   starsOpacity: number; // visibilité des étoiles (0 à 1)
   sunVisibility: number; // 0 = disque solaire caché, 1 = visible
+  starRotation: number[]; // rotation du ciel étoilé : matrice 3×3 (ligne par ligne), du repère équatorial vers celui du jeu
 }
 
 // Un point de repère de couleurs, à une hauteur de soleil donnée.
@@ -83,5 +84,6 @@ export function sunState(hoursIn: number, latDeg: number, day: number): SunState
     moonIntensity: 0.5 * (1 - smoothstep(-6, 0, elevationDeg)), // la lune n'éclaire que quand le soleil est couché
     starsOpacity: 1 - smoothstep(-12, -3, elevationDeg), // les étoiles apparaissent après le crépuscule
     sunVisibility: smoothstep(-2, 2, elevationDeg), // le disque solaire disparaît sous l'horizon
+    starRotation: skyRotation(latDeg, day, hours), // le ciel étoilé tourne avec l'heure, la saison et la latitude
   };
 }

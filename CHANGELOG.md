@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.3.0 — 2026-11-23
+
+Vrai ciel étoilé : 5 044 étoiles du catalogue Hipparcos (position, éclat, couleur), rotation autour de la Polaire selon la latitude, le jour et l'heure ; étoiles cachées par le relief et l'eau.
+
 ## 1.2.1 — 2026-11-23
 
 Correction d'une phrase du README (feuille de route).

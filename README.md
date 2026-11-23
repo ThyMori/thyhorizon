@@ -49,6 +49,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Les anciennes sauvegardes sont reprises (date du jour, heure conservée).
 - Pas encore reprises du réel : la forme de la côte et du relief (le terrain reste inventé, océan à l'ouest) ; l'étape 3 apportera la vraie côte nord de Lannion (la mer y est au nord). La lune est simplement à l'opposé du soleil, sans phases.
 
+### 1.3.0 — Un vrai ciel étoilé
+- **5 044 vraies étoiles** (catalogue Hipparcos, magnitude ≤ 6, fichier `src/data/stars.json`) avec leur vraie position, leur éclat et leur couleur (bleutées, blanches, jaunes, orangées).
+- Le ciel tourne comme le vrai : autour de l'étoile Polaire, inclinée selon la latitude, et il avance d'environ 1° par jour avec les saisons (la Polaire reste à ~48,7° de hauteur à Lannion).
+- Les étoiles sont dessinées derrière le relief et l'eau (elles ne s'affichent plus sur le terrain) et s'éteignent près de l'horizon.
+- Régénérer le fichier : `node scripts/build-stars.mjs chemin/vers/stars.6.json` (source : paquet npm `d3-celestial`, licence BSD-3 dans `src/data/STARS-LICENSE.txt`).
+- Pas encore : Voie lactée, planètes, phases et vraie position de la lune, scintillement.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

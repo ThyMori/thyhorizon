@@ -3,8 +3,9 @@
 
 import * as THREE from 'three';
 import { smoothstep } from '../core/math';
-import { mulberry32 } from '../core/noise';
+import { StarRow, buildStarBuffers } from '../core/stars';
 import type { SunState } from '../core/sun';
+import catalog from '../data/stars.json';
 
 // Dôme de ciel : la direction vers chaque pixel suffit à calculer sa couleur.
 const VERTEX = /* glsl */ `
@@ -40,13 +41,43 @@ void main() {
 }
 `;
 
+// Étoiles : chaque point est un petit disque doux. Taille, éclat et couleur viennent du catalogue.
+const STAR_VERTEX = /* glsl */ `
+attribute float aSize; // taille en pixels
+attribute float aBright; // éclat 0 à 1
+attribute vec3 aColor; // couleur (linéaire)
+uniform float uPixelRatio; // densité de pixels de l'écran
+uniform float uOpacity; // visibilité globale (selon la nuit)
+varying vec3 vColor;
+void main() {
+  vec3 dir = normalize(mat3(modelMatrix) * position); // direction de l'étoile dans le monde
+  float horizon = smoothstep(-0.02, 0.14, dir.y); // les étoiles s'éteignent près de l'horizon (brume) et sous lui
+  vColor = aColor * aBright * uOpacity * horizon; // couleur finale (sera ajoutée au ciel)
+  gl_PointSize = aSize * uPixelRatio; // taille à l'écran
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+const STAR_FRAGMENT = /* glsl */ `
+varying vec3 vColor;
+void main() {
+  float d = length(gl_PointCoord - vec2(0.5)) * 2.0; // distance au centre du point (0 centre, 1 bord)
+  float a = smoothstep(1.0, 0.15, d); // disque doux
+  gl_FragColor = vec4(vColor * a, 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}
+`;
+
 // Convertit une couleur sRGB du module de logique en couleur Three.js (linéaire).
 export const toColor = (rgb: readonly [number, number, number], target = new THREE.Color()): THREE.Color =>
   target.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace);
 
+const STAR_RADIUS = 2500; // rayon de la sphère des étoiles, en mètres (plus petit que le dôme)
+
 export class SkyDome {
   readonly dome: THREE.Mesh; // le dôme
   readonly stars: THREE.Points; // les étoiles
+  private readonly starMaterial: THREE.ShaderMaterial; // leur matériau
   private readonly material: THREE.ShaderMaterial;
   private readonly tmp = new THREE.Color(); // couleur de travail réutilisée
 
@@ -75,27 +106,29 @@ export class SkyDome {
     this.dome.renderOrder = -1000; // dessiné en premier
     this.dome.frustumCulled = false; // toujours dessiné
 
-    // 1500 étoiles réparties au hasard sur une sphère (graine fixe : toujours le même ciel).
-    const rand = mulberry32(2024);
-    const positions = new Float32Array(1500 * 3);
-    const colors = new Float32Array(1500 * 3);
-    for (let i = 0; i < 1500; i++) {
-      const u = rand() * 2 - 1; // hauteur uniforme
-      const a = rand() * Math.PI * 2; // angle
-      const r = Math.sqrt(1 - u * u); // rayon du cercle à cette hauteur
-      positions.set([Math.cos(a) * r * 2500, u * 2500, Math.sin(a) * r * 2500], i * 3);
-      const b = 0.25 + 0.75 * Math.pow(rand(), 3); // la plupart des étoiles sont faibles, quelques-unes brillent
-      colors.set([b * (0.85 + 0.15 * rand()), b * 0.92, b], i * 3); // légère teinte
-    }
+    // Les vraies étoiles du catalogue Hipparcos (magnitude ≤ 6), placées dans le repère équatorial :
+    // la rotation du ciel (latitude, saison, heure) est appliquée à tout le nuage par une matrice.
+    const buffers = buildStarBuffers(catalog.stars as unknown as StarRow[], STAR_RADIUS);
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    this.stars = new THREE.Points(
-      geometry,
-      new THREE.PointsMaterial({ vertexColors: true, size: 1.5, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, depthTest: false, fog: false }),
-    );
-    this.stars.renderOrder = -999; // juste après le dôme
-    this.stars.frustumCulled = false;
+    geometry.setAttribute('position', new THREE.BufferAttribute(buffers.positions, 3));
+    geometry.setAttribute('aSize', new THREE.BufferAttribute(buffers.sizes, 1));
+    geometry.setAttribute('aBright', new THREE.BufferAttribute(buffers.brightness, 1));
+    geometry.setAttribute('aColor', new THREE.BufferAttribute(buffers.colors, 3));
+    this.starMaterial = new THREE.ShaderMaterial({
+      vertexShader: STAR_VERTEX,
+      fragmentShader: STAR_FRAGMENT,
+      uniforms: { uPixelRatio: { value: 1 }, uOpacity: { value: 0 } },
+      blending: THREE.AdditiveBlending, // la lumière des étoiles s'ajoute à celle du ciel
+      transparent: false, // dessiné AVANT le terrain (file des objets opaques) : le sol et l'eau les cachent
+      depthTest: false, // pas de test de profondeur : l'ordre de dessin suffit
+      depthWrite: false, // les étoiles ne cachent rien
+      toneMapped: false, // même traitement que le dôme du ciel
+      fog: false,
+    });
+    this.stars = new THREE.Points(geometry, this.starMaterial);
+    this.stars.renderOrder = -999; // juste après le dôme, avant tout le reste
+    this.stars.frustumCulled = false; // toujours dessiné
+    this.stars.matrixAutoUpdate = false; // sa matrice (rotation du ciel + position de la caméra) est posée à la main
   }
 
   // Met à jour le ciel pour l'état donné et le recentre sur la caméra.
@@ -112,9 +145,15 @@ export class SkyDome {
     (u.uMoonDir!.value as THREE.Vector3).set(...state.moonDirection);
     u.uSunVis!.value = state.sunVisibility;
     u.uMoonVis!.value = state.starsOpacity; // la lune se montre quand les étoiles se montrent
-    (this.stars.material as THREE.PointsMaterial).opacity = state.starsOpacity * 0.9;
-    this.stars.rotation.y = (state.hours / 24) * Math.PI * 2; // le ciel étoilé tourne avec les heures
+    this.starMaterial.uniforms.uOpacity!.value = state.starsOpacity; // les étoiles apparaissent après le crépuscule
+    const r = state.starRotation; // rotation du ciel : latitude, jour de l'année, heure
+    this.stars.matrix.set(r[0]!, r[1]!, r[2]!, camera.position.x, r[3]!, r[4]!, r[5]!, camera.position.y, r[6]!, r[7]!, r[8]!, camera.position.z, 0, 0, 0, 1); // rotation + suit la caméra
+    this.stars.matrixWorldNeedsUpdate = true; // la matrice a changé
     this.dome.position.copy(camera.position); // le ciel suit la caméra : on ne s'en approche jamais
-    this.stars.position.copy(camera.position);
+  }
+
+  // Densité de pixels de l'écran (pour que les étoiles gardent la même taille sur un écran très fin).
+  setPixelRatio(ratio: number): void {
+    this.starMaterial.uniforms.uPixelRatio!.value = ratio;
   }
 }

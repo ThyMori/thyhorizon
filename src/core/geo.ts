@@ -36,8 +36,37 @@ export function formatDay(day: number): string {
   return `31 ${MONTH_NAMES[11]}`; // jamais atteint, par sécurité
 }
 
+const OBLIQUITY = 23.44 * DEG; // inclinaison de l'axe de la Terre, en radians
+const YEAR_DAYS = 365.2422; // durée de l'année tropique, en jours
+
+// Longitude écliptique du soleil (radians) : 0 à l'équinoxe de mars (≈ 20 mars), 90° au solstice de juin.
+const sunLongitude = (day: number): number => ((wrapDay(day) + 0.5 - 79.6) / YEAR_DAYS) * 2 * Math.PI;
+
 // Déclinaison du soleil (angle entre le soleil et l'équateur) en degrés : +23,44° au solstice d'été, −23,44° à celui d'hiver.
-export const declinationDeg = (day: number): number => -23.44 * Math.cos(((2 * Math.PI) / DAYS_IN_YEAR) * (wrapDay(day) + 10));
+export const declinationDeg = (day: number): number => Math.asin(Math.sin(OBLIQUITY) * Math.sin(sunLongitude(day))) / DEG;
+
+// Ascension droite du soleil en degrés (0 à 360) : sa position le long de l'équateur céleste, qui avance d'environ 1° par jour.
+export function sunRightAscensionDeg(day: number): number {
+  const lambda = sunLongitude(day); // longitude écliptique
+  return ((Math.atan2(Math.cos(OBLIQUITY) * Math.sin(lambda), Math.cos(lambda)) / DEG) + 360) % 360; // ramenée dans [0 ; 360[
+}
+
+// Angle sidéral local en degrés : de combien le ciel étoilé a tourné. Il vaut l'ascension droite des étoiles qui passent au sud à cet instant.
+// Il est égal à l'ascension droite du soleil plus l'angle horaire du soleil (15° par heure solaire depuis midi).
+export const siderealAngleDeg = (day: number, hours: number): number => (((sunRightAscensionDeg(day) + (hours - 12) * 15) % 360) + 360) % 360;
+
+// Matrice 3×3 (9 nombres, ligne par ligne) qui fait passer une direction « équatoriale » (X vers le point vernal, Z vers le pôle nord céleste)
+// dans le repère du jeu (+x est, +y haut, +z sud). Elle applique la rotation du ciel : latitude du lieu, jour et heure.
+export function skyRotation(latDeg: number, day: number, hours: number): number[] {
+  const phi = latDeg * DEG; // latitude
+  const theta = siderealAngleDeg(day, hours) * DEG; // angle sidéral
+  const [sp, cp, st, ct] = [Math.sin(phi), Math.cos(phi), Math.sin(theta), Math.cos(theta)]; // sinus et cosinus utiles
+  return [
+    -st, ct, 0, // x (est) = −ouest
+    cp * ct, cp * st, sp, // y (haut)
+    sp * ct, sp * st, -cp, // z (sud)
+  ];
+}
 
 // Position du soleil dans le repère du jeu pour une latitude, un jour et une heure SOLAIRE locale (midi = soleil au sud).
 // Renvoie la hauteur au-dessus de l'horizon (degrés) et le vecteur unitaire vers le soleil (+x est, +z sud, y haut).

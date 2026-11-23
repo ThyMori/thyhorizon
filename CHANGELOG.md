@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.12.0 — 2026-11-23
+
+Arbres et forêts selon le climat réel
+
 ## 1.11.0 — 2026-11-23
 
 Jour et nuit sur la carte du monde

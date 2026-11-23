@@ -16,7 +16,7 @@ const SEABED_SHALLOW: Rgb = [0.5, 0.49, 0.4]; // fond peu profond (l'eau le tein
 const SEABED_DEEP: Rgb = [0.03, 0.1, 0.14]; // fond profond, sombre et bleuté
 
 // Biome par défaut (climat océanique : les verts d'origine du jeu), utilisé quand on n'en précise pas.
-const DEFAULT_BIOME: Biome = { grassDark: GRASS_DARK, grassLight: GRASS_LIGHT, snowLine: 2450 };
+const DEFAULT_BIOME: Biome = { grassDark: GRASS_DARK, grassLight: GRASS_LIGHT, snowLine: 2450, forest: 0.55, conifer: 0.1, acacia: 0 };
 
 // Couleur du sol en LUMIÈRE LINÉAIRE (le format attendu par les sommets du maillage Three.js).
 // h = altitude, ny = composante verticale de la normale (1 = plat), variation = bruit -1..1, biome = climat d'ici.

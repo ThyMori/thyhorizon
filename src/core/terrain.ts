@@ -20,6 +20,7 @@ export interface Terrain {
   heightAt(x: number, z: number): number; // altitude du sol en (x, z), en mètres
   realHeightAt(x: number, z: number): number; // altitude réelle lissée (sans détail inventé), en mètres
   colorNoise(x: number, z: number): number; // variation douce (-1..1) pour les couleurs du sol
+  forestNoise(x: number, z: number): number; // grandes taches (-1..1) : où les forêts se regroupent, où s'ouvrent les clairières
   biomeAt(x: number, z: number): Biome; // climat d'ici : couleurs de la végétation, altitude de la neige
 }
 
@@ -48,6 +49,7 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
   const ridgeNoise = new Noise2D(seed + 59); // crêtes des montagnes
   const coastNoise = new Noise2D(seed + 11); // forme des côtes
   const colorN = new Noise2D(seed + 67); // variations de couleur
+  const forestN = new Noise2D(seed + 71); // forêts et clairières
 
   // Altitude réelle lissée, redressée près de la mer.
   const base = (x: number, z: number): number => {
@@ -93,7 +95,9 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
     return climate.biomeAt(lat, lon); // le climat réel de la Terre à cet endroit
   };
 
-  return { seed, heightAt, realHeightAt, colorNoise, biomeAt };
+  const forestNoise = (x: number, z: number): number => fbm(forestN, x / 380, z / 380, 3); // taches de quelques centaines de mètres
+
+  return { seed, heightAt, realHeightAt, colorNoise, forestNoise, biomeAt };
 }
 
 // Trouve un point de départ agréable : sur la terre ferme, juste derrière la plage, face à la mer.

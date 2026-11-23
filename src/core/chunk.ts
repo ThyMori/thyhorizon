@@ -3,6 +3,7 @@
 // aussi bien dans un worker (calcul en arrière-plan) que dans les tests.
 
 import { terrainColor } from './palette';
+import { MeshBuilder, addTreesForChunk } from './trees';
 import type { Terrain } from './terrain';
 
 // Côté d'une tuile, en mètres.
@@ -128,5 +129,22 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
     }
   }
 
-  return { cx, cz, lod, positions, normals, colors, indices, minY, maxY };
+  // 6) Arbres : ajoutés à la suite du terrain, dans les mêmes tableaux (une seule tuile, un seul objet 3D).
+  const trees: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
+  const added = addTreesForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE);
+  if (added.count === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY };
+  const base = positions.length / 3; // numéro du premier sommet d'arbre
+  const allPositions = new Float32Array(positions.length + trees.positions.length);
+  allPositions.set(positions);
+  allPositions.set(trees.positions, positions.length);
+  const allNormals = new Float32Array(normals.length + trees.normals.length);
+  allNormals.set(normals);
+  allNormals.set(trees.normals, normals.length);
+  const allColors = new Float32Array(colors.length + trees.colors.length);
+  allColors.set(colors);
+  allColors.set(trees.colors, colors.length);
+  const allIndices = new Uint16Array(indices.length + trees.indices.length);
+  allIndices.set(indices);
+  for (let k = 0; k < trees.indices.length; k++) allIndices[indices.length + k] = trees.indices[k]! + base;
+  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY) };
 }

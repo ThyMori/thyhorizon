@@ -149,6 +149,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - L'ombre est calculée à chaque ouverture de la carte (le temps est figé tant qu'elle est ouverte). Elle ne montre pas la lune ni les saisons autrement que par la position du soleil.
 - Vérifié : 195 tests, capture à 23 h 30 solaire en novembre (nuit sur l'Europe et l'Afrique, soleil dans le Pacifique sud). Pas testé : en « Temps réel » avec ton horloge.
 
+### 1.12.0 — Arbres et forêts par climat (étape 4b)
+- Des arbres bas-polygones, placés selon le **climat réel** (`src/core/trees.ts`) : forêt dense en Amazonie et au Congo, feuillus en Bretagne et en Europe, conifères en taïga et en altitude, **acacias à cime plate** en savane et au Sahel, presque rien dans les déserts, rien sur la glace. Les forêts forment de grandes taches avec des clairières ; en savane, des arbres isolés.
+- Règles : pas sur la plage ni dans l'eau, pas sur les pentes de plus de ~29°, pas au-dessus de 60 % de la limite des neiges. Arbres plus petits près des pôles. Même graine = mêmes arbres.
+- Rendu : les arbres sont ajoutés au maillage de chaque tuile (un seul objet 3D par tuile, 1 case de 8 m = au plus 1 arbre, ≈ 64 arbres par tuile au maximum). Tuiles proches : arbres détaillés ; tuiles moyennes (6 à 11 tuiles) : moitié moins nombreux et un peu plus gros ; au-delà : pas d'arbres. Ils projettent des ombres sur les tuiles proches.
+- Vérifié : 204 tests (placement par climat, règles de terrain, forme, indices 16 bits), captures en forêt bretonne, au Congo (forêt dense avec ombres) et au Sahel (acacias). Pas testé : les performances sur ta carte graphique (jusqu'à ~12 000 arbres à l'écran en forêt dense), la taïga en capture, les montagnes boisées.
+- Limites : pas de buissons ni d'herbes, pas de saisons (feuilles toujours vertes), les arbres lointains disparaissent d'un coup au-delà de ~11 tuiles (la couleur du sol reste verte).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -163,7 +170,7 @@ Sans objet : jeu local, sans compte ni serveur.
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
 2. ✅ Déplacement de l'origine du rendu (voyager loin sans défaut d'image) (1.3.1)
 3. ✅ Carte réelle de relief et d'océans à basse résolution, détail inventé par-dessus (1.7.0)
-4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) arbres et végétation par biome
+4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) ✅ arbres par biome (1.12.0)
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
 **Ensuite** : Bateau à voile · Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.

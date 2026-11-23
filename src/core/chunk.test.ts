@@ -21,20 +21,22 @@ describe('buildChunk', () => {
     for (let lod = 0; lod < LOD_CELLS.length; lod++) {
       const n = LOD_CELLS[lod]!;
       const d = buildChunk(terrain, 5, 3, lod);
-      const vertexCount = (n + 1) * (n + 1) + 4 * (n + 1); // grille + jupes
-      expect(d.positions.length).toBe(vertexCount * 3);
-      expect(d.normals.length).toBe(vertexCount * 3);
-      expect(d.colors.length).toBe(vertexCount * 3);
-      expect(d.indices.length).toBe(n * n * 6 + 4 * n * 6);
-      expect(vertexCount).toBeLessThan(65536); // sinon Uint16Array déborde
-      for (const i of d.indices) expect(i).toBeLessThan(vertexCount); // aucun indice hors limites
+      const terrainVertices = (n + 1) * (n + 1) + 4 * (n + 1); // grille + jupes (les arbres viennent après)
+      const total = d.positions.length / 3; // sommets du terrain et des arbres
+      expect(total).toBeGreaterThanOrEqual(terrainVertices);
+      expect(d.normals.length).toBe(total * 3);
+      expect(d.colors.length).toBe(total * 3);
+      expect(d.indices.length).toBeGreaterThanOrEqual(n * n * 6 + 4 * n * 6);
+      expect(total).toBeLessThan(65536); // sinon Uint16Array déborde
+      for (const i of d.indices) expect(i).toBeLessThan(total); // aucun indice hors limites
     }
   });
-  it('produit des normales unitaires tournées vers le haut et des couleurs valides', () => {
+  it('produit des normales unitaires (tournées vers le haut pour le terrain) et des couleurs valides', () => {
     const d = buildChunk(terrain, 20, -4, 1);
+    const terrainVertices = (LOD_CELLS[1]! + 1) * (LOD_CELLS[1]! + 1) + 4 * (LOD_CELLS[1]! + 1);
     for (let v = 0; v < d.normals.length; v += 3) {
       expect(Math.hypot(d.normals[v]!, d.normals[v + 1]!, d.normals[v + 2]!)).toBeCloseTo(1, 4);
-      expect(d.normals[v + 1]!).toBeGreaterThan(0);
+      if (v / 3 < terrainVertices) expect(d.normals[v + 1]!).toBeGreaterThan(0);
     }
     for (const c of d.colors) {
       expect(c).toBeGreaterThanOrEqual(0);

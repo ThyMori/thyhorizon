@@ -10,6 +10,7 @@ import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
 import { createRelief } from './core/relief';
 import { realClimate } from './world/climateData';
+import { CALM_SEA, SeaState, approachSea, seaName, seaStateFor } from './core/sea';
 import { CLEAR_WEATHER, WeatherState, applyWeatherToSky, blendWeather, weatherAt, weatherText } from './core/weather';
 import { beaufort, beaufortName, windAt, windVelocity } from './core/wind';
 import { WIND_START } from './player/boatDriver';
@@ -45,6 +46,9 @@ export class Game {
   private weather: WeatherState = CLEAR_WEATHER; // temps actuel au lieu du joueur (adouci)
   private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
   private weatherTimer = 0;
+  private sea: SeaState = CALM_SEA; // état de mer actuel (suit le vent avec retard)
+  private seaInit = false;
+  private seaForced: SeaState | null = null; // pour les essais (?debug)
   private weatherForced: Partial<WeatherState> | null = null; // pour les essais (?debug)
   private day: number; // jour de l'année du jeu (1 à 365)
   private origin: Origin; // origine flottante du rendu (voir core/origin.ts)
@@ -143,7 +147,7 @@ export class Game {
       this.weatherTimer = 0.5; // inutile de recalculer à chaque image
       const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
       const target = weatherAt(lat, lon, realClimate.classAt(lat, lon), this.day, this.gameHours, this.hours);
-      if (this.boat.aboard) this.boatHud.setWeather(`${weatherText(this.weather)} · ${beaufortName(beaufort(this.boat.wind.speed))}`);
+      if (this.boat.aboard) this.boatHud.setWeather(`${weatherText(this.weather)} · ${beaufortName(beaufort(this.boat.wind.speed))} · ${seaName(this.sea.hs)}`);
       this.weatherTarget = this.weatherForced ? { ...target, ...this.weatherForced } : target;
     }
     this.weather = blendWeather(this.weather, this.weatherTarget, 1 - Math.exp(-dt / 4)); // le temps change en quelques secondes si on change de lieu
@@ -152,6 +156,12 @@ export class Game {
     const base = windAt(lat, lon, WIND_START + seconds);
     const wind = windVelocity({ speed: base.speed * this.weather.windScale, from: base.from }); // vent du lieu, renforcé par la météo
     this.gs.setWeather(this.weather, wind.x, wind.z);
+    // État de mer : le vent établi et les dépressions font la mer ; elle réagit lentement.
+    const target = seaStateFor(Math.hypot(wind.x, wind.z), this.weather.front, lat);
+    this.sea = this.seaForced ?? (this.seaInit ? approachSea(this.sea, target, dt) : target); // au premier calcul, la mer est déjà formée
+    this.seaInit = true;
+    this.gs.setSea(this.sea);
+    this.boat.sea = this.sea;
   }
 
   // ---------- Boucle principale ----------
@@ -567,6 +577,11 @@ export class Game {
       pending: () => this.chunks.stats().pending,
       boat: () => ({ aboard: this.boat.aboard, state: this.boat.state as unknown as Record<string, unknown> | null, wind: this.boat.wind, board: () => this.boat.toggle() }),
       play: (on) => this.controls.setTouchActive(on),
+      sea: (hs) => {
+        const wind = Math.sqrt(Math.max(0, hs) / 0.0213); // vent qui donnerait cette mer
+        this.seaForced = { ...seaStateFor(wind, -1, 0), swell: Math.max(0.12, hs / 1.2), hs }; // impose la mer (essais)
+        return `${hs} m`;
+      },
       weather: (w) => {
         this.weatherForced = w; // impose (ou rend) le temps pour les essais
         this.weatherTimer = 0;

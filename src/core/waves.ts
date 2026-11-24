@@ -15,11 +15,12 @@ export const LOW_WAVES = 3; // les trois premières déforment la surface ; tout
 
 // Hauteur de la surface de l'eau (en m, autour du niveau 0) au point du monde (x, z) à l'instant t (secondes).
 // Ici on utilise les coordonnées du monde directement : le calcul se fait sur le processeur, pas sur la carte graphique.
-export function waveHeight(x: number, z: number, t: number): number {
+// swell = facteur d'amplitude des vagues larges (1 = mer de base ; voir core/sea.ts).
+export function waveHeight(x: number, z: number, t: number, swell = 1): number {
   let h = 0; // hauteur cumulée
   for (let i = 0; i < LOW_WAVES; i++) {
     const d = WAVE_DEFS[i]!; // la vague numéro i
-    h += d.amp * Math.sin((x * d.dx + z * d.dz) * d.k + t * d.w); // même formule que le shader (les trois vagues larges)
+    h += d.amp * swell * Math.sin((x * d.dx + z * d.dz) * d.k + t * d.w); // même formule que le shader (les trois vagues larges)
   }
   return h;
 }

@@ -19,6 +19,7 @@ export class PlayerControls {
   fly: boolean; // vol libre actif ?
   aboard = false; // à bord du bateau ? (le bateau pose lui-même la position ; le joueur ne marche plus)
   roll = 0; // roulis de la caméra (rad), donné par la gîte du bateau
+  pitchBias = 0; // tangage ajouté au regard (rad), donné par les vagues
   sensitivity = 1; // sensibilité de la souris
   onBlocked: (() => void) | null = null; // appelé quand l'eau profonde bloque le chemin
   onFlyChange: ((on: boolean) => void) | null = null; // appelé quand on active/désactive le vol
@@ -133,7 +134,7 @@ export class PlayerControls {
       this.y = this.y > target ? smoothTo(this.y, target, 5, dt) : smoothTo(this.y, target, 14, dt); // descente douce, relief suivi vite
     }
     camera.position.set(this.x - originX, this.y, this.z - originZ); // la caméra est placée relativement à l'origine flottante
-    camera.rotation.set(this.pitch, this.yaw, this.roll, 'YXZ'); // d'abord le cap, puis l'inclinaison, puis le roulis (gîte du bateau)
+    camera.rotation.set(this.pitch + this.pitchBias, this.yaw, this.roll, 'YXZ'); // d'abord le cap, puis l'inclinaison, puis le roulis (gîte du bateau)
   }
 
   // Une touche physique est-elle enfoncée en ce moment ? (utilisé par le bateau pour la barre et l'écoute)

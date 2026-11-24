@@ -13,6 +13,7 @@ import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { WeatherState, CLEAR_WEATHER, fogFactor } from '../core/weather';
+import type { SeaState } from '../core/sea';
 import { Ocean } from './ocean';
 import { Rain } from './rain';
 import { SkyDome, toColor } from './sky';
@@ -56,6 +57,25 @@ float groundGrain(vec3 wp, float dist) { // facteur de luminosité du sol (autou
 }
 `;
 
+// Rivage : sous l'eau, le fond s'assombrit et prend la teinte de la mer avec la profondeur (on voit le sable clair dans les petits fonds,
+// du bleu sombre plus loin) ; au bord, l'écume de la houle monte et redescend en bandes.
+const SHORE = /* glsl */ `
+{
+  float wy = vGroundPos.y;
+  float dep = max(-wy, 0.0);
+  float absorb = 1.0 - exp(-dep * 0.45);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.04, 0.2, 0.23), absorb * 0.92);
+  if (wy > -1.4 && wy < 0.9) {
+    float swash = 0.06 + 0.3 * sin(uSurfTime * 0.8 + gNoise(vGroundPos.xz * 0.04 + uShiftA) * 6.28);
+    float band = 1.0 - smoothstep(0.0, 0.26, abs(wy - swash));
+    float band2 = 1.0 - smoothstep(0.0, 0.2, abs(wy + 0.6 + 0.3 * sin(uSurfTime * 0.8 + 2.3 + gNoise(vGroundPos.xz * 0.05 + uShiftA) * 6.28)));
+    float lacy = gNoise(vGroundPos.xz * ${glsl(GRAIN_FREQUENCIES[1])} + uShiftB);
+    float foamT = clamp(band + 0.7 * band2, 0.0, 1.0) * smoothstep(0.2, 0.6, lacy + 0.2) * uSurf;
+    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.93, 0.95), foamT * 0.9);
+  }
+}
+`;
+
 export class GameScene {
   readonly renderer: THREE.WebGLRenderer; // moteur de rendu
   readonly scene = new THREE.Scene(); // la scène 3D
@@ -67,6 +87,8 @@ export class GameScene {
   private readonly sky = new SkyDome();
   private readonly ocean = new Ocean();
   private readonly rain = new Rain(); // pluie autour de la caméra
+  private readonly surfTime = new THREE.Uniform(0); // temps de l'écume de rivage
+  private readonly surfStrength = new THREE.Uniform(0.4); // force de l'écume de rivage (dépend de l'état de mer)
   private weather: WeatherState = CLEAR_WEATHER; // temps actuel (nuages, pluie, brume)
   private windX = 0; // vent vers où il souffle (m/s), pour la dérive des nuages et l'inclinaison de la pluie
   private windZ = 0;
@@ -115,12 +137,14 @@ export class GameScene {
       shader.uniforms.uShiftA = this.grainUniforms[0]!; // les décalages sont partagés avec le jeu (mis à jour à chaque déplacement de l'origine)
       shader.uniforms.uShiftB = this.grainUniforms[1]!;
       shader.uniforms.uShiftC = this.grainUniforms[2]!;
+      shader.uniforms.uSurfTime = this.surfTime;
+      shader.uniforms.uSurf = this.surfStrength;
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vGroundPos;') // position monde transmise au fragment
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\nvarying vec3 vGroundPos;\n${GROUND_NOISE}`)
-        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= groundGrain(vGroundPos, length(vViewPosition));');
+        .replace('#include <common>', `#include <common>\nvarying vec3 vGroundPos;\nuniform float uSurfTime;\nuniform float uSurf;\n${GROUND_NOISE}`)
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= groundGrain(vGroundPos, length(vViewPosition));\n' + SHORE);
     };
   }
 
@@ -147,6 +171,12 @@ export class GameScene {
     this.radiusMeters = settings.viewDistance * CHUNK_SIZE; // distance d'affichage
     this.ocean.setRadius(this.radiusMeters * 1.05); // l'eau déborde un peu pour que l'horizon soit propre
     this.fog.density = (FOG_DENSITY_FACTOR / this.radiusMeters) * fogFactor(this.weather);
+  }
+
+  // État de mer : amplitude des vagues, moutons, force de l'écume de rivage.
+  setSea(sea: SeaState): void {
+    this.ocean.setSea(sea);
+    this.surfStrength.value = Math.min(1, Math.max(0.3, 0.3 + 0.3 * sea.swell));
   }
 
   // Le temps qu'il fait (nuages, pluie, brume) et le vent (m/s, vers où il souffle) qui pousse nuages et gouttes.
@@ -243,6 +273,7 @@ export class GameScene {
     // Nuages : ils dérivent avec le vent (décalage calculé ici, en petit nombre ; le shader ne voit jamais de grande coordonnée).
     const dtEnv = Math.min(0.2, Math.max(0, timeSeconds - this.lastEnvTime));
     this.lastEnvTime = timeSeconds;
+    this.surfTime.value = timeSeconds;
     this.cloudX = (this.cloudX - this.windX * 0.0009 * dtEnv) % 1000;
     this.cloudZ = (this.cloudZ - this.windZ * 0.0009 * dtEnv) % 1000;
     this.sky.setClouds(this.weather.cloud, this.cloudX, this.cloudZ);

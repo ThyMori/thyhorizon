@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.18.0 — 2026-11-24
+
+Mer cohérente avec la météo : houle, moutons, écume de rivage, transparence
+
 ## 1.17.0 — 2026-11-24
 
 Météo hors ligne évolutive : nuages, pluie, brume, vent lié au temps

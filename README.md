@@ -193,6 +193,12 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Le **vent** simulé est renforcé dans une perturbation et calmé sous un anticyclone. Le temps du lieu s'affiche dans les instruments du voilier.
 - En ligne, la vraie météo la remplacera (1.19). Essai : `?debug` puis `__thy.weather({cloud:0.9, rain:0.6})`.
 
+### 1.18.0 — Mer cohérente avec la météo
+- La **houle** et le **clapot** dépendent du vent (loi de Pierson–Moskowitz) et des perturbations : une dépression lève une houle longue qui arrive et retombe lentement (environ 2 min 30 pour monter, 1 min 30 pour baisser). Logique pure : `src/core/sea.ts` (testée).
+- Visible : **moutons** sur les crêtes quand la mer est forte, **eau translucide** (on devine le fond près du bord), **écume de rivage** où les vagues viennent mourir, **tangage et roulis** du bateau avec la houle (caméra comprise).
+- Les instruments affichent l'état de mer (calme, belle, agitée, forte…). Essai : `?debug` puis `__thy.sea(3)` (hauteur significative en mètres).
+- Pas encore : la mer ne freine pas encore la coque.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

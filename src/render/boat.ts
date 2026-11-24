@@ -306,11 +306,11 @@ export class BoatView {
   }
 
   // Place le bateau, oriente ses pièces mobiles. y = hauteur de la surface de l'eau sous le bateau.
-  update(s: BoatState, wind: Wind, originX: number, originZ: number, y: number, timeSeconds: number): void {
+  update(s: BoatState, wind: Wind, originX: number, originZ: number, y: number, timeSeconds: number, pitch = 0, roll = 0): void {
     const dt = Math.min(0.1, Math.max(0, timeSeconds - this.lastTime));
     this.lastTime = timeSeconds;
     this.group.position.set(s.x - originX, y, s.z - originZ);
-    this.group.rotation.set(0, s.yaw, -s.heel, 'YXZ'); // gîte positive à tribord : rotation Z négative
+    this.group.rotation.set(pitch, s.yaw, -(s.heel + roll), 'YXZ'); // gîte positive à tribord : rotation Z négative ; tangage (étrave en haut > 0) et roulis dus aux vagues en plus
     this.boomPivot.rotation.y = s.boom;
     this.wheel.rotation.z = -s.rudder * 4; // la roue tourne dans le sens du virage (plus que le safran : démultiplication)
 

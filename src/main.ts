@@ -18,6 +18,7 @@ declare global {
       pose(): { x: number; z: number; yaw: number; pitch: number; fly: boolean; playing: boolean }; // position et regard (pour vérifier)
       hideUi(): void;
       boat(): { aboard: boolean; state: Record<string, unknown> | null; wind: { speed: number; from: number }; board(): void }; // le voilier (pour vérifier)
+      sea(hs: number): string; // impose une mer de hauteur significative hs (m) pour les essais
       weather(w: { cloud?: number; rain?: number; fog?: number; windScale?: number } | null): string; // impose le temps (essais)
       play(on: boolean): void; // fait « jouer » sans capture de souris (essais automatiques)
       ready(): boolean;

@@ -41,13 +41,13 @@ describe('repousser hors des troncs', () => {
   });
   it('deux troncs rapprochés : on ne finit dans aucun des deux', () => {
     const a = tree(0, 0);
-    const b = tree(1.6, 0);
-    const r = pushOutOfTrees([a, b], 0.8, 0.05);
+    const b = tree(2.4, 0);
+    const r = pushOutOfTrees([a, b], 1.2, 0.05);
     for (const t of [a, b]) expect(Math.hypot(r.x - t.x, r.z - t.z)).toBeGreaterThanOrEqual(trunkRadius(t) + PLAYER_RADIUS - 1e-3);
   });
   it('un gros arbre bloque plus large qu’un petit', () => {
-    const small = pushOutOfTrees([tree(0, 0, 'broadleaf', 0.8)], 0.9, 0);
-    const big = pushOutOfTrees([tree(0, 0, 'broadleaf', 1.4)], 0.9, 0);
+    const small = pushOutOfTrees([tree(0, 0, 'broadleaf', 0.8)], 1.2, 0);
+    const big = pushOutOfTrees([tree(0, 0, 'broadleaf', 1.4)], 1.2, 0);
     expect(big.hit).toBe(true);
     expect(small.hit).toBe(false);
   });
@@ -73,5 +73,11 @@ describe('avec le vrai terrain', () => {
     expect(r.hit).toBe(false);
     for (let k = 0; k < 80; k++) obstacles.resolve(k * 200, 0);
     expect((obstacles as unknown as { cache: Map<string, unknown> }).cache.size).toBeLessThanOrEqual(48);
+  });
+});
+
+describe('pas de découpe de l\'écorce', () => {
+  it('le joueur reste plus loin de l\'écorce que le plan de coupe de la caméra', () => {
+    expect(PLAYER_RADIUS).toBeGreaterThanOrEqual(0.5); // plan de coupe 0,3 m, pris en diagonale ≈ 0,45 m
   });
 });

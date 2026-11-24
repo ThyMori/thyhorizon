@@ -79,7 +79,7 @@ const SHORE = /* glsl */ `
 export class GameScene {
   readonly renderer: THREE.WebGLRenderer; // moteur de rendu
   readonly scene = new THREE.Scene(); // la scène 3D
-  readonly camera = new THREE.PerspectiveCamera(70, 1, 0.5, 6000); // caméra à la première personne
+  readonly camera = new THREE.PerspectiveCamera(70, 1, 0.3, 6000); // caméra à la première personne
   readonly terrainMaterial: THREE.MeshStandardMaterial; // matériau commun du terrain
   private readonly sun = new THREE.DirectionalLight(0xffffff, 1); // soleil (projette des ombres)
   private readonly moon = new THREE.DirectionalLight(0x8fa6ff, 0); // lune (lumière douce, sans ombre)

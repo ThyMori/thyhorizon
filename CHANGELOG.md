@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.27.1 — 2026-11-24
+
+Troncs : plus de découpe de l'écorce de près (plan de coupe 0,3 m, joueur gardé à 0,6 m)
+
 ## 1.27.0 — 2026-11-24
 
 Arbres refaits (troncs épais, feuillage fourni, sapins, bouleaux), collision avec les troncs, touche C pour s'accroupir

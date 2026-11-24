@@ -5,7 +5,8 @@ import { CHUNK_SIZE } from './chunk';
 import type { Terrain } from './terrain';
 import { Tree, treesForChunk, trunkRadius } from './trees';
 
-export const PLAYER_RADIUS = 0.35; // « épaisseur » du joueur (m)
+// « Épaisseur » du joueur (m). Elle doit rester plus grande que le plan de coupe proche de la caméra (CAMERA_NEAR, render/scene.ts), sinon l'écorce est découpée et on voit l'intérieur du tronc.
+export const PLAYER_RADIUS = 0.6;
 const MAX_CACHED = 48; // nombre de tuiles dont on garde les arbres en mémoire
 
 // Repousse un point hors des troncs : renvoie la position corrigée (le joueur glisse le long du tronc au lieu de s'y coller).

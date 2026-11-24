@@ -277,6 +277,10 @@ Sans objet : jeu local, sans compte ni serveur.
 - Logique pure et testée : `src/core/treeCollide.ts` (collision, mémoire des tuiles), `src/core/trees.ts` (formes, `trunkRadius`), `src/core/movement.ts` (accroupi).
 - Limites : pas d'ombre propre ni de feuilles individuelles (maillage à couleurs de sommets, sans texture) ; on ne se heurte pas aux branches, seulement aux troncs ; les arbres lointains (tuiles moyennes) ne sont pas solides, mais on ne les atteint qu'en s'approchant, donc ils deviennent détaillés et solides avant.
 
+### 1.27.1 — Plus de découpe des troncs de près
+- Quand on s'approchait d'un tronc, on voyait « dedans » : le plan de coupe proche de la caméra (0,5 m) découpait l'écorce, alors que la collision t'arrêtait à 0,35 m de la surface. Corrigé : le plan de coupe passe à 0,3 m et le joueur est arrêté à 0,6 m du centre + rayon du tronc (`PLAYER_RADIUS`, doit rester plus grand que le plan de coupe `near` de `render/scene.ts`).
+- Effet de bord : un peu moins de précision de profondeur au loin (négligeable), et un peu plus d'espace entre toi et un tronc.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

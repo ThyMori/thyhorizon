@@ -199,6 +199,16 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Les instruments affichent l'état de mer (calme, belle, agitée, forte…). Essai : `?debug` puis `__thy.sea(3)` (hauteur significative en mètres).
 - Pas encore : la mer ne freine pas encore la coque.
 
+### 1.19.0 — Météo et houle réelles (option, Open-Meteo)
+- **Réglages → Temps → « Météo et houle réelles du lieu (Internet) »**, **désactivée par défaut**. Tant qu'elle est coupée, rien n'est envoyé sur Internet : tout reste local.
+- Activée : le jeu demande à [Open-Meteo.com](https://open-meteo.com) le vent à 10 m, les nuages, la pluie, la pression, la visibilité et la hauteur des vagues pour **ta position arrondie à 0,5° (≈ 55 km)** — jamais ta position exacte, sans cookie ni identifiant. Une requête au plus toutes les 15 minutes, ou quand tu changes de case.
+- Le vent réel remplace le vent simulé (lissé sur ≈ 20 s, avec de petites rafales ajoutées) ; les nuages/pluie/brume suivent la mesure ; la pression donne la « perturbation » ; la houle suit la hauteur réelle des vagues (le clapot et les moutons suivent le vent). Les instruments affichent « météo réelle ».
+- **Hors ligne ou en erreur** : le jeu garde (ou retrouve) la météo simulée, le dit une fois, et réessaie 5 minutes plus tard. Sur terre, l'API de mer ne donne pas de vagues : on garde la houle simulée.
+- Limites connues : la **direction** des vagues réelles n'est pas utilisée (les vagues du jeu ont des directions fixes) ; c'est le temps **actuel** du lieu, indépendant de l'heure du jeu ; Open-Meteo est gratuit pour un usage non commercial.
+- Logique pure et testée avec un faux serveur : `src/core/realWeather.ts`. Le seul fichier qui touche Internet : `src/net/openMeteo.ts`. Le service worker ne met jamais ces appels en cache (il ignore les autres sites).
+- Données météo : Open-Meteo.com, licence CC BY 4.0.
+- Essai sans réseau : `?debug` puis `__thy.real({wind:{speed:13,from:4.71},weather:{front:0.8,cloud:0.9,rain:0.5,fog:0.1,pressure:990},hs:3})` (et `__thy.real(null)` pour revenir au simulé).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 
@@ -216,7 +226,7 @@ Sans objet : jeu local, sans compte ni serveur.
 4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) ✅ arbres par biome (1.12.0)
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
-**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → houle (tangage, roulis, sillage, mer qui se forme avec le vent) ; 3. vent réel Open-Meteo avec repli sur le vent simulé ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
+**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
 
 **Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 

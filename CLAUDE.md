@@ -3,7 +3,7 @@
 Jeu 3D contemplatif personnel (PC d'abord) : monde infini guidé par le vrai relief de la Terre (détail inventé), départ au bord de la Manche près de Lannion, première personne, rendu « pictural ». Plus tard : bateau, maison, JDR solo.
 
 ## Pile technique
-TypeScript + Vite + Vitest + Three.js. Aucune donnée en ligne : tout est local (localStorage, IndexedDB plus tard). Pas de Supabase.
+TypeScript + Vite + Vitest + Three.js. Tout est local (localStorage, IndexedDB plus tard), SAUF l'option « météo et houle réelles » (désactivée par défaut) qui interroge Open-Meteo. Pas de Supabase.
 
 ## Conventions
 - Chaque ligne de code est commentée en français (ce qu'elle fait).
@@ -29,7 +29,7 @@ Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousi
 - Le bateau n'est simulé que quand le joueur est à bord ET que la souris est capturée. Quand on débarque, il reste amarré (vitesse 0).
 - Voilure (1.15) : `mainUp`/`reef`/`jibOut` dans `BoatState` ; `sailPlan` donne surface, centre de voilure avant/arrière et hauteur. Les ordres Y/U/X/C sont des impulsions dans `BoatInput` (`toggleMain`, `toggleJib`, `reef`).
 - Marche à bord (1.16) : `core/deck.ts`, repère du bateau (u avant, v tribord). Le joueur n'a pas de corps physique : la caméra suit `eyeWorld(u, h, v)`. Pilote : `autopilotHelm` + `autoTrim` (core/sailing.ts), état `pilotInt` dans `BoatState`.
-- Vent simulé : tout local (1.13). Le vent réel (Open-Meteo) arrive en 1.19 : il faudra alors adapter la règle « tout est local » ci-dessus.
+- Vent simulé : local (1.13). Météo réelle (1.19, option `realWeather`, OFF par défaut) : seul `src/net/openMeteo.ts` touche Internet ; `src/core/realWeather.ts` (pur, testé avec un faux serveur) arrondit les coordonnées à 0,5°, lit les réponses et convertit. Jamais de vrai réseau dans les tests. Toute erreur → météo simulée, sans exception. Ne jamais envoyer la position exacte. Mention de licence CC BY 4.0 à garder dans les Réglages et le README.
 
 ## Rendu et grandes coordonnées
 Ne jamais envoyer une coordonnée du monde à la carte graphique (shader, position d'objet, caméra) : tout est relatif à l'origine flottante (`Game.origin`, `core/origin.ts`). Un shader qui a besoin de la position dans le monde (bruit, vagues) reçoit un décalage calculé en JavaScript (`grainShift`, `wavePhase`).

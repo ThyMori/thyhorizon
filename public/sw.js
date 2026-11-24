@@ -1,9 +1,9 @@
 // Service worker de ThyHorizon : coquille d'application hors ligne.
 // Stratégie « réseau d'abord » : les mises à jour publiées sur GitHub Pages apparaissent tout de suite ;
 // si le réseau manque, on retombe sur la copie gardée. Les fichiers du jeu (noms à empreinte, générés par Vite)
-// sont gardés au fur et à mesure qu'ils sont chargés. Aucun appel à un serveur de données : tout est local.
+// sont gardés au fur et à mesure qu'ils sont chargés. Les appels à d'autres sites (ex. la météo réelle Open-Meteo, option) ne passent jamais par ici : ils ne sont pas mis en cache.
 
-const VERSION = "1.18.0"; // géré par scripts/bump-version.mjs : ne jamais modifier à la main
+const VERSION = "1.19.0"; // géré par scripts/bump-version.mjs : ne jamais modifier à la main
 const CACHE = `thyhorizon-shell-${VERSION}`; // nom du cache de cette version
 const SHELL = ["./", "index.html", "manifest.webmanifest", "favicon.ico", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"]; // fichiers de base à garder dès l'installation
 

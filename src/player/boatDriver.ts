@@ -14,6 +14,7 @@ import { waveHeight } from '../core/waves';
 import { CALM_SEA, SeaState } from '../core/sea';
 import { CLEAR_WEATHER, WeatherState, weatherWind } from '../core/weather';
 import { Wind, windAt } from '../core/wind';
+import { realWindWithGusts } from '../core/realWeather';
 import { BoatView } from '../render/boat';
 import { toast } from '../ui/toast';
 import type { PlayerControls } from './controls';
@@ -41,6 +42,7 @@ export class BoatDriver {
   private waveRoll = 0; // roulis dû aux vagues (rad, adouci, + = tribord bas)
   weather: WeatherState = CLEAR_WEATHER; // le temps qu'il fait (donné par le jeu) : il renforce ou calme le vent
   wind: Wind = { speed: 5, from: 0 }; // dernier vent calculé au bateau
+  realWind: Wind | null = null; // vent réel lissé donné par le jeu (null = on utilise le vent simulé)
   onChange: ((aboard: boolean) => void) | null = null; // appelé quand on monte ou descend
 
   constructor(
@@ -53,6 +55,12 @@ export class BoatDriver {
   toggle(): void {
     if (this.aboard) this.disembark();
     else this.board();
+  }
+
+  // Vent au lieu donné : le vent réel (lissé par le jeu) quand l'option est active et qu'il est connu, sinon le vent simulé.
+  private localWind(lat: number, lon: number, seconds: number): Wind {
+    const real = realWindWithGusts(this.realWind, seconds); // null si pas de vent réel
+    return real ?? weatherWind(windAt(lat, lon, WIND_START + seconds), this.weather);
   }
 
   // Met le bateau à l'eau près du joueur (ou remonte sur celui qu'on a laissé tout près) et monte à bord.
@@ -68,7 +76,7 @@ export class BoatDriver {
       return;
     }
     const { lat, lon } = worldToLatLon(spot.x, spot.z);
-    const wind = weatherWind(windAt(lat, lon, WIND_START + this.clock()), this.weather);
+    const wind = this.localWind(lat, lon, this.clock()); // vent réel si disponible, sinon simulé
     const yaw = startHeading(c.yaw, wind); // jamais face au vent au départ
     const boat = createBoat(spot.x, spot.z, yaw);
     this.wind = wind;
@@ -145,7 +153,7 @@ export class BoatDriver {
     const boat = this.state;
     if (!boat || !this.view) return;
     const { lat, lon } = worldToLatLon(boat.x, boat.z);
-    this.wind = weatherWind(windAt(lat, lon, WIND_START + seconds), this.weather);
+    this.wind = this.localWind(lat, lon, seconds); // vent réel si disponible, sinon simulé
     if (this.aboard && this.controls.locked) {
       const yawBefore = boat.yaw;
       stepBoat(boat, CRUISER, this.wind, this.readInput(boat, dt), dt, (x, z) => -this.terrain.heightAt(x, z));

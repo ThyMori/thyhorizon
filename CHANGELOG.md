@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.19.0 — 2026-11-24
+
+Météo et houle réelles (Open-Meteo, option désactivée par défaut) avec repli hors ligne
+
 ## 1.18.0 — 2026-11-24
 
 Mer cohérente avec la météo : houle, moutons, écume de rivage, transparence

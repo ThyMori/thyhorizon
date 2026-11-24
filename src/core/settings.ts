@@ -16,6 +16,7 @@ export interface Settings {
   resolution: number; // netteté de l'image, de 0.5 à 1 (1 = résolution native de l'écran)
   showFps: boolean; // affiche le compteur d'images par seconde
   showInstruments: boolean; // affiche les instruments du voilier (touche I) ; coupés, on navigue aux penons
+  realWeather: boolean; // météo et houle RÉELLES du lieu (Open-Meteo, besoin d'Internet) ; sinon tout est simulé en local
   mouseSensitivity: number; // sensibilité de la souris, de 0.5 à 2
   daysPass: boolean; // le calendrier avance-t-il (un jour de plus à chaque minuit du jeu) ?
   realTime: boolean; // « Temps réel » : l'heure et la date du jeu suivent la vraie horloge (journées de 24 h)
@@ -36,6 +37,7 @@ export const DEFAULT_SETTINGS: Settings = {
   constellations: false, // les traits n'apparaissent que si on les demande (touche L)
   showFps: true, // visible au début : on a besoin de mesurer la fluidité
   showInstruments: true, // les instruments aident au début ; on peut les cacher pour naviguer « à l'œil »
+  realWeather: false, // désactivé par défaut : rien n'est envoyé sur Internet tant que tu ne l'actives pas
   mouseSensitivity: 1,
   daysPass: true, // les saisons avancent lentement tant qu'on joue
   realTime: false, // par défaut, les journées sont accélérées
@@ -86,6 +88,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     resolution: clamp(num(r.resolution, d.resolution), LIMITS.resolution.min, LIMITS.resolution.max),
     showFps: bool(r.showFps, d.showFps),
     showInstruments: bool(r.showInstruments, d.showInstruments),
+    realWeather: bool(r.realWeather, d.realWeather),
     mouseSensitivity: clamp(num(r.mouseSensitivity, d.mouseSensitivity), LIMITS.mouseSensitivity.min, LIMITS.mouseSensitivity.max),
     daysPass: bool(r.daysPass, d.daysPass),
     dayLengthMinutes: DAY_LENGTH_CHOICES.includes(num(r.dayLengthMinutes, d.dayLengthMinutes) as (typeof DAY_LENGTH_CHOICES)[number])

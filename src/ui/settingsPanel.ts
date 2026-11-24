@@ -27,6 +27,7 @@ export class SettingsPanel {
   private readonly resolution = byId<HTMLInputElement>('set-resolution');
   private readonly fps = byId<HTMLInputElement>('set-fps');
   private readonly instruments = byId<HTMLInputElement>('set-instruments');
+  private readonly realWeather = byId<HTMLInputElement>('set-realweather'); // météo réelle
   private readonly hours = byId<HTMLInputElement>('set-hours');
   private readonly day = byId<HTMLInputElement>('set-day');
   private readonly realTime = byId<HTMLInputElement>('set-realtime');
@@ -45,6 +46,7 @@ export class SettingsPanel {
     this.shadowSize.addEventListener('change', () => this.change({ shadowSize: Number(this.shadowSize.value) }));
     this.resolution.addEventListener('input', () => this.change({ resolution: Number(this.resolution.value) / 100 }));
     this.fps.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showFps: this.fps.checked }));
+    this.realWeather.addEventListener('change', () => this.apply({ ...bridge.getSettings(), realWeather: this.realWeather.checked }));
     this.instruments.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showInstruments: this.instruments.checked }));
     this.sensitivity.addEventListener('input', () => this.apply({ ...bridge.getSettings(), mouseSensitivity: Number(this.sensitivity.value) / 100 }));
     this.dayLength.addEventListener('change', () => this.apply({ ...bridge.getSettings(), dayLengthMinutes: Number(this.dayLength.value) }));
@@ -78,6 +80,7 @@ export class SettingsPanel {
     byId('out-resolution').textContent = `${Math.round(s.resolution * 100)} %`;
     this.fps.checked = s.showFps;
     this.instruments.checked = s.showInstruments;
+    this.realWeather.checked = s.realWeather;
     this.dayLength.value = String(s.dayLengthMinutes);
     this.sensitivity.value = String(Math.round(s.mouseSensitivity * 100));
     byId('out-sensitivity').textContent = `${Math.round(s.mouseSensitivity * 100)} %`;

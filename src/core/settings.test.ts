@@ -34,6 +34,9 @@ describe('sanitizeSettings', () => {
     expect(detectQuality({ ...DEFAULT_SETTINGS, constellations: true })).toBe('balanced');
   });
   it('affiche les instruments par défaut et valide le réglage', () => {
+    expect(DEFAULT_SETTINGS.realWeather).toBe(false); // la météo réelle est désactivée par défaut
+    expect(sanitizeSettings({ realWeather: 'oui' }).realWeather).toBe(false);
+    expect(sanitizeSettings({ realWeather: true }).realWeather).toBe(true);
     expect(DEFAULT_SETTINGS.showInstruments).toBe(true);
     expect(sanitizeSettings({ showInstruments: false }).showInstruments).toBe(false);
     expect(sanitizeSettings({ showInstruments: 'non' }).showInstruments).toBe(true);

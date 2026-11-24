@@ -13,6 +13,9 @@ export class Ambient {
   private readonly param: Record<string, AudioParam> = {}; // les réglages qu'on fait évoluer
   private nextPlip = 0; // instant de la prochaine goutte isolée
   private plipRate = 0; // gouttes isolées par seconde
+  private readonly air: GainNode; // départ vers l'« air » : petit écho de forêt pour les cris d'animaux
+  private readonly rates: Record<string, number> = { birds: 0, gulls: 0, frogs: 0, owl: 0 }; // rythmes des cris (par seconde)
+  private readonly next: Record<string, number> = {}; // instant du prochain cri de chaque espèce
   private immediate = false; // changements immédiats (essais hors ligne)
 
   constructor(private readonly ctx: BaseAudioContext, destination: AudioNode = ctx.destination, private readonly rnd: () => number = Math.random) {
@@ -28,6 +31,82 @@ export class Ambient {
     this.buildRain();
     this.buildSea();
     this.buildHull();
+    this.air = this.buildAir();
+    this.buildLife();
+  }
+
+  // Un petit écho doux (0,23 s) filtré : donne de l'espace aux cris, comme dans une clairière. Renvoie l'entrée du départ.
+  private buildAir(): GainNode {
+    const input = this.ctx.createGain();
+    input.gain.value = 0.5;
+    const delay = this.ctx.createDelay(1);
+    delay.delayTime.value = 0.23;
+    const tone = this.ctx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 2600;
+    const fb = this.ctx.createGain();
+    fb.gain.value = 0.32;
+    input.connect(delay).connect(tone).connect(fb).connect(delay); // boucle de retour
+    tone.connect(this.master);
+    return input;
+  }
+
+  // Bruits continus de la vie : grillons (3 voix), cigales, feuillage.
+  private buildLife(): void {
+    // Grillons : chaque voix = une note aiguë hachée très vite (stridulation), par groupes de quelques secondes.
+    const bus = this.ctx.createGain();
+    bus.gain.value = 0;
+    bus.connect(this.master);
+    this.param.crickets = bus.gain;
+    [4200, 4650, 5150].forEach((f, k) => {
+      const o = this.ctx.createOscillator();
+      o.frequency.value = f;
+      const pulse = this.ctx.createGain(); // hachage rapide
+      const gate = this.ctx.createGain(); // groupes : on chante, on se tait
+      pulse.gain.value = 0;
+      gate.gain.value = 0;
+      const level = this.ctx.createGain(); // une voix reste discrète : trois voix ensemble ne dépassent pas le niveau voulu
+      level.gain.value = 0.3;
+      o.connect(pulse).connect(gate).connect(level).connect(bus);
+      o.start(0);
+      this.mod(pulse.gain, 26 + k * 4, 0.5, 0.5, `cricketPulse${k}`); // 0 à 1 à ~30 Hz
+      this.mod(gate.gain, 0.55 + k * 0.17, 0.5, 0.5); // 0 à 1 à ~0,6 Hz (chant par phrases)
+    });
+    // Cigales : bruit étroit vers 5 kHz haché à ~90 Hz, avec un gonflement lent.
+    const cic = this.ctx.createBiquadFilter();
+    cic.type = 'bandpass';
+    cic.frequency.value = 5200;
+    cic.Q.value = 5;
+    const am = this.ctx.createGain(); // hachage à ~90 Hz : le bruit « grésille » comme une cigale
+    am.gain.value = 0;
+    this.mod(am.gain, 88, 0.45, 0.55);
+    const cg = this.ctx.createGain();
+    cg.gain.value = 0;
+    this.source().connect(cic).connect(am).connect(cg).connect(this.master);
+    this.param.cicada = cg.gain;
+    // Feuillage : souffle moyen-aigu dans les arbres, plus grave pour les conifères.
+    const fo = this.ctx.createBiquadFilter();
+    fo.type = 'bandpass';
+    fo.Q.value = 0.45;
+    fo.frequency.value = 3000;
+    this.param.foliageFreq = fo.frequency;
+    this.layer('foliage', fo);
+    this.lfo(fo.frequency, 0.21, 300);
+  }
+
+  // Un oscillateur lent qui fait osciller un paramètre : valeur = offset (constante) + oscillation d'amplitude `depth`.
+  private mod(target: AudioParam, rate: number, depth: number, offset: number, name?: string): void {
+    const o = this.ctx.createOscillator();
+    o.frequency.value = rate;
+    const g = this.ctx.createGain();
+    g.gain.value = depth;
+    o.connect(g).connect(target);
+    o.start(0);
+    const c = this.ctx.createConstantSource();
+    c.offset.value = offset;
+    c.connect(target);
+    c.start(0);
+    if (name) this.param[name] = o.frequency;
   }
 
   // Bruit rose (plus doux que le bruit blanc) : somme filtrée de bruit blanc (approximation de Paul Kellet).
@@ -168,17 +247,182 @@ export class Ambient {
     this.set('hull', mix.hull.gain);
     this.set('hullFreq', mix.hull.freq);
     this.plipRate = mix.rain.plips;
+    // Vie sauvage : niveaux continus, rythmes des cris.
+    const l = mix.life;
+    this.set('crickets', l.crickets.gain);
+    for (let k = 0; k < 3; k++) this.set(`cricketPulse${k}`, (26 + k * 4) * l.crickets.pulse);
+    this.set('cicada', l.cicadas);
+    this.set('foliage', l.foliage.gain);
+    this.set('foliageFreq', l.foliage.freq);
+    this.rates.birds = l.birds;
+    this.rates.gulls = l.gulls;
+    this.rates.frogs = l.frogs;
+    this.rates.owl = l.owl;
   }
 
   // Gouttes isolées de la pluie (petits « plic » clairs) : à appeler à chaque image avec le temps écoulé.
   tick(dt: number): void {
-    if (this.plipRate <= 0 || this.ctx.state !== 'running') return;
-    const now = this.ctx.currentTime;
+    if (this.ctx.state !== 'running') return;
+    this.run(this.ctx.currentTime, Math.max(dt, 0.05) + 0.1);
+  }
+
+  // Pour les essais hors ligne : planifie d'un coup tous les cris des `seconds` prochaines secondes.
+  renderCalls(seconds: number): void {
+    this.run(0, seconds);
+  }
+
+  // Planifie les cris (et gouttes) qui tombent entre `now` et `now + ahead`.
+  private run(now: number, ahead: number): void {
+    this.schedule('birds', now, ahead, (t) => this.birdCall(t));
+    this.schedule('gulls', now, ahead, (t) => this.gullCall(t));
+    this.schedule('frogs', now, ahead, (t) => this.frogCall(t));
+    this.schedule('owl', now, ahead, (t) => this.owlCall(t));
+    if (this.plipRate <= 0) return;
     if (this.nextPlip < now) this.nextPlip = now;
-    while (this.nextPlip < now + Math.max(dt, 0.05) + 0.05) { // on planifie un peu à l'avance
+    while (this.nextPlip < now + ahead) {
       this.plip(this.nextPlip, 0.02 + this.rnd() * 0.04);
       this.nextPlip += -Math.log(1 - this.rnd()) / this.plipRate; // intervalles aléatoires (loi de Poisson)
     }
+  }
+
+  // Planifie les cris d'une espèce : intervalles aléatoires (loi de Poisson) autour du rythme demandé.
+  private schedule(name: string, now: number, ahead: number, call: (at: number) => void): void {
+    const rate = this.rates[name] ?? 0;
+    if (rate <= 0.001) {
+      delete this.next[name]; // plus d'activité : le prochain cri sera tiré à zéro quand elle reprendra
+      return;
+    }
+    const gap = (): number => -Math.log(1 - this.rnd()) / rate;
+    if (this.next[name] === undefined) this.next[name] = now + gap(); // reprise : pas de cri instantané
+    while (this.next[name]! < now + ahead) {
+      call(Math.max(this.next[name]!, now));
+      this.next[name]! += gap();
+    }
+  }
+
+  // Une note : sinusoïde qui glisse de f0 à f1 en `dur` secondes, avec attaque courte et extinction douce (vibrato léger possible).
+  private tone(at: number, f0: number, f1: number, dur: number, level: number, dest: AudioNode, vibrato = 0): void {
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.frequency.setValueAtTime(f0, at);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), at + dur);
+    if (vibrato > 0) {
+      const v = this.ctx.createOscillator();
+      const vg = this.ctx.createGain();
+      v.frequency.value = 28 + this.rnd() * 10;
+      vg.gain.value = f0 * vibrato;
+      v.connect(vg).connect(o.frequency);
+      v.start(at);
+      v.stop(at + dur + 0.05);
+    }
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(level, at + Math.min(0.012, dur * 0.3));
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g).connect(dest);
+    o.start(at);
+    o.stop(at + dur + 0.02);
+  }
+
+  // Sortie d'un cri : placé au hasard à gauche ou à droite, avec un départ vers l'écho de l'air.
+  private spot(): AudioNode {
+    const pan = this.ctx.createStereoPanner();
+    pan.pan.value = this.rnd() * 1.6 - 0.8;
+    pan.connect(this.master);
+    pan.connect(this.air);
+    return pan;
+  }
+
+  // Un chant d'oiseau : sifflement en deux ou trois notes, trille rapide, ou petit gazouillis.
+  private birdCall(at: number): void {
+    const out = this.spot();
+    const kind = this.rnd();
+    const level = 0.02 + this.rnd() * 0.035; // proche ou lointain
+    if (kind < 0.4) { // « ti-ou, ti-ou »
+      const f = 2100 + this.rnd() * 1700;
+      const n = 2 + Math.floor(this.rnd() * 2);
+      for (let k = 0; k < n; k++) {
+        this.tone(at + k * 0.2, f, f * 1.28, 0.11, level, out);
+        this.tone(at + k * 0.2 + 0.1, f * 1.28, f * 0.9, 0.09, level * 0.8, out);
+      }
+    } else if (kind < 0.7) { // trille
+      const f = 3000 + this.rnd() * 1600;
+      const n = 8 + Math.floor(this.rnd() * 7);
+      for (let k = 0; k < n; k++) this.tone(at + k * 0.045, f * (1 + (k % 2) * 0.06), f * 0.95, 0.032, level * 0.8, out);
+    } else { // gazouillis
+      const n = 5 + Math.floor(this.rnd() * 5);
+      let t = at;
+      for (let k = 0; k < n; k++) {
+        const f = 2000 + this.rnd() * 3200;
+        const d = 0.05 + this.rnd() * 0.07;
+        this.tone(t, f, f * (0.8 + this.rnd() * 0.5), d, level, out);
+        t += d + 0.03 + this.rnd() * 0.07;
+      }
+    }
+  }
+
+  // Un goéland : 2 à 4 « kiou » rauques (dent de scie filtrée qui monte puis retombe).
+  private gullCall(at: number): void {
+    const out = this.spot();
+    const n = 2 + Math.floor(this.rnd() * 3);
+    const f = 900 + this.rnd() * 300;
+    for (let k = 0; k < n; k++) {
+      const t = at + k * 0.52;
+      const o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f * 0.8, t);
+      o.frequency.linearRampToValueAtTime(f * 1.6, t + 0.1);
+      o.frequency.exponentialRampToValueAtTime(f * 0.7, t + 0.45);
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1700;
+      bp.Q.value = 1.6;
+      const g = this.ctx.createGain();
+      const lv = 0.05 * (1 - k * 0.12);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(lv, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.48);
+      o.connect(bp).connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 0.5);
+    }
+  }
+
+  // Un coassement : une série de petites impulsions graves (onde carrée filtrée).
+  private frogCall(at: number): void {
+    const out = this.spot();
+    const n = 5 + Math.floor(this.rnd() * 8);
+    const f = 240 + this.rnd() * 140;
+    for (let k = 0; k < n; k++) {
+      const t = at + k * (0.045 + this.rnd() * 0.01);
+      const o = this.ctx.createOscillator();
+      o.type = 'square';
+      o.frequency.setValueAtTime(f * (1 + 0.15 * Math.sin(k)), t);
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 850;
+      bp.Q.value = 3.5;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.03, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.034);
+      o.connect(bp).connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 0.04);
+    }
+  }
+
+  // Une chouette : « hou… hou-ou » grave et doux, avec une octave faible.
+  private owlCall(at: number): void {
+    const out = this.spot();
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1100;
+    lp.connect(out);
+    const f = 360 + this.rnd() * 50;
+    this.tone(at, f * 1.1, f, 0.38, 0.05, lp);
+    this.tone(at, f * 2.2, f * 2, 0.38, 0.012, lp);
+    this.tone(at + 0.62, f * 0.92, f * 0.8, 0.75, 0.05, lp);
+    this.tone(at + 0.62, f * 1.84, f * 1.6, 0.75, 0.01, lp);
   }
 
   // Une goutte : un petit son sinusoïdal qui chute vite en hauteur et en niveau.

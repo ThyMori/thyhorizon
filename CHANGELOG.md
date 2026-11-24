@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.23.0 — 2026-11-24
+
+Son : vie sauvage (oiseaux, goélands, grillons, cigales, grenouilles, chouette, feuillage) selon heure, biome, saison et météo
+
 ## 1.22.0 — 2026-11-24
 
 Son : ambiance synthétisée (vent, pluie, houle, déferlement, coque) et volume

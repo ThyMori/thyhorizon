@@ -39,6 +39,7 @@ import { LensDrops } from './render/lensDrops';
 import { AudioSystem } from './audio/audioSystem';
 import { Ambient } from './audio/ambient';
 import { shoreProximity, soundMix } from './core/soundMix';
+import { LifeInput, lifeMix } from './core/wildlife';
 import { SettingsPanel } from './ui/settingsPanel';
 import { toast } from './ui/toast';
 import { ChunkManager } from './world/chunkManager';
@@ -212,9 +213,28 @@ export class Game {
     this.shore = shoreProximity((x, z) => this.terrain.heightAt(x, z), this.controls.x, this.controls.z); // loin du rivage = 0
     const r = aboard ? this.boat.getReadout() : null; // instruments : vent apparent et vitesse
     const wind = this.boat.wind;
+    const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
+    const biome = this.terrain.biomeAt(this.controls.x, this.controls.z);
+    const ground = this.terrain.heightAt(this.controls.x, this.controls.z);
+    const sun = sunState(this.hours, lat, this.day);
+    const windFelt = r ? r.aws : wind.speed;
+    const life = lifeMix({
+      cls: realClimate.classAt(lat, lon),
+      lat,
+      day: this.day,
+      sunElevation: sun.elevationDeg,
+      hours: this.hours,
+      forest: biome.forest,
+      conifer: biome.conifer,
+      land: !aboard && ground > 0, // à bord, on est sur l'eau
+      snowy: ground > biome.snowLine,
+      shore: this.shore,
+      rain: this.weather.rain,
+      wind: windFelt,
+    });
     this.audio.setMix(
       soundMix({
-        windSpeed: r ? r.aws : wind.speed, // à bord on entend le vent apparent
+        windSpeed: windFelt, // à bord on entend le vent apparent
         rain: this.weather.rain,
         seaHs: this.sea.hs,
         onWater: aboard,
@@ -223,6 +243,7 @@ export class Game {
         aboard,
         volume: this.settings.soundVolume,
         active: this.controls.locked,
+        life,
       }),
     );
   }
@@ -682,11 +703,14 @@ export class Game {
         if (w) this.weather = { ...this.weather, ...w };
         return weatherText(this.weather);
       },
-      audioTest: async (over) => {
+      audioTest: async (over, life) => {
         // Rend 2 s de son hors ligne (sans haut-parleur) et mesure : niveau moyen, crête, valeurs invalides. Pour vérifier le moteur sans l'écouter.
         const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);
         const amb = new Ambient(ctx);
-        amb.apply(soundMix({ windSpeed: 6, rain: 0, seaHs: 1, onWater: true, shore: 0.5, boatSpeed: 2, aboard: true, volume: 0.8, active: true, ...over }), true);
+        const base: LifeInput = { cls: 'Cfb', lat: 48.7, day: 196, sunElevation: 40, hours: 13, forest: 0.55, conifer: 0.1, land: true, snowy: false, shore: 0, rain: 0, wind: 2 };
+        const mix = soundMix({ windSpeed: 2, rain: 0, seaHs: 0.2, onWater: false, shore: 0, boatSpeed: 0, aboard: false, volume: 0.8, active: true, ...over, life: lifeMix({ ...base, ...life }) });
+        amb.apply(mix, true);
+        amb.renderCalls(2);
         const data = (await ctx.startRendering()).getChannelData(0);
         let sum = 0, peak = 0, bad = 0;
         for (const v of data) {

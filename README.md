@@ -237,6 +237,13 @@ Sans objet : jeu local, sans compte ni serveur.
 - Pas encore (prochaines versions) : oiseaux, insectes, grenouilles selon l'heure et le biome ; nappes de musique douces ; bruits du bateau (craquements, voiles) et pas sur le pont.
 - Limite honnête : je ne peux pas **écouter** le résultat. Vérifié : niveaux cohérents, aucune valeur invalide, pas de saturation, volume 0 = silence. Le **rendu agréable** reste à juger par tes oreilles : dis-moi ce qui est trop fort, trop aigu ou trop répétitif.
 
+### 1.23.0 — Son : vie sauvage selon l'heure, le biome et la météo
+- **Oiseaux** : chœur à l'aube (plus fort le matin que le soir), chants plus rares en journée, plus nombreux en forêt ; ils se taisent sous la pluie forte, dans la tempête, sur l'eau, sur la neige et dans le froid. Trois sortes de chants (sifflement, trille, gazouillis), placés au hasard à gauche ou à droite avec un petit écho de clairière.
+- **Goélands** près des côtes (de jour), quelques-uns seulement au large ; **grillons** les soirs et nuits chauds (plus rapides quand il fait plus chaud) ; **cigales** en pleine chaleur du jour dans les climats secs, méditerranéens et tropicaux ; **grenouilles** la nuit (ou sous la pluie) dans les climats humides et tièdes, plus près de l'eau ; **chouette** la nuit en forêt ; **vent dans les feuilles** selon le vent et le nombre d'arbres (plus grave dans les conifères).
+- La **saison** compte : un soir d'été en Bretagne a ses grillons, un soir d'hiver non ; l'hémisphère sud est inversé. Rien à terre au-dessus de la limite des neiges ni dans le froid polaire.
+- Logique pure et testée : `src/core/wildlife.ts` (qui chante, à quel rythme) ; les voix sont synthétisées dans `src/audio/ambient.ts`.
+- Même limite qu'en 1.22 : je ne peux pas **écouter**. Vérifié : bonne espèce au bon moment (tests), aucune valeur invalide, pas de saturation. Le **rendu** (naturel ? agaçant ? répétitif ?) est à juger par tes oreilles : dis-moi quelles voix sonnent faux, trop fort ou trop souvent.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

@@ -12,6 +12,7 @@ declare global {
     __thyFail?: (message: string) => void; // affiche l'écran de secours avec un message
     __thy?: {
       teleport(x: number, z: number, yaw: number, pitch: number, fly?: boolean, y?: number): void;
+      moon(): { name: string; illumination: number; elevation: number; yaw: number; pitch: number }; // la Lune ici et maintenant (essais)
       setHours(hours: number): void;
       setDay(day: number): void; // change le jour de l'année (1 à 365)
       origin(): { x: number; z: number; camera: number[] }; // origine flottante et position de la caméra (pour vérifier)

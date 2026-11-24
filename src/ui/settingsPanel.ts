@@ -15,6 +15,7 @@ export interface SettingsBridge {
   setHours(hours: number): void; // change l'heure du jeu
   getDay(): number; // jour de l'année du jeu
   setDay(day: number): void; // change le jour de l'année
+  getMoonText(): string; // phase de la Lune à la date et au lieu courants
 }
 
 export class SettingsPanel {
@@ -98,6 +99,7 @@ export class SettingsPanel {
     for (const el of [this.hours, this.day, this.daysPass, this.dayLength]) el.disabled = s.realTime; // l'horloge réelle décide : ces réglages ne servent plus
     byId('out-place').textContent = `${START_PLACE} — ${formatCoords(START_LAT, START_LON)}`; // le lieu du monde
     byId('out-hours').textContent = formatHours(h);
+    byId('out-moon').textContent = `Lune : ${this.bridge.getMoonText()}`; // la vraie phase de la Lune à cette date
   }
 
   // Modifie un réglage de qualité et recalcule le préréglage correspondant.

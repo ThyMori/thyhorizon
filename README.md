@@ -244,6 +244,15 @@ Sans objet : jeu local, sans compte ni serveur.
 - Logique pure et testée : `src/core/wildlife.ts` (qui chante, à quel rythme) ; les voix sont synthétisées dans `src/audio/ambient.ts`.
 - Même limite qu'en 1.22 : je ne peux pas **écouter**. Vérifié : bonne espèce au bon moment (tests), aucune valeur invalide, pas de saturation. Le **rendu** (naturel ? agaçant ? répétitif ?) est à juger par tes oreilles : dis-moi quelles voix sonnent faux, trop fort ou trop souvent.
 
+### 1.24.0 — La vraie Lune (phases, lever et coucher)
+- La Lune n'est plus « toujours pleine et à l'opposé du soleil » : sa **position** et sa **phase** viennent de la **vraie date** (formules astronomiques simplifiées : ≈ 0,3° pour la position, quelques minutes pour les levers et couchers). L'année du jeu est l'année en cours ; en « Temps réel », c'est exactement le ciel d'aujourd'hui.
+- Elle se **lève à l'est et se couche à l'ouest**, avec ≈ 50 minutes de retard par jour (certains jours n'ont pas de lever), haute en hiver pour une pleine lune, basse en été. Elle est cohérente avec les étoiles (même rotation du ciel).
+- Le disque est une vraie **sphère éclairée par le soleil** : croissants, quartiers, gibbeuses, dont le côté éclairé regarde le soleil ; taches sombres (mers lunaires) et faible lueur cendrée sur la face cachée. On la voit aussi **pâle en plein jour** quand elle est levée.
+- Sa **lumière** dépend de la phase (nuit de pleine lune bien plus claire qu'une nuit de nouvelle lune) et de sa hauteur (rien quand elle est couchée).
+- **Réglages → Temps** affiche la phase du jour (nom, % éclairé, dans le ciel ou sous l'horizon).
+- Vérifié contre des dates réelles : nouvelles et pleines lunes de janvier–février 2024 et de l'an 2000, quartiers, durée du cycle ; la nouvelle lune du 18 janvier 2026 sort bien à 0 %. Limites : le Soleil du jeu ignore l'équation du temps (± 15 min, comme avant) ; calendrier de 365 jours (le 31 décembre d'une année bissextile est décalé d'un jour) ; la parallaxe de la Lune (≈ 1°) n'est pas corrigée ; le disque est grossi ≈ 4× pour être visible.
+- Essai : `?debug` puis `__thy.setDay(26)`, `__thy.setHours(19)` et `__thy.moon()` donne où regarder.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

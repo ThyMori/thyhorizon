@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.24.0 — 2026-11-24
+
+La vraie Lune : phases, position, lever et coucher, lumière selon la phase
+
 ## 1.23.0 — 2026-11-24
 
 Son : vie sauvage (oiseaux, goélands, grillons, cigales, grenouilles, chouette, feuillage) selon heure, biome, saison et météo

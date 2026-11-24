@@ -27,6 +27,7 @@ uniform vec3 uGlow; // couleur du halo autour du soleil
 uniform float uSunVis; // visibilité du disque solaire
 uniform vec3 uMoonDir; // direction de la lune
 uniform float uMoonVis; // visibilité de la lune
+uniform vec3 uMoonPhase; // phase : (sinus de l'angle de phase, cosinus, part éclairée)
 uniform float uMaxLight; // plafond de lumière (le soleil est plafonné quand le bloom est actif, sinon son halo noie l'écran)
 uniform float uCloud; // couverture nuageuse, 0 à 1
 uniform vec2 uCloudShift; // dérive des nuages (décalage calculé en JavaScript : jamais de grande coordonnée ici)
@@ -81,8 +82,27 @@ void main() {
     col = mix(col, cloudCol, cloudCover);
   }
   bright *= 1.0 - 0.95 * cloudCover; // le soleil et la lune disparaissent derrière les nuages
-  float md = max(dot(d, uMoonDir), 0.0); // alignement avec la lune
-  bright += vec3(0.75, 0.82, 1.0) * smoothstep(0.9996, 0.9998, md) * 1.6 * uMoonVis; // disque lunaire
+  // La Lune : une vraie sphère éclairée par le soleil, vue de la Terre. Sa phase vient de la date réelle (core/moon.ts).
+  float md = dot(d, uMoonDir); // alignement avec la lune
+  if (md > 0.99) {
+    const float MOON_R = 0.02; // rayon apparent (sinus) ≈ 1,15°, un peu plus grand que le vrai pour qu'on la voie bien
+    vec3 mt = d - uMoonDir * md; // décalage dans le plan du disque
+    vec3 e1 = normalize(cross(uMoonDir, abs(uMoonDir.y) > 0.99 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0)));
+    vec3 e2 = cross(e1, uMoonDir);
+    vec2 q = vec2(dot(mt, e1), dot(mt, e2)) / MOON_R; // position sur le disque (rayon = 1)
+    float rq = length(q);
+    float disc = 1.0 - smoothstep(0.9, 1.04, rq); // bord légèrement flou
+    vec3 sp = uSunDir - uMoonDir * dot(uSunDir, uMoonDir); // direction du soleil dans le plan du disque
+    sp = length(sp) > 1e-4 ? normalize(sp) : e2;
+    vec3 L = sp * uMoonPhase.x - uMoonDir * uMoonPhase.y; // d'où vient la lumière sur la lune
+    vec3 nrm = e1 * q.x + e2 * q.y - uMoonDir * sqrt(max(1.0 - rq * rq, 0.0)); // normale de la surface (vers l'observateur)
+    float lit = smoothstep(-0.03, 0.07, dot(nrm, L)); // partie éclairée (terminateur doux)
+    float maria = smoothstep(0.45, 0.68, fbm(q * 2.3 + 3.7)) * 0.5; // mers lunaires : taches plus sombres
+    vec3 surf = vec3(0.86, 0.87, 0.93) * (1.0 - maria);
+    vec3 moonCol = surf * lit + vec3(0.07, 0.085, 0.13) * (1.0 - lit) * (1.0 - maria * 0.5); // face cachée : très faible lueur cendrée
+    bright += moonCol * disc * 1.0 * uMoonVis * smoothstep(-0.01, 0.01, d.y);
+    col += vec3(0.5, 0.6, 0.9) * pow(max(md, 0.0), 500.0) * 0.10 * uMoonPhase.z * uMoonVis; // halo discret
+  }
   if (uMaxLight < 100.0) { // bloom actif : le ciel lui-même ne dépasse jamais 0,95 (il ne « brille » pas en entier), seuls les disques du soleil et de la lune dépassent
     col = min(col, vec3(0.95));
     bright = min(bright, vec3(uMaxLight));
@@ -182,6 +202,7 @@ export class SkyDome {
         uSunVis: { value: 1 },
         uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
         uMoonVis: { value: 0 },
+        uMoonPhase: { value: new THREE.Vector3(0, 1, 1) },
         uMaxLight: { value: 1000 }, // sans bloom : pas de plafond
         uCloud: { value: 0 },
         uCloudShift: { value: new THREE.Vector2() },
@@ -267,7 +288,9 @@ export class SkyDome {
     (u.uMoonDir!.value as THREE.Vector3).set(...state.moonDirection);
     u.uSunVis!.value = state.sunVisibility;
     u.uDaylight!.value = state.daylight;
-    u.uMoonVis!.value = state.starsOpacity; // la lune se montre quand les étoiles se montrent
+    u.uMoonVis!.value = Math.max(state.starsOpacity, 0.45 * (1 - state.starsOpacity)); // vive la nuit, pâle en plein jour (la vraie Lune se voit parfois de jour)
+    const phaseAngle = (Math.abs(180 - state.moonElongation) * Math.PI) / 180; // angle de phase : 0 = pleine, 180° = nouvelle
+    (u.uMoonPhase!.value as THREE.Vector3).set(Math.sin(phaseAngle), Math.cos(phaseAngle), state.moonIllumination);
     this.starMaterial.uniforms.uOpacity!.value = state.starsOpacity; // les étoiles apparaissent après le crépuscule
     const r = state.starRotation; // rotation du ciel : latitude, jour de l'année, heure
     this.stars.matrix.set(r[0]!, r[1]!, r[2]!, camera.position.x, r[3]!, r[4]!, r[5]!, camera.position.y, r[6]!, r[7]!, r[8]!, camera.position.z, 0, 0, 0, 1); // rotation + suit la caméra

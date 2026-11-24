@@ -35,6 +35,7 @@ import { anyDialogOpen, bindDialog, openDialog } from './ui/dialogs';
 import { Hud } from './ui/hud';
 import { initInstall } from './pwa/install';
 import { initPwa } from './pwa/pwa';
+import { moonState, moonText } from './core/moon';
 import { LensDrops } from './render/lensDrops';
 import { AudioSystem } from './audio/audioSystem';
 import { Ambient } from './audio/ambient';
@@ -139,6 +140,10 @@ export class Game {
       setHours: (h) => {
         this.hours = wrapHours(h);
       },
+      getMoonText: () => {
+        const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
+        return moonText(moonState(lat, lon, this.day, this.hours)); // phase de la vraie Lune ici et maintenant
+      },
       getDay: () => this.day,
       setDay: (d) => {
         this.day = wrapDay(d);
@@ -216,7 +221,7 @@ export class Game {
     const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
     const biome = this.terrain.biomeAt(this.controls.x, this.controls.z);
     const ground = this.terrain.heightAt(this.controls.x, this.controls.z);
-    const sun = sunState(this.hours, lat, this.day);
+    const sun = sunState(this.hours, lat, this.day, lon);
     const windFelt = r ? r.aws : wind.speed;
     const life = lifeMix({
       cls: realClimate.classAt(lat, lon),
@@ -302,8 +307,8 @@ export class Game {
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
     if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
-    this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
-    const sky = sunState(this.hours, this.playerLat(), this.day);
+    this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day, this.playerLon()), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
+    const sky = sunState(this.hours, this.playerLat(), this.day, this.playerLon());
     this.updateSound(dt);
     this.lens.update(dt, this.weather.rain, sky.daylight, this.controls.locked); // gouttes sur l'écran quand il pleut et qu'on joue
     this.gs.render();
@@ -416,6 +421,11 @@ export class Game {
     this.controls.onConstellationsKey = () => this.toggleConstellations();
   }
 
+  // Longitude actuelle du joueur (sert à la Lune : l'heure UT en dépend).
+  private playerLon(): number {
+    return worldToLatLon(this.controls.x, this.controls.z).lon;
+  }
+
   // Latitude actuelle du joueur, en degrés (sert au soleil : sa hauteur dépend du lieu).
   private playerLat(): number {
     return worldToLatLon(this.controls.x, this.controls.z).lat; // converti depuis la position dans le monde
@@ -433,7 +443,7 @@ export class Game {
   private toggleConstellations(): void {
     const on = !this.settings.constellations;
     this.applySettings({ ...this.settings, constellations: on });
-    const night = sunState(this.hours, this.playerLat(), this.day).starsOpacity > 0.05;
+    const night = sunState(this.hours, this.playerLat(), this.day, this.playerLon()).starsOpacity > 0.05;
     toast(on ? (night ? 'Constellations affichées.' : 'Constellations activées : elles apparaîtront à la nuit.') : 'Constellations cachées.');
   }
 
@@ -682,6 +692,12 @@ export class Game {
       },
       setDay: (d) => {
         this.day = wrapDay(d);
+      },
+      moon: () => {
+        // Où est la Lune ? (essais) : phase, hauteur, et le cap/inclinaison à donner à la caméra pour la viser.
+        const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
+        const m = moonState(lat, lon, this.day, this.hours);
+        return { name: m.name, illumination: m.illumination, elevation: m.elevationDeg, yaw: Math.atan2(m.direction[0], m.direction[2]) + Math.PI, pitch: Math.asin(m.direction[1]) };
       },
       hideUi: () => {
         this.hidePause();

@@ -32,13 +32,23 @@ describe('sunState', () => {
     expect(s.daylight).toBe(0);
     expect(s.sunIntensity).toBe(0);
     expect(s.starsOpacity).toBe(1);
-    expect(s.moonIntensity).toBeGreaterThan(0);
+    expect(s.moonIntensity).toBeGreaterThanOrEqual(0); // la Lune éclaire si elle est levée (sa phase et sa hauteur dépendent de la vraie date)
   });
-  it('donne des vecteurs unitaires et la lune à l\'opposé', () => {
+  it('éclaire la nuit d\'une pleine lune haute, pas d\'une nouvelle lune', () => {
+    const day = 25; // 25 janvier 2024 : pleine lune
+    const full = sunStateAt(0.5, START_LAT, day, -3.46, 2024);
+    expect(full.moonIllumination).toBeGreaterThan(0.95);
+    expect(full.moonIntensity).toBeGreaterThan(0.3);
+    const day2 = 11; // 11 janvier 2024 : nouvelle lune
+    const nw = sunStateAt(0.5, START_LAT, day2, -3.46, 2024);
+    expect(nw.moonIllumination).toBeLessThan(0.05);
+    expect(nw.moonIntensity).toBeLessThan(0.07);
+  });
+  it('donne des vecteurs unitaires (soleil et lune)', () => {
     for (let h = 0; h < 24; h += 0.5) {
       const s = sunState(h);
       expect(Math.hypot(...s.sunDirection)).toBeCloseTo(1, 6);
-      expect(s.moonDirection[1]).toBeCloseTo(-s.sunDirection[1], 6);
+      expect(Math.hypot(...s.moonDirection)).toBeCloseTo(1, 6);
     }
   });
   it('a un jour qui s\'installe progressivement le matin', () => {

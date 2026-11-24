@@ -4,7 +4,8 @@
 // et de l'heure solaire locale (midi = soleil plein sud). Il se lève donc à l'est, se couche à l'ouest, et la saison
 // change sa hauteur et la durée du jour.
 
-import { skyRotation, sunPosition } from './geo';
+import { START_LON, skyRotation, sunPosition } from './geo';
+import { CURRENT_YEAR, moonState } from './moon';
 import { Rgb, clamp, lerp, lerpRgb, smoothstep } from './math';
 
 // Tout ce qui dépend de l'heure. Les couleurs sont en sRGB (perceptuel).
@@ -12,7 +13,11 @@ export interface SunState {
   hours: number; // heure du jour, 0 ≤ h < 24
   elevationDeg: number; // hauteur du soleil au-dessus de l'horizon, en degrés (négatif = sous l'horizon)
   sunDirection: [number, number, number]; // vecteur unitaire vers le soleil
-  moonDirection: [number, number, number]; // vecteur unitaire vers la lune (opposée au soleil)
+  moonDirection: [number, number, number]; // vecteur unitaire vers la vraie Lune
+  moonElevationDeg: number; // hauteur de la Lune au-dessus de l'horizon (négatif = couchée)
+  moonIllumination: number; // part éclairée du disque lunaire, 0 à 1
+  moonElongation: number; // angle Lune–Soleil (0 nouvelle, 180 pleine), en degrés
+  moonName: string; // nom de la phase
   daylight: number; // 0 = nuit noire, 1 = plein jour
   skyTop: Rgb; // couleur du zénith
   skyHorizon: Rgb; // couleur de l'horizon (sert aussi pour la brume)
@@ -51,10 +56,10 @@ const STOPS: readonly Stop[] = [
 export const wrapHours = (h: number): number => ((h % 24) + 24) % 24;
 
 // Calcule tout l'état du ciel pour une heure solaire, une latitude (degrés) et un jour de l'année (1 à 365).
-export function sunState(hoursIn: number, latDeg: number, day: number): SunState {
+export function sunState(hoursIn: number, latDeg: number, day: number, lonDeg = START_LON, year = CURRENT_YEAR): SunState {
   const hours = wrapHours(hoursIn); // heure normalisée
   const { elevationDeg, direction: sunDirection } = sunPosition(latDeg, day, hours); // vraie position du soleil
-  const moonDirection: [number, number, number] = [-sunDirection[0], -sunDirection[1], -sunDirection[2]]; // la lune est opposée
+  const moon = moonState(latDeg, lonDeg, day, hours, year); // la vraie Lune : phase, position, lever et coucher
 
   // Interpolation entre les deux repères qui encadrent la hauteur du soleil.
   let lo = STOPS[0]!; // repère inférieur
@@ -74,14 +79,19 @@ export function sunState(hoursIn: number, latDeg: number, day: number): SunState
     hours,
     elevationDeg,
     sunDirection,
-    moonDirection,
+    moonDirection: moon.direction,
+    moonElevationDeg: moon.elevationDeg,
+    moonIllumination: moon.illumination,
+    moonElongation: moon.elongation,
+    moonName: moon.name,
     daylight: smoothstep(-6, 8, elevationDeg), // le jour s'installe entre -6° et 8°
     skyTop: lerpRgb(lo.top, hi.top, t),
     skyHorizon: lerpRgb(lo.horizon, hi.horizon, t),
     sunColor: lerpRgb(lo.sun, hi.sun, t),
     sunIntensity: lerp(lo.sunI, hi.sunI, t),
     ambientIntensity: lerp(lo.ambI, hi.ambI, t),
-    moonIntensity: 0.5 * (1 - smoothstep(-6, 0, elevationDeg)), // la lune n'éclaire que quand le soleil est couché
+    // La Lune n'éclaire que le soleil couché, quand elle est au-dessus de l'horizon, et d'autant plus qu'elle est pleine.
+    moonIntensity: 0.5 * (1 - smoothstep(-6, 0, elevationDeg)) * smoothstep(-1, 8, moon.elevationDeg) * (0.12 + 0.88 * Math.pow(moon.illumination, 1.8)),
     starsOpacity: 1 - smoothstep(-12, -3, elevationDeg), // les étoiles apparaissent après le crépuscule
     sunVisibility: smoothstep(-2, 2, elevationDeg), // le disque solaire disparaît sous l'horizon
     starRotation: skyRotation(latDeg, day, hours), // le ciel étoilé tourne avec l'heure, la saison et la latitude

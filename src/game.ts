@@ -21,6 +21,10 @@ import { Terrain, createTerrain } from './core/terrain';
 import { clamp } from './core/math';
 import { PlayerControls } from './player/controls';
 import { Avatar } from './render/avatar';
+import { EditObjects } from './render/editObjects';
+import { EditStore } from './core/worldEdits';
+import { WORLD_VERSION, readWorldVersion, worldVersionStatus } from './core/worldVersion';
+import { EditsPersistence, openEditsDb } from './storage/editsDb';
 import { CompassState, bearingFromYaw, compassText, newCompass, stepCompass } from './core/compass';
 import { THIRD_DISTANCE, THIRD_SHOULDER, ViewMode, clampAboveGround, nextViewBlend, thirdPersonOffset, toggleView } from './core/cameraRig';
 import { CROUCH_EYE_HEIGHT, EYE_HEIGHT } from './core/movement';
@@ -64,6 +68,12 @@ export class Game {
   private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
   private readonly lens: LensDrops; // gouttes de pluie sur l'écran
   private readonly audio = new AudioSystem(); // ambiance sonore (démarre au premier geste)
+  private readonly edits = new EditStore(); // les modifications du monde faites par le joueur (cairns…)
+  private editsDb: EditsPersistence | null = null; // leur enregistrement durable (null tant que la base n'est pas ouverte)
+  private editObjects!: EditObjects; // leur dessin
+  private savedWorldVersion = WORLD_VERSION; // version du monde lue dans la sauvegarde
+  private editsReadOnly = false; // vrai si la sauvegarde vient d'un jeu plus récent : on ne touche à rien
+  private editClock = 0; // temps depuis le dernier rafraîchissement du dessin (s)
   private avatar!: Avatar; // les bras, les mains, la boussole et le corps du joueur
   private compass: CompassState | null = null; // la rose de la boussole (null avant la première image)
   private viewMode: ViewMode = 'first'; // première ou troisième personne
@@ -127,6 +137,7 @@ export class Game {
     const seed = hashSeed(this.seedText);
     this.relief = createRelief(reliefGrid);
     this.terrain = createTerrain(seed, this.relief, realClimate); // le vrai relief de la Terre + un détail inventé
+    this.savedWorldVersion = readWorldVersion(rawSave); // version du monde de la sauvegarde lue
     const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
     this.gameHours = save.day * 24 + save.hours;
@@ -353,6 +364,11 @@ export class Game {
     this.boat.update(dt, now / 1000, this.origin); // le bateau avance et pose la caméra sur le pont (s'il y a lieu)
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
     this.updateAvatar(dt, now / 1000); // bras, mains, boussole (et caméra extérieure)
+    this.editClock += dt;
+    if (this.editClock > 0.5) {
+      this.editClock = 0;
+      this.editObjects.update(this.controls.x, this.controls.z, this.origin.x, this.origin.z, (x, z) => this.terrain.heightAt(x, z)); // dessin des cairns proches
+    }
     if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
     this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day, this.playerLon()), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
@@ -469,7 +485,48 @@ export class Game {
     this.controls.onConstellationsKey = () => this.toggleConstellations();
     this.controls.onViewKey = () => this.toggleViewMode();
     this.avatar = new Avatar(this.gs.scene);
+    this.editObjects = new EditObjects(this.gs.scene, this.edits);
+    this.controls.onEditKey = (remove) => this.editAction(remove);
+    this.edits.onChange((c) => {
+      this.editClock = 99; // le dessin se met à jour tout de suite
+      if (c.added) void this.editsDb?.put(c.added).catch(() => toast('Impossible d\'enregistrer ce cairn sur cet appareil.', 'error'));
+      if (c.removed) void this.editsDb?.delete(c.removed.id).catch(() => undefined);
+    });
+    void this.loadEdits(); // lecture de l'enregistrement, sans bloquer le démarrage
   }
+
+  // Lit les modifications enregistrées. Un monde enregistré par un jeu plus récent est laissé intact (lecture seule).
+  private async loadEdits(): Promise<void> {
+    this.editsReadOnly = worldVersionStatus(this.savedWorldVersion) === 'future';
+    const db = await openEditsDb();
+    this.editsDb = db;
+    try {
+      this.edits.load(await db.loadAll());
+    } catch {
+      toast('Tes constructions n\'ont pas pu être relues.', 'error');
+    }
+    if (!db.persistent) toast('Ce navigateur ne garde pas les constructions (navigation privée ?) : elles disparaîtront au rechargement.', 'error');
+    if (this.editsReadOnly) toast('Ce monde a été enregistré par une version plus récente du jeu : tu peux le visiter, pas le modifier.', 'error');
+    this.editClock = 99;
+  }
+
+  // K : pose un cairn devant soi ; Maj+K : retire le plus proche (à 3 m).
+  private editAction(remove: boolean): void {
+    if (this.boat.aboard || this.controls.fly) return toast('Les cairns se posent à pied, sur la terre ferme.');
+    if (!this.editsDb) return toast('Un instant, le monde se charge…');
+    if (this.editsReadOnly) return toast('Ce monde vient d\'une version plus récente du jeu : impossible de le modifier.', 'error');
+    const { x, z, yaw } = this.controls;
+    if (remove) {
+      const e = this.edits.nearest(x, z, 3, 'cairn');
+      return toast(e && this.edits.remove(e.id) ? 'Cairn retiré.' : 'Aucun cairn à moins de 3 m.');
+    }
+    const px = x - Math.sin(yaw) * 1.6; // 1,6 m devant (devant = direction −sin, −cos)
+    const pz = z - Math.cos(yaw) * 1.6;
+    if (this.terrain.heightAt(px, pz) <= 0.3) return toast('Il faut poser le cairn sur la terre ferme.');
+    if (this.edits.nearest(px, pz, 0.8)) return toast('Il y a déjà un cairn ici.');
+    toast(this.edits.add('cairn', px, pz, yaw, Date.now()) ? 'Cairn posé. Maj+K pour le retirer.' : 'Trop de constructions : retires-en avant d\'en poser.', 'info');
+  }
+
 
   // Longitude actuelle du joueur (sert à la Lune : l'heure UT en dépend).
   private playerLon(): number {
@@ -775,7 +832,9 @@ export class Game {
       hours: this.hours,
       day: this.day,
       fly: shore ? false : this.controls.fly,
+      worldVersion: this.savedWorldVersion, // le monde garde son numéro d'origine
     };
+    if (this.editsReadOnly) return; // sauvegarde d'un jeu plus récent : on ne l'écrase pas
     saveJson(SAVE_KEY, data);
   }
 
@@ -815,6 +874,7 @@ export class Game {
         else this.viewBlend = 1;
         return mode;
       },
+      edits: () => ({ count: this.edits.size, shown: this.editObjects.count, persistent: this.editsDb?.persistent ?? null, worldVersion: WORLD_VERSION, list: this.edits.all().slice(0, 20).map((e) => ({ id: e.id, x: e.x, z: e.z })) }),
       compass: () => (this.compass ? { card: this.compass.card, text: compassText(bearingFromYaw(this.controls.yaw)) } : null),
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),
       pending: () => this.chunks.stats().pending,

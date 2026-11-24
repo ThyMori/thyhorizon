@@ -290,6 +290,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - Limites : la boussole indique le **nord géographique** (pas de déclinaison magnétique) ; les mains sont modélisées sans texture (peau unie, sans plis) ; le corps de la 3ᵉ personne est un mannequin simple (jambes qui balancent, pas de pose accroupie ni de bras animés au-delà de la boussole) ; à bord et en vol libre le corps ne suit pas le sol ou le pont.
 - Essai : `?debug` puis `__thy.compass()` (cap et angle de la rose), `__thy.view('third')`.
 
+## 1.29 — Constructions qui restent + version du monde
+
+- **Le monde est calculé, pas stocké** : même graine + même code = même Lannion à chaque visite, où que tu sois allé entre-temps.
+- **Tes modifications sont enregistrées à part** (IndexedDB, sur cet ordinateur) et posées par-dessus le monde calculé. Pour l'instant une seule : le **cairn** (touche **K** pour en poser un à 1,6 m devant toi sur la terre ferme, **Maj+K** pour retirer le plus proche à moins de 3 m). Plus tard : maison, objets…
+- **Numéro de version du monde** (`WORLD_VERSION` dans `src/core/worldVersion.ts`, distinct du numéro du jeu) : on ne le monte que si une évolution du générateur déplace ou transforme des choses déjà visitées. Chaque sauvegarde et chaque construction note le sien. Une sauvegarde d'un jeu plus récent est en lecture seule (rien n'est écrasé).
+- Navigation privée / IndexedDB bloqué : le jeu marche, mais les constructions disparaissent au rechargement (message affiché).
+- Limite : tout reste sur CET appareil et CE navigateur (pas de synchronisation entre PC et téléphone). Vider les données du site efface les constructions.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

@@ -64,3 +64,6 @@ Format x.y.z (z = correction, y = fonction, x = majeur). Ne JAMAIS éditer à la
 - Le contrôle visuel se fait avec Chrome sans GPU (SwiftShader, ~10 i/s) : non représentatif des performances.
 - `?debug` dans l'URL expose `window.__thy` (téléportation, heure, stats).
 - Drapeau `UPDATE_PENDING` dans `src/flags.ts` : toujours `false` ici (pas de service externe).
+
+## Constructions et version du monde (1.29)
+Le monde est déterministe ; ce que le joueur change est une liste à part, posée par-dessus. `core/worldEdits.ts` (pur, testé : `WorldEdit`, `sanitizeEdit`, `EditStore`, plafond 20000), `storage/editsDb.ts` (IndexedDB `thyhorizon`/`edits`, repli mémoire avec `persistent=false`, testé avec fake-indexeddb ; passer `null` et non `undefined` pour « pas d'IndexedDB »), `render/editObjects.ts` (dessine dans 250 m, repère du rendu, y lu sur le terrain). `core/worldVersion.ts` : `WORLD_VERSION` ne monte QUE si le générateur déplace/transforme des choses déjà visitées ; `SaveData.worldVersion` garde celui de la sauvegarde ; sauvegarde d'un jeu plus récent = lecture seule (`editsReadOnly`, `saveNow` n'écrit pas). Ajouter un type de construction = l'ajouter à `EDIT_TYPES` + son dessin dans `editObjects.ts`. Touche K / Maj+K, debug `__thy.edits()`.

@@ -79,6 +79,11 @@ describe('sauvegarde', () => {
   const TODAY = 327; // 23 novembre
   const base = defaultSave(terrain, DEFAULT_SEED, TODAY);
 
+  it('garde le numéro de version du monde de la sauvegarde (absent = 1)', () => {
+    expect(sanitizeSave({ ...base }, terrain, DEFAULT_SEED, TODAY).worldVersion).toBe(1);
+    expect(sanitizeSave({ ...base, worldVersion: 7 }, terrain, DEFAULT_SEED, TODAY).worldVersion).toBe(7);
+    expect(sanitizeSave({ ...base, worldVersion: 'x' }, terrain, DEFAULT_SEED, TODAY).worldVersion).toBe(1);
+  });
   it('part d\'un départ valide sur la terre', () => {
     expect(base.day).toBe(TODAY);
     expect(base.hours).toBeCloseTo(15.3, 1); // une heure avant le coucher (≈ 16 h 18 solaire le 23 novembre à Lannion)

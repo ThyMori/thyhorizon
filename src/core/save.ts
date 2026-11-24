@@ -7,6 +7,7 @@ import { clamp } from './math';
 import { wrapHours } from './sun';
 import { Terrain, findSpawn } from './terrain';
 import { isWalkable } from './movement';
+import { WORLD_VERSION, readWorldVersion } from './worldVersion';
 
 // Graine du monde par défaut (le texte est transformé en nombre par hashSeed).
 export const DEFAULT_SEED = 'horizon';
@@ -22,6 +23,7 @@ export interface SaveData {
   hours: number; // heure solaire locale du jeu
   day: number; // jour de l'année du jeu (1 à 365)
   fly: boolean; // vol libre actif
+  worldVersion: number; // version du monde (voir worldVersion.ts) sur laquelle cette partie a été jouée
 }
 
 // Lit la graine d'une sauvegarde brute (ou la graine par défaut).
@@ -35,7 +37,7 @@ export function readSavedSeed(raw: unknown): string {
 export function defaultSave(terrain: Terrain, seed: string, today: number): SaveData {
   const s = findSpawn(terrain); // point de départ sur la plage
   const day = wrapDay(today); // jour valide
-  return { version: 2, seed, x: s.x, z: s.z, y: terrain.heightAt(s.x, s.z) + 1.7, yaw: s.yaw, pitch: s.pitch, hours: startHours(START_LAT, day), day, fly: false };
+  return { version: 2, seed, x: s.x, z: s.z, y: terrain.heightAt(s.x, s.z) + 1.7, yaw: s.yaw, pitch: s.pitch, hours: startHours(START_LAT, day), day, fly: false, worldVersion: WORLD_VERSION };
 }
 
 // Nettoie une sauvegarde brute pour ce terrain. La position redevient celle du départ si elle n'est plus valable.
@@ -61,5 +63,6 @@ export function sanitizeSave(raw: unknown, terrain: Terrain, seed: string, today
     hours: wrapHours(num(r.hours, fallback.hours)), // ancienne sauvegarde sans heure : départ par défaut
     day: wrapDay(num(r.day, fallback.day)), // ancienne sauvegarde sans date : aujourd'hui
     fly: positionOk && fly,
+    worldVersion: readWorldVersion(raw), // on garde le numéro de la sauvegarde (absent = 1)
   };
 }

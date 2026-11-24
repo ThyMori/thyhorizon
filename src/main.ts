@@ -18,6 +18,7 @@ declare global {
       origin(): { x: number; z: number; camera: number[] }; // origine flottante et position de la caméra (pour vérifier)
       pose(): { x: number; z: number; yaw: number; pitch: number; fly: boolean; playing: boolean }; // position et regard (pour vérifier)
       view(mode: 'first' | 'third'): string; // change de vue (essais)
+      edits(): { count: number; shown: number; persistent: boolean | null; worldVersion: number; list: { id: string; x: number; z: number }[] }; // constructions du joueur (essais)
       compass(): { card: number; text: string } | null; // état de la boussole (essais)
       hideUi(): void;
       boat(): { aboard: boolean; state: Record<string, unknown> | null; wind: { speed: number; from: number }; board(): void }; // le voilier (pour vérifier)

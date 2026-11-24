@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.29.0 — 2026-11-24
+
+Constructions du joueur qui restent (cairns, touche K) et numéro de version du monde
+
 ## 1.28.0 — 2026-11-24
 
 Mains réalistes, boussole fonctionnelle dans la main gauche, vue à la 3e personne préparée (touche T)

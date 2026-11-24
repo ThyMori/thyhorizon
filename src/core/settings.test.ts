@@ -44,6 +44,9 @@ describe('sanitizeSettings', () => {
     expect(DEFAULT_SETTINGS.realWeather).toBe(false); // la météo réelle est désactivée par défaut
     expect(sanitizeSettings({ realWeather: 'oui' }).realWeather).toBe(false);
     expect(sanitizeSettings({ realWeather: true }).realWeather).toBe(true);
+    expect(DEFAULT_SETTINGS.showHands).toBe(true);
+    expect(sanitizeSettings({ showHands: false }).showHands).toBe(false);
+    expect(sanitizeSettings({ showHands: 3 }).showHands).toBe(true);
     expect(DEFAULT_SETTINGS.showInstruments).toBe(true);
     expect(sanitizeSettings({ showInstruments: false }).showInstruments).toBe(false);
     expect(sanitizeSettings({ showInstruments: 'non' }).showInstruments).toBe(true);

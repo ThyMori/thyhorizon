@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.28.0 — 2026-11-24
+
+Mains réalistes, boussole fonctionnelle dans la main gauche, vue à la 3e personne préparée (touche T)
+
 ## 1.27.1 — 2026-11-24
 
 Troncs : plus de découpe de l'écorce de près (plan de coupe 0,3 m, joueur gardé à 0,6 m)

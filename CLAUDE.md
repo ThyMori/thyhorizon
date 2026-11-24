@@ -37,6 +37,9 @@ Tout est synthétisé (Web Audio), aucun fichier son. `core/soundMix.ts` (pur, t
 ## Arbres (1.27)
 Maillage à couleurs de sommets, dans la tuile (`core/trees.ts`, `addTree(..., detail)` : 0 de près, 1 de loin). Collision : `core/treeCollide.ts` utilise le placement de niveau 0 (cases de 8 m, identique aux niveaux 0 et 1) ; `trunkRadius` sert au dessin ET à la collision. Si on change le placement ou la taille des arbres, la collision suit toute seule ; si on change le rayon du tronc, les deux suivent. Budget : `TREE_VERTEX_BUDGET` (indices 16 bits). `PLAYER_RADIUS` (collision) doit rester plus grand que le plan de coupe `near` de la caméra (`render/scene.ts`), sinon on voit l'intérieur des troncs. Accroupi : touche C à pied (`CROUCH_*` dans `core/movement.ts`).
 
+## Joueur : mains, boussole, vue (1.28)
+`render/avatar.ts` assemble bras (IK : `core/arm.ts`), mains (`render/hand.ts`, poses dans `core/handPose.ts`), boussole (`render/compassModel.ts` ; cap et inertie dans `core/compass.ts`) et corps provisoire. Il vit dans la scène principale, en coordonnées du rendu (jamais de coordonnée du monde). La main gauche est le miroir de la droite DANS `Hand.geo` : tout ce qu'on accroche à `Hand.root` n'est pas inversé. Cap compas = `bearingFromYaw(yaw)` (sens horaire depuis le nord ; yaw du jeu = sens inverse). Vue : `core/cameraRig.ts` (T), la caméra n'est reculée qu'après `updateAvatar`. G lève la boussole. Réglage `showHands`.
+
 ## Rendu et grandes coordonnées
 Ne jamais envoyer une coordonnée du monde à la carte graphique (shader, position d'objet, caméra) : tout est relatif à l'origine flottante (`Game.origin`, `core/origin.ts`). Un shader qui a besoin de la position dans le monde (bruit, vagues) reçoit un décalage calculé en JavaScript (`grainShift`, `wavePhase`).
 

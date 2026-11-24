@@ -24,6 +24,7 @@ export class PlayerControls {
   sensitivity = 1; // sensibilité de la souris
   onBlocked: (() => void) | null = null; // appelé quand l'eau profonde bloque le chemin
   onFlyChange: ((on: boolean) => void) | null = null; // appelé quand on active/désactive le vol
+  onViewKey: (() => void) | null = null; // appelé quand on appuie sur T (première / troisième personne)
   onConstellationsKey: (() => void) | null = null; // appelé quand on appuie sur L (constellations)
   onMapKey: (() => void) | null = null; // appelé quand on appuie sur M (carte du monde)
   onBoatKey: (() => void) | null = null; // appelé quand on appuie sur B (monter à bord / débarquer)
@@ -168,6 +169,7 @@ export class PlayerControls {
     if (e.code === 'KeyH') this.onHelpKey?.(); // H : aide
     if (e.code === 'KeyM') this.onMapKey?.(); // M : carte du monde
     if (e.code === 'KeyI') this.onInstrumentsKey?.(); // I : montre ou cache les instruments du voilier
+    if (e.code === 'KeyT') this.onViewKey?.(); // T : changer de vue (première / troisième personne)
     if (e.code === 'KeyL') this.onConstellationsKey?.(); // L : traits des constellations
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // pas de défilement de page
   }

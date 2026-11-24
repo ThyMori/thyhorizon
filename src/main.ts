@@ -17,6 +17,8 @@ declare global {
       setDay(day: number): void; // change le jour de l'année (1 à 365)
       origin(): { x: number; z: number; camera: number[] }; // origine flottante et position de la caméra (pour vérifier)
       pose(): { x: number; z: number; yaw: number; pitch: number; fly: boolean; playing: boolean }; // position et regard (pour vérifier)
+      view(mode: 'first' | 'third'): string; // change de vue (essais)
+      compass(): { card: number; text: string } | null; // état de la boussole (essais)
       hideUi(): void;
       boat(): { aboard: boolean; state: Record<string, unknown> | null; wind: { speed: number; from: number }; board(): void }; // le voilier (pour vérifier)
       sea(hs: number): string; // impose une mer de hauteur significative hs (m) pour les essais

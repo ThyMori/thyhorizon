@@ -18,7 +18,12 @@ import { fetchRealConditions } from './net/openMeteo';
 import { WIND_START } from './player/boatDriver';
 import type { ReliefGrid } from './core/relief';
 import { Terrain, createTerrain } from './core/terrain';
+import { clamp } from './core/math';
 import { PlayerControls } from './player/controls';
+import { Avatar } from './render/avatar';
+import { CompassState, bearingFromYaw, compassText, newCompass, stepCompass } from './core/compass';
+import { THIRD_DISTANCE, THIRD_SHOULDER, ViewMode, clampAboveGround, nextViewBlend, thirdPersonOffset, toggleView } from './core/cameraRig';
+import { CROUCH_EYE_HEIGHT, EYE_HEIGHT } from './core/movement';
 import { BoatDriver } from './player/boatDriver';
 import { BoatHud } from './ui/boatHud';
 import { TouchUi } from './player/touchUi';
@@ -59,6 +64,13 @@ export class Game {
   private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
   private readonly lens: LensDrops; // gouttes de pluie sur l'écran
   private readonly audio = new AudioSystem(); // ambiance sonore (démarre au premier geste)
+  private avatar!: Avatar; // les bras, les mains, la boussole et le corps du joueur
+  private compass: CompassState | null = null; // la rose de la boussole (null avant la première image)
+  private viewMode: ViewMode = 'first'; // première ou troisième personne
+  private viewBlend = 0; // 0 = première personne, 1 = troisième (fondu)
+  private lastX = 0; // position de l'image précédente (pour estimer la vitesse de marche)
+  private lastZ = 0;
+  private walkSpeed = 0; // vitesse de marche lissée (m/s)
   private soundTimer = 0;
   private shore = 0; // proximité du rivage (0 à 1), recalculée quelques fois par seconde
   private weatherTimer = 0;
@@ -340,6 +352,7 @@ export class Game {
     }
     this.boat.update(dt, now / 1000, this.origin); // le bateau avance et pose la caméra sur le pont (s'il y a lieu)
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
+    this.updateAvatar(dt, now / 1000); // bras, mains, boussole (et caméra extérieure)
     if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
     this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day, this.playerLon()), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
@@ -454,6 +467,8 @@ export class Game {
     this.controls.onBoatKey = () => this.boat.toggle();
     this.controls.onInstrumentsKey = () => this.toggleInstruments();
     this.controls.onConstellationsKey = () => this.toggleConstellations();
+    this.controls.onViewKey = () => this.toggleViewMode();
+    this.avatar = new Avatar(this.gs.scene);
   }
 
   // Longitude actuelle du joueur (sert à la Lune : l'heure UT en dépend).
@@ -475,6 +490,61 @@ export class Game {
   }
 
   // Montre ou cache les traits des constellations ; de jour, on prévient qu'ils n'apparaîtront qu'à la nuit.
+  // T : bascule entre la première et la troisième personne (pas à bord pour l'instant : le corps ne suit pas encore le pont).
+  private toggleViewMode(): void {
+    if (this.boat.aboard) {
+      toast('La vue à la troisième personne n\'est pas encore disponible à bord.', 'info');
+      return;
+    }
+    this.viewMode = toggleView(this.viewMode);
+    toast(this.viewMode === 'third' ? 'Troisième personne (corps provisoire). T pour revenir.' : 'Première personne.', 'info');
+  }
+
+  // Bras, mains, boussole et (en vue extérieure) corps du joueur ; place aussi la caméra à la troisième personne.
+  private updateAvatar(dt: number, seconds: number): void {
+    const c = this.controls;
+    const cam = this.gs.camera;
+    const moved = Math.hypot(c.x - this.lastX, c.z - this.lastZ) / Math.max(dt, 1e-3); // vitesse de déplacement horizontale
+    this.lastX = c.x;
+    this.lastZ = c.z;
+    let speed = 0;
+    if (this.boat.aboard) speed = this.boat.walking ? this.boat.walkSpeed : 0; // à bord, seuls nos pas comptent (pas le mouvement du bateau)
+    else if (!c.fly) {
+      this.walkSpeed += (Math.min(moved, 12) - this.walkSpeed) * (1 - Math.exp(-8 * dt));
+      speed = this.walkSpeed;
+    } else this.walkSpeed = 0;
+    const bearing = bearingFromYaw(c.yaw);
+    if (!this.compass) this.compass = newCompass(bearing);
+    const shake = Math.sin(seconds * 8.3) * 0.02 * Math.min(speed / 4, 1.5); // la marche secoue un peu la rose
+    this.compass = stepCompass(this.compass, bearing, dt, shake);
+    if (this.boat.aboard) this.viewMode = 'first';
+    this.viewBlend = nextViewBlend(this.viewBlend, this.viewMode, dt);
+    const ground = this.terrain.heightAt(c.x, c.z);
+    const eyeHeight = c.fly || this.boat.aboard ? EYE_HEIGHT : clamp(c.y - ground, CROUCH_EYE_HEIGHT - 0.1, EYE_HEIGHT + 0.1); // accroupi : yeux plus bas
+    this.avatar.update({
+      dt,
+      time: seconds,
+      eye: cam.position,
+      yaw: c.yaw,
+      pitch: c.pitch,
+      roll: c.roll,
+      eyeHeight,
+      walkSpeed: speed,
+      compassCard: this.compass.card,
+      raise: c.locked && c.down('KeyG') ? 1 : 0,
+      blend: this.viewBlend,
+      showHands: this.settings.showHands,
+    });
+    if (this.viewBlend > 0) {
+      // Troisième personne : la caméra recule derrière l'épaule, sans passer sous le sol.
+      const o = thirdPersonOffset(c.yaw, c.pitch, THIRD_DISTANCE * this.viewBlend, THIRD_SHOULDER * this.viewBlend);
+      cam.position.x += o[0];
+      cam.position.y += o[1];
+      cam.position.z += o[2];
+      cam.position.y = clampAboveGround(cam.position.y, this.terrain.heightAt(cam.position.x + this.origin.x, cam.position.z + this.origin.z));
+    }
+  }
+
   private toggleConstellations(): void {
     const on = !this.settings.constellations;
     this.applySettings({ ...this.settings, constellations: on });
@@ -739,6 +809,13 @@ export class Game {
         this.hud.setLoading(false);
         byId('toast').hidden = true;
       },
+      view: (mode) => {
+        this.viewMode = mode;
+        if (mode === 'first') this.viewBlend = 0;
+        else this.viewBlend = 1;
+        return mode;
+      },
+      compass: () => (this.compass ? { card: this.compass.card, text: compassText(bearingFromYaw(this.controls.yaw)) } : null),
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),
       pending: () => this.chunks.stats().pending,
       boat: () => ({ aboard: this.boat.aboard, state: this.boat.state as unknown as Record<string, unknown> | null, wind: this.boat.wind, board: () => this.boat.toggle() }),

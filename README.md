@@ -281,6 +281,15 @@ Sans objet : jeu local, sans compte ni serveur.
 - Quand on s'approchait d'un tronc, on voyait « dedans » : le plan de coupe proche de la caméra (0,5 m) découpait l'écorce, alors que la collision t'arrêtait à 0,35 m de la surface. Corrigé : le plan de coupe passe à 0,3 m et le joueur est arrêté à 0,6 m du centre + rayon du tronc (`PLAYER_RADIUS`, doit rester plus grand que le plan de coupe `near` de `render/scene.ts`).
 - Effet de bord : un peu moins de précision de profondeur au loin (négligeable), et un peu plus d'espace entre toi et un tronc.
 
+### 1.28.0 — Mains, boussole fonctionnelle, 3ᵉ personne (préparée)
+- **Deux bras avec leurs mains**, construits doigt par doigt (paume, quatre doigts à trois phalanges, pouce, ongles, poignet) et vêtus d'un manteau vert. Les bras sont posés par cinématique inverse (épaule → coude → poignet) : les épaules suivent le corps, les mains suivent le regard avec un léger retard, se balancent à la marche et respirent.
+- **La main gauche tient une boussole fonctionnelle** : la rose tourne sous une vitre, le nord est vrai (le haut du cadran = là où tu regardes, trait rouge de visée). Elle a l'inertie d'une vraie rose (elle dépasse un peu, puis se pose ; la marche la secoue légèrement). Elle marche aussi à bord et en vol. Repères lumineux verts sur le N, les points cardinaux et l'aiguille pour la nuit. **G (tenue)** la lève devant les yeux pour la lire.
+- **Troisième personne préparée** : **T** bascule entre la vue d'yeux et la vue de dos (caméra à 3,4 m derrière l'épaule, jamais sous le sol, fondu en douceur). Le corps est **provisoire** (formes simples) ; la structure est prête pour un vrai personnage plus tard. Pas disponible à bord pour l'instant.
+- Réglages → Affichage : case **Mains et boussole** (pour les cacher).
+- Logique pure et testée : `core/compass.ts` (cap, rose à inertie, noms des directions), `core/arm.ts` (bras à deux os), `core/handPose.ts` (poses des doigts), `core/cameraRig.ts` (caméra 3ᵉ personne). Dessin : `render/hand.ts`, `render/compassModel.ts`, `render/avatar.ts`.
+- Limites : la boussole indique le **nord géographique** (pas de déclinaison magnétique) ; les mains sont modélisées sans texture (peau unie, sans plis) ; le corps de la 3ᵉ personne est un mannequin simple (jambes qui balancent, pas de pose accroupie ni de bras animés au-delà de la boussole) ; à bord et en vol libre le corps ne suit pas le sol ou le pont.
+- Essai : `?debug` puis `__thy.compass()` (cap et angle de la rose), `__thy.view('third')`.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

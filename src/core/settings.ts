@@ -15,6 +15,7 @@ export interface Settings {
   bloom: boolean; // halo lumineux autour des lumières (soleil, étoiles) : plus beau, plus gourmand
   resolution: number; // netteté de l'image, de 0.5 à 1 (1 = résolution native de l'écran)
   showFps: boolean; // affiche le compteur d'images par seconde
+  showHands: boolean; // montre les bras et la boussole à la première personne
   showInstruments: boolean; // affiche les instruments du voilier (touche I) ; coupés, on navigue aux penons
   realWeather: boolean; // météo et houle RÉELLES du lieu (Open-Meteo, besoin d'Internet) ; sinon tout est simulé en local
   soundVolume: number; // volume du son, de 0 (coupé) à 1
@@ -38,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ...PRESETS.balanced,
   constellations: false, // les traits n'apparaissent que si on les demande (touche L)
   showFps: true, // visible au début : on a besoin de mesurer la fluidité
+  showHands: true, // les mains et la boussole sont visibles par défaut
   showInstruments: true, // les instruments aident au début ; on peut les cacher pour naviguer « à l'œil »
   realWeather: false, // désactivé par défaut : rien n'est envoyé sur Internet tant que tu ne l'actives pas
   soundVolume: 0.6, // volume moyen par défaut
@@ -93,6 +95,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     constellations: bool(r.constellations, d.constellations),
     resolution: clamp(num(r.resolution, d.resolution), LIMITS.resolution.min, LIMITS.resolution.max),
     showFps: bool(r.showFps, d.showFps),
+    showHands: bool(r.showHands, d.showHands),
     showInstruments: bool(r.showInstruments, d.showInstruments),
     realWeather: bool(r.realWeather, d.realWeather),
     soundVolume: clamp(num(r.soundVolume, d.soundVolume), LIMITS.soundVolume.min, LIMITS.soundVolume.max),

@@ -28,6 +28,7 @@ export class SettingsPanel {
   private readonly resolution = byId<HTMLInputElement>('set-resolution');
   private readonly fps = byId<HTMLInputElement>('set-fps');
   private readonly instruments = byId<HTMLInputElement>('set-instruments');
+  private readonly hands = byId<HTMLInputElement>('set-hands'); // mains et boussole
   private readonly realWeather = byId<HTMLInputElement>('set-realweather'); // météo réelle
   private readonly hours = byId<HTMLInputElement>('set-hours');
   private readonly day = byId<HTMLInputElement>('set-day');
@@ -50,6 +51,7 @@ export class SettingsPanel {
     this.resolution.addEventListener('input', () => this.change({ resolution: Number(this.resolution.value) / 100 }));
     this.fps.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showFps: this.fps.checked }));
     this.realWeather.addEventListener('change', () => this.apply({ ...bridge.getSettings(), realWeather: this.realWeather.checked }));
+    this.hands.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showHands: this.hands.checked }));
     this.instruments.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showInstruments: this.instruments.checked }));
     this.sensitivity.addEventListener('input', () => this.apply({ ...bridge.getSettings(), mouseSensitivity: Number(this.sensitivity.value) / 100 }));
     this.volume.addEventListener('input', () => this.apply({ ...bridge.getSettings(), soundVolume: Number(this.volume.value) / 100 }));
@@ -85,6 +87,7 @@ export class SettingsPanel {
     byId('out-resolution').textContent = `${Math.round(s.resolution * 100)} %`;
     this.fps.checked = s.showFps;
     this.instruments.checked = s.showInstruments;
+    this.hands.checked = s.showHands;
     this.realWeather.checked = s.realWeather;
     this.dayLength.value = String(s.dayLengthMinutes);
     this.volume.value = String(Math.round(s.soundVolume * 100));

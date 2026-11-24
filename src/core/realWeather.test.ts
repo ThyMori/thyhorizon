@@ -1,10 +1,10 @@
 // Tests de la météo réelle (logique pure) et de l'appel réseau avec un faux serveur : jamais de vrai réseau ici.
 import { describe, expect, it } from 'vitest';
-import { approachWind, cellKey, forecastUrl, marineUrl, needsRefresh, parseForecast, parseMarine, realWindWithGusts, roundCoord, seaFromReal } from './realWeather';
+import { approachWind, cellKey, currentVector, shouldTurnSea, waveTurnFor, forecastUrl, marineUrl, needsRefresh, parseForecast, parseMarine, realWindWithGusts, roundCoord, seaFromReal } from './realWeather';
 import { fetchRealConditions, Fetcher } from '../net/openMeteo';
 
 const FORECAST = { current: { wind_speed_10m: 9, wind_direction_10m: 270, cloud_cover: 80, precipitation: 2, pressure_msl: 995, visibility: 2000 } };
-const MARINE = { current: { wave_height: 2.4, wave_direction: 280 } };
+const MARINE = { current: { wave_height: 2.4, wave_direction: 280, ocean_current_velocity: 3.6, ocean_current_direction: 90 } }; // courant : 3,6 km/h = 1 m/s vers l'est
 
 describe('coordonnées et adresses', () => {
   it('arrondit à 0,5° et ne contient jamais la position exacte', () => {
@@ -57,9 +57,43 @@ describe('lecture des réponses', () => {
   });
   it('vent absurde borné', () => expect(parseForecast({ current: { wind_speed_10m: 500, wind_direction_10m: 720, pressure_msl: 1000 } })!.wind!.speed).toBe(40));
   it('lit la mer, null sur terre', () => {
-    expect(parseMarine(MARINE)).toBe(2.4);
-    expect(parseMarine({ current: { wave_height: null } })).toBeNull();
+    const m = parseMarine(MARINE)!;
+    expect(m.hs).toBe(2.4);
+    expect(m.waveFrom).toBeCloseTo((280 * Math.PI) / 180, 5);
+    expect(m.current!.x).toBeCloseTo(1, 5); // vers l'est = +x, 1 m/s
+    expect(m.current!.z).toBeCloseTo(0, 5);
+    expect(parseMarine({ current: { wave_height: null, wave_direction: null } })).toBeNull();
     expect(parseMarine('x')).toBeNull();
+  });
+  it('le courant va VERS sa direction : 0° = vers le nord (−z), 180° = vers le sud (+z)', () => {
+    expect(currentVector(1, 0).z).toBeCloseTo(-1, 5);
+    expect(currentVector(1, 180).z).toBeCloseTo(1, 5);
+    expect(currentVector(2, 270).x).toBeCloseTo(-2, 5); // vers l'ouest
+  });
+  it('courant borné à ~8 nœuds', () => {
+    const c = parseMarine({ current: { ocean_current_velocity: 99, ocean_current_direction: 0 } })!.current!;
+    expect(Math.hypot(c.x, c.z)).toBeCloseTo(4, 5);
+  });
+});
+
+describe('direction de la houle', () => {
+  it('une houle d’ouest (270°) donne un vecteur « d’où elle vient » pointant vers −x', () => {
+    const t = waveTurnFor((270 * Math.PI) / 180);
+    const c = Math.cos(t), s = Math.sin(t);
+    const main = { dx: 0.8 * c - 0.6 * s, dz: 0.8 * s + 0.6 * c }; // houle principale tournée (voir waveDir)
+    const n = Math.hypot(main.dx, main.dz);
+    expect(main.dx / n).toBeCloseTo(-1, 5);
+    expect(main.dz / n).toBeCloseTo(0, 5);
+  });
+  it('une houle du nord (0°) vient de −z', () => {
+    const t = waveTurnFor(0);
+    const c = Math.cos(t), s = Math.sin(t);
+    expect((0.8 * s + 0.6 * c) / 1).toBeCloseTo(-1, 5);
+  });
+  it('on ne tourne la mer que pour un écart de plus de 15°', () => {
+    expect(shouldTurnSea(0, (10 * Math.PI) / 180)).toBe(false);
+    expect(shouldTurnSea(0, (20 * Math.PI) / 180)).toBe(true);
+    expect(shouldTurnSea(3.1, -3.1)).toBe(false); // passage par ±π : écart réel de 0,08 rad
   });
 });
 
@@ -85,6 +119,8 @@ describe('appel réseau avec faux serveur', () => {
     const r = await fetchRealConditions(48.73, -3.46, 42, f);
     expect(r!.wind!.speed).toBe(9);
     expect(r!.hs).toBe(2.4);
+    expect(r!.current!.x).toBeCloseTo(1, 5);
+    expect(r!.waveFrom).not.toBeNull();
     expect(r!.fetchedAt).toBe(42);
     expect(urls.every((u) => !u.includes('48.73'))).toBe(true); // jamais la position exacte
   });

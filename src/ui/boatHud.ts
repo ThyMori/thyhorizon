@@ -53,7 +53,7 @@ export class BoatHud {
     this.last = nowMs;
     const deg = (rad: number): number => (rad * 180) / Math.PI;
     this.cap.textContent = `${Math.round(r.bearing).toString().padStart(3, '0')}°`;
-    this.speed.textContent = `${fmt1(msToKnots(r.speed))} nd`;
+    this.speed.textContent = r.current > 0.1 ? `${fmt1(msToKnots(r.sog))} nd · route ${Math.round(r.cog).toString().padStart(3, '0')}°` : `${fmt1(msToKnots(r.sog))} nd`; // vitesse sur le fond (courant compris), et la route si un courant joue
     this.tw.textContent = `${Math.round(msToKnots(r.tws))} nd · ${side(deg(r.twa))}`;
     this.aw.textContent = `${Math.round(msToKnots(r.aws))} nd · ${side(deg(r.awa))}`;
     this.heel.textContent = side(r.heelDeg);

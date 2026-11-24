@@ -26,7 +26,7 @@ async function getJson(url: string, doFetch: Fetcher): Promise<unknown | null> {
 export async function fetchRealConditions(lat: number, lon: number, nowMs: number, doFetch: Fetcher = (u, i) => fetch(u, { ...i, credentials: 'omit', referrerPolicy: 'no-referrer' })): Promise<RealConditions | null> {
   const [fc, mar] = await Promise.all([getJson(forecastUrl(lat, lon), doFetch), getJson(marineUrl(lat, lon), doFetch)]); // les deux requêtes en parallèle
   const forecast = fc ? parseForecast(fc) : null; // temps
-  const hs = mar ? parseMarine(mar) : null; // vagues
-  if (!forecast && hs === null) return null; // les deux ont échoué
-  return { wind: forecast?.wind ?? null, weather: forecast?.weather ?? null, hs, fetchedAt: nowMs };
+  const marine = mar ? parseMarine(mar) : null; // vagues et courant
+  if (!forecast && !marine) return null; // les deux ont échoué
+  return { wind: forecast?.wind ?? null, weather: forecast?.weather ?? null, hs: marine?.hs ?? null, waveFrom: marine?.waveFrom ?? null, current: marine?.current ?? null, fetchedAt: nowMs };
 }

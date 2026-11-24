@@ -6,17 +6,18 @@ import * as THREE from 'three';
 import { Origin, NO_ORIGIN, wavePhase } from '../core/origin';
 import { buildPolarGrid } from '../core/polar';
 import { SeaState, waveScales } from '../core/sea';
-import { LOW_WAVES, WAVE_DEFS } from '../core/waves'; // les vagues sont définies dans la logique pure (partagées avec le bateau)
+import { LOW_WAVES, MAIN_WAVE_ANGLE, WAVE_DEFS, waveDir } from '../core/waves'; // les vagues sont définies dans la logique pure (partagées avec le bateau)
 import type { SunState } from '../core/sun';
 import { toColor } from './sky';
 
 // Texte GLSL d'une somme de vagues. Les positions sont relatives à l'origine flottante : uPh[i] rend à chaque vague sa phase dans le monde.
 const waveSum = (count: number): string =>
   WAVE_DEFS.slice(0, count)
-    .map((d, i) => `  h += ${d.amp} * uAmpScale[${i}] * sin(dot(p, vec2(${d.dx.toFixed(2)}, ${d.dz.toFixed(2)})) * ${d.k} + t * ${d.w} + uPh[${i}]);`)
+    .map((d, i) => `  h += ${d.amp} * uAmpScale[${i}] * sin(dot(p, uDir[${i}]) * ${d.k} + t * ${d.w} + uPh[${i}]);`)
     .join('\n');
 
 const WAVES = /* glsl */ `
+uniform vec2 uDir[${WAVE_DEFS.length}]; // direction de chaque vague (tournée selon la houle réelle)
 uniform float uPh[${WAVE_DEFS.length}]; // déphasage de chaque vague (origine flottante)
 uniform float uAmpScale[${WAVE_DEFS.length}]; // facteur d'amplitude de chaque vague (état de mer)
 float waveLow(vec2 p, float t) { // vagues larges, utilisées pour déformer la surface
@@ -112,6 +113,8 @@ void main() {
 export class Ocean {
   readonly mesh: THREE.Mesh;
   private readonly material: THREE.ShaderMaterial;
+  private origin: Origin = NO_ORIGIN; // dernière origine flottante (pour recalculer les déphasages quand la mer tourne)
+  private turn = 0; // rotation actuelle de la mer (rad)
 
   constructor() {
     const grid = buildPolarGrid(110, 160, 0.0015); // anneaux denses près du centre, larges au loin
@@ -132,11 +135,12 @@ export class Ocean {
           uSunVis: { value: 1 },
           uDaylight: { value: 1 },
           uWater: { value: toColor([0.05, 0.27, 0.3]) }, // vert-bleu de l'Atlantique
+          uDir: { value: WAVE_DEFS.map((d) => new THREE.Vector2(d.dx, d.dz)) }, // directions des vagues (mises à jour par setWaveTurn)
           uPh: { value: WAVE_DEFS.map(() => 0) }, // déphasages des vagues (mis à jour par setOrigin)
           uAmpScale: { value: WAVE_DEFS.map(() => 1) }, // amplitude de chaque vague (état de mer)
           uFoam: { value: 0 },
           uCrest: { value: 1 },
-          uWaveDir: { value: new THREE.Vector2(0.8, 0.6) },
+          uWaveDir: { value: new THREE.Vector2(-Math.cos(MAIN_WAVE_ANGLE), -Math.sin(MAIN_WAVE_ANGLE)) },
         },
       ]),
       fog: true, // l'eau se fond dans la brume
@@ -150,7 +154,25 @@ export class Ocean {
 
   // Recalcule le déphasage des vagues quand l'origine flottante change : la mer garde sa forme dans le monde.
   setOrigin(origin: Origin = NO_ORIGIN): void {
-    this.material.uniforms.uPh!.value = WAVE_DEFS.map((d) => wavePhase(origin, d.dx, d.dz, d.k));
+    this.origin = origin;
+    this.material.uniforms.uPh!.value = WAVE_DEFS.map((d, i) => {
+      const dir = waveDir(i, this.turn); // direction tournée
+      return wavePhase(origin, dir.dx, dir.dz, d.k);
+    });
+  }
+
+  // Tourne toute la mer (houle réelle) : les directions et les déphasages sont recalculés, le bateau utilise la même rotation.
+  setWaveTurn(turn: number): void {
+    if (turn === this.turn) return;
+    this.turn = turn;
+    const u = this.material.uniforms as Record<string, THREE.IUniform>;
+    u.uDir!.value = WAVE_DEFS.map((_, i) => {
+      const d = waveDir(i, turn);
+      return new THREE.Vector2(d.dx, d.dz);
+    });
+    const main = waveDir(0, turn);
+    (u.uWaveDir!.value as THREE.Vector2).set(-main.dx, -main.dz); // sens de déplacement des vagues = opposé au vecteur « d'où elles viennent »
+    this.setOrigin(this.origin); // déphasages recalculés pour les nouvelles directions
   }
 
   // État de mer : amplitude des vagues et part de moutons.

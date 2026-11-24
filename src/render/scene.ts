@@ -173,6 +173,11 @@ export class GameScene {
     this.fog.density = (FOG_DENSITY_FACTOR / this.radiusMeters) * fogFactor(this.weather);
   }
 
+  // Tourne la mer pour que la houle vienne de la bonne direction (rad).
+  setWaveTurn(turn: number): void {
+    this.ocean.setWaveTurn(turn);
+  }
+
   // État de mer : amplitude des vagues, moutons, force de l'écume de rivage.
   setSea(sea: SeaState): void {
     this.ocean.setSea(sea);

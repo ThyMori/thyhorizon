@@ -371,3 +371,43 @@ describe('écoute automatique', () => {
     expect(Math.abs(autoTrim(s, EAST_12))).toBeLessThan(0.05);
   });
 });
+
+describe('courant', () => {
+  const deep = (): number => 50; // eau profonde partout
+  const calmWind: Wind = { speed: 0, from: 0 };
+  const noInput: BoatInput = { helm: 0, trim: 0, center: false };
+  it('un bateau à l’arrêt est emporté par le courant', () => {
+    const s = createBoat(0, 0, 0);
+    s.mainTarget = 0; s.mainUp = 0; s.jibTarget = 0; s.jibOut = 0; // pas de voile
+    for (let i = 0; i < 100; i++) stepBoat(s, CRUISER, calmWind, noInput, 0.1, deep, { x: 1, z: 0 }); // 10 s, 1 m/s vers l'est
+    expect(s.x).toBeGreaterThan(9);
+    expect(s.x).toBeLessThan(11);
+    expect(Math.abs(s.z)).toBeLessThan(1);
+  });
+  it('le courant ne change ni la vitesse dans l’eau ni le vent apparent', () => {
+    const a = createBoat(0, 0, 0);
+    const b = createBoat(0, 0, 0);
+    for (let i = 0; i < 50; i++) {
+      stepBoat(a, CRUISER, { speed: 6, from: 0 }, noInput, 0.1, deep);
+      stepBoat(b, CRUISER, { speed: 6, from: 0 }, noInput, 0.1, deep, { x: 0.8, z: 0.4 });
+    }
+    expect(b.u).toBeCloseTo(a.u, 9);
+    expect(b.v).toBeCloseTo(a.v, 9);
+  });
+  it('vitesse et route sur le fond : cap nord à 2 m/s dans l’eau, courant 1 m/s vers l’est', () => {
+    const s = createBoat(0, 0, 0); // yaw 0 = cap nord
+    s.u = 2; s.v = 0;
+    const r = readout(s, calmWind, { x: 1, z: 0 });
+    expect(r.speed).toBeCloseTo(2, 9);
+    expect(r.sog).toBeCloseTo(Math.hypot(2, 1), 9);
+    expect(r.cog).toBeCloseTo((Math.atan2(1, 2) * 180) / Math.PI, 5); // route 26,6° (nord-nord-est)
+    expect(r.current).toBeCloseTo(1, 9);
+  });
+  it('sans courant, la vitesse sur le fond est la vitesse dans l’eau', () => {
+    const s = createBoat(0, 0, 0);
+    s.u = 3;
+    const r = readout(s, calmWind);
+    expect(r.sog).toBeCloseTo(3, 9);
+    expect(r.current).toBe(0);
+  });
+});

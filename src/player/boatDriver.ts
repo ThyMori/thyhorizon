@@ -8,7 +8,7 @@ import { EYE_HEIGHT } from '../core/movement';
 import type { Origin } from '../core/origin';
 import { HELM_POS, WALK_EYE, WALK_SPEED, deckStep, deckSurface, moveOnDeck, nearHelm } from '../core/deck';
 import type { DeckPos } from '../core/deck';
-import { BoatInput, BoatState, forwardOf, starboardOf, CRUISER, MAX_REEFS, Readout, apparentWind, autoTrim, autopilotHelm, createBoat, readout, startHeading, stepBoat } from '../core/sailing';
+import { BoatInput, BoatState, forwardOf, starboardOf, CRUISER, MAX_REEFS, Readout, apparentWind, autoTrim, autopilotHelm, createBoat, readout, startHeading, stepBoat, Vec2, NO_CURRENT } from '../core/sailing';
 import type { Terrain } from '../core/terrain';
 import { waveHeight } from '../core/waves';
 import { CALM_SEA, SeaState } from '../core/sea';
@@ -42,6 +42,8 @@ export class BoatDriver {
   private waveRoll = 0; // roulis dû aux vagues (rad, adouci, + = tribord bas)
   weather: WeatherState = CLEAR_WEATHER; // le temps qu'il fait (donné par le jeu) : il renforce ou calme le vent
   wind: Wind = { speed: 5, from: 0 }; // dernier vent calculé au bateau
+  current: Vec2 = NO_CURRENT; // courant (m/s, repère du monde) donné par le jeu
+  waveTurn = 0; // rotation de la mer (rad) donnée par le jeu : le bateau suit les mêmes vagues que le rendu
   realWind: Wind | null = null; // vent réel lissé donné par le jeu (null = on utilise le vent simulé)
   onChange: ((aboard: boolean) => void) | null = null; // appelé quand on monte ou descend
 
@@ -156,21 +158,21 @@ export class BoatDriver {
     this.wind = this.localWind(lat, lon, seconds); // vent réel si disponible, sinon simulé
     if (this.aboard && this.controls.locked) {
       const yawBefore = boat.yaw;
-      stepBoat(boat, CRUISER, this.wind, this.readInput(boat, dt), dt, (x, z) => -this.terrain.heightAt(x, z));
+      stepBoat(boat, CRUISER, this.wind, this.readInput(boat, dt), dt, (x, z) => -this.terrain.heightAt(x, z), this.current);
       this.controls.yaw += boat.yaw - yawBefore; // le pont tourne avec le bateau : le regard reste dans le même sens du bateau
       this.report(boat);
     }
     const sw = this.sea.swell;
-    const y = waveHeight(boat.x, boat.z, seconds, sw); // le bateau suit la surface de l'eau
+    const y = waveHeight(boat.x, boat.z, seconds, sw, this.waveTurn); // le bateau suit la surface de l'eau
     // Tangage et roulis : la pente de la houle sous la coque (on mesure la hauteur à l'étrave, à l'étambot et sur les bords).
     const fw = forwardOf(boat.yaw);
     const sb = starboardOf(boat.yaw);
     const half = CRUISER.length * 0.4;
     const halfB = CRUISER.beam * 0.5;
-    const hFront = waveHeight(boat.x + fw.x * half, boat.z + fw.z * half, seconds, sw);
-    const hBack = waveHeight(boat.x - fw.x * half, boat.z - fw.z * half, seconds, sw);
-    const hStbd = waveHeight(boat.x + sb.x * halfB, boat.z + sb.z * halfB, seconds, sw);
-    const hPort = waveHeight(boat.x - sb.x * halfB, boat.z - sb.z * halfB, seconds, sw);
+    const hFront = waveHeight(boat.x + fw.x * half, boat.z + fw.z * half, seconds, sw, this.waveTurn);
+    const hBack = waveHeight(boat.x - fw.x * half, boat.z - fw.z * half, seconds, sw, this.waveTurn);
+    const hStbd = waveHeight(boat.x + sb.x * halfB, boat.z + sb.z * halfB, seconds, sw, this.waveTurn);
+    const hPort = waveHeight(boat.x - sb.x * halfB, boat.z - sb.z * halfB, seconds, sw, this.waveTurn);
     const k = 1 - Math.exp(-Math.min(dt, 0.1) * 5); // la coque amortit les mouvements brusques
     this.wavePitch += (Math.atan2(hFront - hBack, half * 2) * 0.9 - this.wavePitch) * k;
     this.waveRoll += (Math.atan2(hPort - hStbd, halfB * 2) * 0.6 - this.waveRoll) * k;
@@ -204,7 +206,7 @@ export class BoatDriver {
 
   // Ce qu'affichent les instruments (null si on n'est pas à bord).
   getReadout(): Readout | null {
-    return this.aboard && this.state ? { ...readout(this.state, this.wind), pilot: this.pilotOn } : null;
+    return this.aboard && this.state ? { ...readout(this.state, this.wind, this.current), pilot: this.pilotOn } : null;
   }
 
   // Les commandes du joueur lues sur le clavier.

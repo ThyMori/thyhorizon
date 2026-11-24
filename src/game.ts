@@ -12,8 +12,8 @@ import { createRelief } from './core/relief';
 import { realClimate } from './world/climateData';
 import { CALM_SEA, SeaState, approachSea, seaName, seaStateFor } from './core/sea';
 import { CLEAR_WEATHER, WeatherState, applyWeatherToSky, blendWeather, weatherAt, weatherText } from './core/weather';
-import { Wind, beaufort, beaufortName, windAt, windVelocity } from './core/wind';
-import { RealConditions, approachWind, cellKey, needsRefresh, realWindWithGusts, seaFromReal } from './core/realWeather';
+import { Wind, msToKnots, beaufort, beaufortName, windAt, windVelocity } from './core/wind';
+import { RealConditions, approachWind, cellKey, needsRefresh, realWindWithGusts, seaFromReal, shouldTurnSea, waveTurnFor } from './core/realWeather';
 import { fetchRealConditions } from './net/openMeteo';
 import { WIND_START } from './player/boatDriver';
 import type { ReliefGrid } from './core/relief';
@@ -57,6 +57,7 @@ export class Game {
   private realDebug = false; // conditions imposées par ?debug : on ne les efface pas
   private realBusy = false; // une requête est-elle en cours ?
   private realAnnounced = false; // a-t-on déjà dit au joueur si la météo réelle marche ?
+  private waveTurn = 0; // rotation actuelle de la mer (houle réelle)
   private seaIsReal = false; // la mer vient-elle des vagues réelles ?
   private seaForced: SeaState | null = null; // pour les essais (?debug)
   private weatherForced: Partial<WeatherState> | null = null; // pour les essais (?debug)
@@ -159,7 +160,7 @@ export class Game {
       let target = weatherAt(lat, lon, realClimate.classAt(lat, lon), this.day, this.gameHours, this.hours);
       this.manageReal(lat, lon); // demande la météo réelle si l'option est active et qu'il est temps
       if (this.real?.weather) target = { ...target, ...this.real.weather, windScale: this.real.wind ? 1 : target.windScale }; // le temps réel remplace le simulé
-      if (this.boat.aboard) this.boatHud.setWeather(`${weatherText(this.weather)} · ${beaufortName(beaufort(this.boat.wind.speed))} · ${seaName(this.sea.hs)}${this.real ? ' · météo réelle' : ''}`);
+      if (this.boat.aboard) this.boatHud.setWeather(`${weatherText(this.weather)} · ${beaufortName(beaufort(this.boat.wind.speed))} · ${seaName(this.sea.hs)}${this.boat.current.x || this.boat.current.z ? ` · courant ${(Math.round(msToKnots(Math.hypot(this.boat.current.x, this.boat.current.z)) * 10) / 10).toString().replace('.', ',')} nd` : ''}${this.real ? ' · météo réelle' : ''}`);
       this.weatherTarget = this.weatherForced ? { ...target, ...this.weatherForced } : target;
     }
     this.weather = blendWeather(this.weather, this.weatherTarget, 1 - Math.exp(-dt / 4)); // le temps change en quelques secondes si on change de lieu
@@ -182,6 +183,12 @@ export class Game {
     }
     this.sea = this.seaForced ?? (this.seaInit ? approachSea(this.sea, target, dt) : target); // au premier calcul, la mer est déjà formée
     this.seaInit = true;
+    // Houle réelle : on tourne la mer vers la direction mesurée, seulement pour un écart net (ou à la première mesure).
+    const wantedTurn = this.real?.waveFrom != null ? waveTurnFor(this.real.waveFrom) : 0;
+    if (this.real?.waveFrom == null ? this.waveTurn !== 0 : shouldTurnSea(this.waveTurn, wantedTurn)) this.waveTurn = wantedTurn;
+    this.gs.setWaveTurn(this.waveTurn);
+    this.boat.waveTurn = this.waveTurn;
+    this.boat.current = this.real?.current ?? { x: 0, z: 0 }; // courant réel (sinon aucun)
     this.gs.setSea(this.sea);
     this.boat.sea = this.sea;
   }
@@ -639,7 +646,7 @@ export class Game {
         return weatherText(this.weather);
       },
       real: (c) => {
-        this.real = c ? { wind: c.wind ?? null, weather: c.weather ?? null, hs: c.hs ?? null, fetchedAt: Date.now() } : null; // impose des conditions réelles simulées (essais)
+        this.real = c ? { wind: c.wind ?? null, weather: c.weather ?? null, hs: c.hs ?? null, waveFrom: c.waveFrom ?? null, current: c.current ?? null, fetchedAt: Date.now() } : null; // impose des conditions réelles simulées (essais)
         this.realDebug = c !== null; // tant qu'elles sont imposées, la gestion réseau est suspendue
         this.weatherTimer = 0;
         return this.real ? 'conditions réelles imposées' : 'retour au simulé';

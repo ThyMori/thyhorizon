@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.20.0 — 2026-11-24
+
+Courant réel (dérive, vitesse et route sur le fond) et direction réelle de la houle
+
 ## 1.19.0 — 2026-11-24
 
 Météo et houle réelles (Open-Meteo, option désactivée par défaut) avec repli hors ligne

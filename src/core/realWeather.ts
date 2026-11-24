@@ -4,6 +4,7 @@
 
 import { clamp, smoothstep } from './math';
 import { BASE_HS, SeaState } from './sea';
+import { MAIN_WAVE_ANGLE } from './waves';
 import { WeatherState } from './weather';
 import { Wind } from './wind';
 
@@ -17,6 +18,8 @@ export interface RealConditions {
   wind: Wind | null; // vent moyen à 10 m (m/s, direction d'origine en radians)
   weather: Pick<WeatherState, 'front' | 'cloud' | 'rain' | 'fog' | 'pressure'> | null; // ciel et pression
   hs: number | null; // hauteur significative réelle des vagues (m) ; null sur terre ou si la mer n'est pas fournie
+  waveFrom: number | null; // direction D'OÙ viennent les vagues (rad, 0 = nord, sens horaire) ; null si inconnue
+  current: { x: number; z: number } | null; // courant (m/s dans le repère du monde : +x est, +z sud) ; null si inconnu
   fetchedAt: number; // instant de la mesure (ms, horloge réelle)
 }
 
@@ -43,7 +46,7 @@ export function forecastUrl(lat: number, lon: number): string {
 // Adresse de la requête « mer » (hauteur des vagues).
 export function marineUrl(lat: number, lon: number): string {
   const q = `latitude=${roundCoord(lat).toFixed(1)}&longitude=${roundCoord(lon).toFixed(1)}`;
-  return `https://marine-api.open-meteo.com/v1/marine?${q}&current=wave_height,wave_direction,swell_wave_height,wind_wave_height,wave_period&timezone=GMT`;
+  return `https://marine-api.open-meteo.com/v1/marine?${q}&current=wave_height,wave_direction,ocean_current_velocity,ocean_current_direction&timezone=GMT`;
 }
 
 // Lit un nombre dans un objet inconnu (la réponse d'un serveur n'est jamais crue sur parole).
@@ -75,11 +78,47 @@ export function parseForecast(json: unknown): Pick<RealConditions, 'wind' | 'wea
   return { wind, weather };
 }
 
-// Convertit la réponse « mer » : hauteur significative des vagues (null sur terre : l'API répond alors sans valeur).
-export function parseMarine(json: unknown): number | null {
+// Ce qu'on lit de la réponse « mer ».
+export interface MarineData {
+  hs: number | null; // hauteur significative (m)
+  waveFrom: number | null; // d'où viennent les vagues (rad, 0 = nord, sens horaire)
+  current: { x: number; z: number } | null; // courant (m/s, repère du monde)
+}
+
+// Vecteur du courant dans le repère du monde (+x est, +z sud) : `toDeg` = direction VERS laquelle il coule (0 = nord, 90 = est).
+export function currentVector(speed: number, toDeg: number): { x: number; z: number } {
+  const a = (toDeg * Math.PI) / 180;
+  return { x: speed * Math.sin(a), z: -speed * Math.cos(a) };
+}
+
+// Convertit la réponse « mer » (null si inutilisable). Sur terre, l'API répond sans valeur : tout est alors null.
+export function parseMarine(json: unknown): MarineData | null {
   const cur = typeof json === 'object' && json !== null ? (json as Record<string, unknown>).current : null;
-  const hs = field(cur, 'wave_height');
-  return hs === null ? null : clamp(hs, 0, 15);
+  if (typeof cur !== 'object' || cur === null) return null;
+  const hsRaw = field(cur, 'wave_height');
+  const dir = field(cur, 'wave_direction');
+  const vel = field(cur, 'ocean_current_velocity'); // en km/h (unité par défaut d'Open-Meteo)
+  const cdir = field(cur, 'ocean_current_direction');
+  const hs = hsRaw === null ? null : clamp(hsRaw, 0, 15);
+  const waveFrom = dir === null ? null : (((dir % 360) + 360) % 360) * (Math.PI / 180);
+  const current = vel !== null && cdir !== null ? currentVector(clamp(vel / 3.6, 0, 4), cdir) : null; // km/h → m/s, borné à ~8 nœuds
+  if (hs === null && waveFrom === null && current === null) return null;
+  return { hs, waveFrom, current };
+}
+
+// Rotation à donner à toute la mer du jeu pour que sa houle principale vienne de `fromRad` (0 = nord, sens horaire).
+export function waveTurnFor(fromRad: number): number {
+  const target = Math.atan2(-Math.cos(fromRad), Math.sin(fromRad)); // angle (plan x, z) du vecteur « d'où vient la houle »
+  let t = target - MAIN_WAVE_ANGLE;
+  t = ((((t + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI; // ramené entre −π et π
+  return t;
+}
+
+// Faut-il tourner la mer ? On ne le fait que pour un écart net (sinon la mer « saute » à chaque mise à jour pour quelques degrés).
+export function shouldTurnSea(current: number, wanted: number): boolean {
+  let d = wanted - current;
+  d = ((((d + Math.PI) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) - Math.PI;
+  return Math.abs(d) > (15 * Math.PI) / 180;
 }
 
 // État de mer visé quand la hauteur des vagues est connue : la houle suit la mesure, le clapot et les moutons suivent le vent local.

@@ -209,6 +209,13 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - Données météo : Open-Meteo.com, licence CC BY 4.0.
 - Essai sans réseau : `?debug` puis `__thy.real({wind:{speed:13,from:4.71},weather:{front:0.8,cloud:0.9,rain:0.5,fog:0.1,pressure:990},hs:3})` (et `__thy.real(null)` pour revenir au simulé).
 
+### 1.20.0 — Courant et direction réelle de la houle
+- Avec la météo réelle activée, la requête « mer » (la même, pas de requête de plus) rapporte aussi le **courant** (vitesse, direction VERS laquelle il coule) et la **direction DE laquelle viennent les vagues**.
+- **Courant** : il emporte le bateau (sa position), sans changer sa vitesse dans l'eau, son vent apparent ni ses voiles. Les instruments affichent la **vitesse sur le fond** (courant compris) et la **route** quand un courant joue, et la ligne de météo indique « courant X nd ». Sans courant (option coupée, hors ligne, ou terre), rien ne change.
+- **Direction de la houle** : toute la mer (rendu et physique du bateau, même formule) est tournée pour que la houle principale vienne de la direction mesurée. La mer ne tourne que pour un écart de plus de 15° (sinon elle « sauterait » à chaque mise à jour) ; la rotation est instantanée, la mer change d'aspect d'un coup.
+- Limites : Open-Meteo calcule le courant à ≈ 8 km de résolution — **pas fiable près des côtes** (note de leur documentation) ; le courant est borné à ≈ 8 nœuds ; la vitesse de courant est lue en km/h (unité par défaut) et le sens des directions suit leur documentation, mais **n'a pas été vérifié sur le vrai réseau**.
+- Essai : `__thy.real({..., waveFrom: 4.71, current:{x:1.2,z:0}})` (x = est, z = sud, en m/s).
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

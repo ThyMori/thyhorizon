@@ -83,6 +83,12 @@ export const CRUISER: BoatSpec = {
 };
 
 // L'état du bateau à un instant.
+export interface Vec2 {
+  x: number;
+  z: number;
+}
+export const NO_CURRENT: Vec2 = { x: 0, z: 0 }; // pas de courant
+
 export interface BoatState {
   x: number; // position dans le monde, est-ouest (m)
   z: number; // position nord-sud (m)
@@ -226,7 +232,7 @@ const SHEET_RATE = 0.3; // vitesse de l'écoute (fraction par seconde)
 const BOOM_RATE = 2.2; // vitesse maximale de balayage visible de la bôme (rad/s)
 
 // Fait avancer le bateau de dt secondes. depthAt(x, z) donne la profondeur d'eau (m, négative à terre).
-export function stepBoat(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt: number, depthAt: (x: number, z: number) => number): void {
+export function stepBoat(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt: number, depthAt: (x: number, z: number) => number, current: Vec2 = NO_CURRENT): void {
   // Les appuis (une seule fois par image) : hisser/affaler, dérouler/rouler, ris.
   if (input.toggleMain) s.mainTarget = s.mainTarget === 1 ? 0 : 1;
   if (input.toggleJib) s.jibTarget = s.jibTarget === 1 ? 0 : 1;
@@ -234,12 +240,12 @@ export function stepBoat(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatIn
   let left = Math.min(dt, 0.25); // on borne : pas de bond après une longue pause
   while (left > 1e-6) {
     const h = Math.min(SUB_STEP, left);
-    stepOnce(s, spec, wind, input, h, depthAt);
+    stepOnce(s, spec, wind, input, h, depthAt, current);
     left -= h;
   }
 }
 
-function stepOnce(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt: number, depthAt: (x: number, z: number) => number): void {
+function stepOnce(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt: number, depthAt: (x: number, z: number) => number, current: Vec2): void {
   // --- Commandes ---
   const rudMax = spec.rudderMax;
   if (input.center) s.rudder = moveToward(s.rudder, 0, RUDDER_RATE * 2 * dt);
@@ -325,8 +331,8 @@ function stepOnce(s: BoatState, spec: BoatSpec, wind: Wind, input: BoatInput, dt
   s.yaw += -s.omega * dt; // tourner à tribord = le cap (yaw) diminue
   const f = forwardOf(s.yaw);
   const r = starboardOf(s.yaw);
-  const nx = s.x + (s.u * f.x + s.v * r.x) * dt;
-  const nz = s.z + (s.u * f.z + s.v * r.z) * dt;
+  const nx = s.x + (s.u * f.x + s.v * r.x + current.x) * dt; // vitesse dans l'eau + courant
+  const nz = s.z + (s.u * f.z + s.v * r.z + current.z) * dt;
   const now = minDepth(spec, depthAt, nx, nz, f);
   const before = minDepth(spec, depthAt, s.x, s.z, f);
   if (now < spec.draft && now < before) {
@@ -416,7 +422,10 @@ export function penonFlow(s: BoatState, wind: Wind): PenonFlow {
 // Ce qu'affichent les instruments.
 export interface Readout {
   bearing: number; // cap compas, en degrés (0 à 360)
-  speed: number; // vitesse sur le fond (m/s)
+  speed: number; // vitesse dans l'eau (m/s)
+  sog: number; // vitesse sur le fond (m/s) : vitesse dans l'eau + courant
+  cog: number; // route sur le fond, en degrés (0 = nord, sens horaire)
+  current: number; // force du courant (m/s)
   tws: number; // vitesse du vent vrai (m/s)
   twd: number; // direction d'où vient le vent vrai, en degrés
   twa: number; // angle du vent vrai (rad), + = tribord
@@ -434,11 +443,17 @@ export interface Readout {
   hint: string; // conseil court (vide si tout va bien)
 }
 
-export function readout(s: BoatState, wind: Wind): Readout {
+export function readout(s: BoatState, wind: Wind, current: Vec2 = NO_CURRENT): Readout {
   const aw = apparentWind(s, wind);
   const bearing = (((-s.yaw / DEG) % 360) + 360) % 360;
   const twa = wrapPi(wind.from + s.yaw);
   const speed = Math.hypot(s.u, s.v);
+  const fw = forwardOf(s.yaw);
+  const rt = starboardOf(s.yaw);
+  const gx = s.u * fw.x + s.v * rt.x + current.x; // vitesse sur le fond, repère du monde
+  const gz = s.u * fw.z + s.v * rt.z + current.z;
+  const sog = Math.hypot(gx, gz);
+  const cog = sog > 0.15 ? ((Math.atan2(gx, -gz) / DEG) % 360 + 360) % 360 : bearing; // route fond (0 = nord, sens horaire)
   const awaAbs = Math.abs(aw.angle);
   const sigma = sheetAngle(s.sheet);
   const alpha = awaAbs - Math.min(sigma, awaAbs);
@@ -453,6 +468,9 @@ export function readout(s: BoatState, wind: Wind): Readout {
   return {
     bearing,
     speed,
+    sog,
+    cog,
+    current: Math.hypot(current.x, current.z),
     tws: wind.speed,
     twd: ((wind.from / DEG) % 360 + 360) % 360,
     twa,

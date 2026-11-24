@@ -21,6 +21,7 @@ export class BoatHud {
   private readonly heel = byId('bh-heel');
   private readonly sheet = byId('bh-sheet');
   private readonly sails = byId('bh-sails');
+  private readonly weather = byId('bh-weather');
   private readonly point = byId('bh-point');
   private readonly hint = byId('bh-hint');
   private readonly colors = { accent: '#e8a24a', text: '#ecebe6', muted: '#9aa3ad', line: '#2b343e', ok: '#4cb782', danger: '#e5484d' };
@@ -37,6 +38,11 @@ export class BoatHud {
   // Montre ou cache le tableau de bord.
   setVisible(visible: boolean): void {
     this.root.hidden = !visible;
+  }
+
+  // Le temps qu'il fait (texte court, déjà en français).
+  setWeather(text: string): void {
+    if (this.weather.textContent !== text) this.weather.textContent = text;
   }
 
   // Met à jour l'affichage (appelé à chaque image ; ne travaille qu'à la cadence voulue). boom = angle visible de la bôme (rad).

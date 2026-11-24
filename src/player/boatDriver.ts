@@ -11,12 +11,13 @@ import type { DeckPos } from '../core/deck';
 import { BoatInput, BoatState, CRUISER, MAX_REEFS, Readout, apparentWind, autoTrim, autopilotHelm, createBoat, readout, startHeading, stepBoat } from '../core/sailing';
 import type { Terrain } from '../core/terrain';
 import { waveHeight } from '../core/waves';
+import { CLEAR_WEATHER, WeatherState, weatherWind } from '../core/weather';
 import { Wind, windAt } from '../core/wind';
 import { BoatView } from '../render/boat';
 import { toast } from '../ui/toast';
 import type { PlayerControls } from './controls';
 
-const WIND_START = 36000; // le « temps météo » démarre à 10 h : le vent n'est pas le même à chaque lancement du calcul
+export const WIND_START = 36000; // le « temps météo » démarre à 10 h : le vent n'est pas le même à chaque lancement du calcul
 const BOARD_DISTANCE = 45; // distance maximale pour remonter sur son bateau (m)
 
 export class BoatDriver {
@@ -34,6 +35,7 @@ export class BoatDriver {
   private view: BoatView | null = null;
   private shore: { x: number; z: number; yaw: number } | null = null; // où le joueur a embarqué (sert à la sauvegarde)
   private lastGround = 0; // dernier message « tu touches le fond »
+  weather: WeatherState = CLEAR_WEATHER; // le temps qu'il fait (donné par le jeu) : il renforce ou calme le vent
   wind: Wind = { speed: 5, from: 0 }; // dernier vent calculé au bateau
   onChange: ((aboard: boolean) => void) | null = null; // appelé quand on monte ou descend
 
@@ -62,7 +64,7 @@ export class BoatDriver {
       return;
     }
     const { lat, lon } = worldToLatLon(spot.x, spot.z);
-    const wind = windAt(lat, lon, WIND_START + this.clock());
+    const wind = weatherWind(windAt(lat, lon, WIND_START + this.clock()), this.weather);
     const yaw = startHeading(c.yaw, wind); // jamais face au vent au départ
     const boat = createBoat(spot.x, spot.z, yaw);
     this.wind = wind;
@@ -138,7 +140,7 @@ export class BoatDriver {
     const boat = this.state;
     if (!boat || !this.view) return;
     const { lat, lon } = worldToLatLon(boat.x, boat.z);
-    this.wind = windAt(lat, lon, WIND_START + seconds);
+    this.wind = weatherWind(windAt(lat, lon, WIND_START + seconds), this.weather);
     if (this.aboard && this.controls.locked) {
       const yawBefore = boat.yaw;
       stepBoat(boat, CRUISER, this.wind, this.readInput(boat, dt), dt, (x, z) => -this.terrain.heightAt(x, z));

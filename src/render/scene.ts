@@ -12,7 +12,9 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { CopyShader } from 'three/addons/shaders/CopyShader.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { WeatherState, CLEAR_WEATHER, fogFactor } from '../core/weather';
 import { Ocean } from './ocean';
+import { Rain } from './rain';
 import { SkyDome, toColor } from './sky';
 
 const SHADOW_EXTENT = 90; // demi-largeur de la zone ombrée autour du joueur, en mètres
@@ -64,6 +66,13 @@ export class GameScene {
   private readonly hemi = new THREE.HemisphereLight(0xffffff, 0x554433, 0.5); // lumière du ciel et du sol
   private readonly sky = new SkyDome();
   private readonly ocean = new Ocean();
+  private readonly rain = new Rain(); // pluie autour de la caméra
+  private weather: WeatherState = CLEAR_WEATHER; // temps actuel (nuages, pluie, brume)
+  private windX = 0; // vent vers où il souffle (m/s), pour la dérive des nuages et l'inclinaison de la pluie
+  private windZ = 0;
+  private cloudX = 0; // décalage de dérive des nuages (unités du plan de nuages)
+  private cloudZ = 0;
+  private lastEnvTime = 0;
   private readonly fog = new THREE.FogExp2(0xffffff, 0.001); // brume atmosphérique
   private readonly tmpColor = new THREE.Color();
   private readonly tmpDir = new THREE.Vector3();
@@ -84,7 +93,7 @@ export class GameScene {
     container.appendChild(this.renderer.domElement); // le canvas entre dans la page
 
     this.scene.fog = this.fog;
-    this.scene.add(this.sky.dome, this.sky.stars, this.sky.lines, this.ocean.mesh);
+    this.scene.add(this.sky.dome, this.sky.stars, this.sky.lines, this.ocean.mesh, this.rain.mesh);
     this.scene.add(this.hemi, this.moon, this.moon.target, this.sun, this.sun.target);
 
     this.sun.castShadow = true; // le soleil ombre le terrain proche
@@ -137,7 +146,14 @@ export class GameScene {
     }
     this.radiusMeters = settings.viewDistance * CHUNK_SIZE; // distance d'affichage
     this.ocean.setRadius(this.radiusMeters * 1.05); // l'eau déborde un peu pour que l'horizon soit propre
-    this.fog.density = FOG_DENSITY_FACTOR / this.radiusMeters;
+    this.fog.density = (FOG_DENSITY_FACTOR / this.radiusMeters) * fogFactor(this.weather);
+  }
+
+  // Le temps qu'il fait (nuages, pluie, brume) et le vent (m/s, vers où il souffle) qui pousse nuages et gouttes.
+  setWeather(weather: WeatherState, windX: number, windZ: number): void {
+    this.weather = weather;
+    this.windX = windX;
+    this.windZ = windZ;
   }
 
   // Active ou coupe le bloom (halo lumineux). Il passe par une chaîne d'effets : image calculée en haute dynamique et anticrénelée (4 échantillons),
@@ -224,6 +240,15 @@ export class GameScene {
     toColor(state.skyHorizon, this.tmpColor);
     this.fog.color.copy(this.tmpColor);
 
+    // Nuages : ils dérivent avec le vent (décalage calculé ici, en petit nombre ; le shader ne voit jamais de grande coordonnée).
+    const dtEnv = Math.min(0.2, Math.max(0, timeSeconds - this.lastEnvTime));
+    this.lastEnvTime = timeSeconds;
+    this.cloudX = (this.cloudX - this.windX * 0.0009 * dtEnv) % 1000;
+    this.cloudZ = (this.cloudZ - this.windZ * 0.0009 * dtEnv) % 1000;
+    this.sky.setClouds(this.weather.cloud, this.cloudX, this.cloudZ);
+    this.fog.density = (FOG_DENSITY_FACTOR / this.radiusMeters) * fogFactor(this.weather); // brume et pluie réduisent la visibilité
+    toColor(state.skyHorizon, this.tmpColor);
+    this.rain.update(this.camera, timeSeconds, this.weather.rain, state.daylight, this.tmpColor, this.windX, this.windZ);
     this.sky.update(state, this.camera, timeSeconds);
     this.ocean.update(timeSeconds, state, this.camera);
   }

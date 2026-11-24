@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.17.0 — 2026-11-24
+
+Météo hors ligne évolutive : nuages, pluie, brume, vent lié au temps
+
 ## 1.16.0 — 2026-11-23
 
 Marche sur le pont, pilote automatique

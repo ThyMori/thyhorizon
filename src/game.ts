@@ -10,6 +10,9 @@ import { Origin, snapOrigin, updateOrigin } from './core/origin';
 import { sunState, wrapHours } from './core/sun';
 import { createRelief } from './core/relief';
 import { realClimate } from './world/climateData';
+import { CLEAR_WEATHER, WeatherState, applyWeatherToSky, blendWeather, weatherAt, weatherText } from './core/weather';
+import { beaufort, beaufortName, windAt, windVelocity } from './core/wind';
+import { WIND_START } from './player/boatDriver';
 import type { ReliefGrid } from './core/relief';
 import { Terrain, createTerrain } from './core/terrain';
 import { PlayerControls } from './player/controls';
@@ -38,6 +41,11 @@ const LOADING_TIMEOUT_S = 15; // au-delà, on arrête d'attendre le terrain et o
 export class Game {
   private settings: Settings; // réglages courants
   private hours: number; // heure solaire locale du jeu
+  private gameHours = 0; // temps de jeu continu (heures) : fait évoluer la météo sans saut à minuit ni au changement d'année
+  private weather: WeatherState = CLEAR_WEATHER; // temps actuel au lieu du joueur (adouci)
+  private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
+  private weatherTimer = 0;
+  private weatherForced: Partial<WeatherState> | null = null; // pour les essais (?debug)
   private day: number; // jour de l'année du jeu (1 à 365)
   private origin: Origin; // origine flottante du rendu (voir core/origin.ts)
   private readonly seedText: string; // graine du monde (texte)
@@ -80,6 +88,7 @@ export class Game {
     this.terrain = createTerrain(seed, this.relief, realClimate); // le vrai relief de la Terre + un détail inventé
     const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
+    this.gameHours = save.day * 24 + save.hours;
     this.day = save.day;
     this.origin = snapOrigin(save.x, save.z); // le rendu démarre près du joueur
 
@@ -123,6 +132,28 @@ export class Game {
     requestAnimationFrame(this.frame);
   }
 
+  // ---------- Météo ----------
+
+  // Calcule le temps visé au lieu du joueur et s'en approche doucement ; donne le vent au voilier et au ciel.
+  private updateWeather(dt: number, seconds: number): void {
+    if (this.settings.realTime) this.gameHours = Date.now() / 3600000; // temps réel : la météo suit vraiment les jours qui passent
+    else if (this.controls.locked && this.settings.dayLengthMinutes > 0) this.gameHours += (dt * 24) / (this.settings.dayLengthMinutes * 60);
+    this.weatherTimer -= dt;
+    if (this.weatherTimer <= 0) {
+      this.weatherTimer = 0.5; // inutile de recalculer à chaque image
+      const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
+      const target = weatherAt(lat, lon, realClimate.classAt(lat, lon), this.day, this.gameHours, this.hours);
+      if (this.boat.aboard) this.boatHud.setWeather(`${weatherText(this.weather)} · ${beaufortName(beaufort(this.boat.wind.speed))}`);
+      this.weatherTarget = this.weatherForced ? { ...target, ...this.weatherForced } : target;
+    }
+    this.weather = blendWeather(this.weather, this.weatherTarget, 1 - Math.exp(-dt / 4)); // le temps change en quelques secondes si on change de lieu
+    this.boat.weather = this.weather;
+    const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
+    const base = windAt(lat, lon, WIND_START + seconds);
+    const wind = windVelocity({ speed: base.speed * this.weather.windScale, from: base.from }); // vent du lieu, renforcé par la météo
+    this.gs.setWeather(this.weather, wind.x, wind.z);
+  }
+
   // ---------- Boucle principale ----------
 
   private frame = (now: number): void => {
@@ -139,6 +170,7 @@ export class Game {
       this.hours = wrapHours(this.hours + (dt * 24) / (this.settings.dayLengthMinutes * 60)); // le temps ne passe que quand on joue
       if (this.settings.daysPass && this.hours < before) this.day = wrapDay(this.day + 1); // minuit passé : le calendrier avance d'un jour
     }
+    this.updateWeather(dt, now / 1000);
     const origin = updateOrigin(this.origin, this.controls.x, this.controls.z); // le joueur s'est-il trop éloigné de l'origine ?
     if (origin !== this.origin) {
       this.origin = origin; // oui : l'origine saute sous le joueur (invisible, tout est replacé d'un coup)
@@ -148,7 +180,7 @@ export class Game {
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
     if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
-    this.gs.updateEnvironment(sunState(this.hours, this.playerLat(), this.day), now / 1000); // le soleil dépend de la latitude du joueur
+    this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
     this.gs.render();
     this.updateFps(dt);
     this.updateLoading();
@@ -535,6 +567,12 @@ export class Game {
       pending: () => this.chunks.stats().pending,
       boat: () => ({ aboard: this.boat.aboard, state: this.boat.state as unknown as Record<string, unknown> | null, wind: this.boat.wind, board: () => this.boat.toggle() }),
       play: (on) => this.controls.setTouchActive(on),
+      weather: (w) => {
+        this.weatherForced = w; // impose (ou rend) le temps pour les essais
+        this.weatherTimer = 0;
+        if (w) this.weather = { ...this.weather, ...w };
+        return weatherText(this.weather);
+      },
       pose: () => ({ x: this.controls.x, z: this.controls.z, yaw: this.controls.yaw, pitch: this.controls.pitch, fly: this.controls.fly, playing: this.controls.locked }),
       origin: () => ({ x: this.origin.x, z: this.origin.z, camera: [this.gs.camera.position.x, this.gs.camera.position.y, this.gs.camera.position.z] }),
       stats: () => ({ ...this.chunks.stats(), triangles: this.gs.renderer.info.render.triangles, calls: this.gs.renderer.info.render.calls }),

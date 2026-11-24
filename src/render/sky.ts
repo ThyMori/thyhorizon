@@ -28,7 +28,33 @@ uniform float uSunVis; // visibilité du disque solaire
 uniform vec3 uMoonDir; // direction de la lune
 uniform float uMoonVis; // visibilité de la lune
 uniform float uMaxLight; // plafond de lumière (le soleil est plafonné quand le bloom est actif, sinon son halo noie l'écran)
+uniform float uCloud; // couverture nuageuse, 0 à 1
+uniform vec2 uCloudShift; // dérive des nuages (décalage calculé en JavaScript : jamais de grande coordonnée ici)
+uniform float uDaylight; // 0 nuit … 1 plein jour (éclaire les nuages)
 varying vec3 vDir;
+
+// Bruit de valeurs : base des nuages.
+float hash21(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x), mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) { // quatre octaves : grandes masses puis détails
+  float a = 0.5;
+  float s = 0.0;
+  for (int i = 0; i < 4; i++) {
+    s += a * vnoise(p);
+    p = p * 2.03 + vec2(17.1, 9.2);
+    a *= 0.5;
+  }
+  return s;
+}
 void main() {
   vec3 d = normalize(vDir); // direction du regard
   float y = d.y; // hauteur de la direction (-1 sol, 1 zénith)
@@ -36,6 +62,25 @@ void main() {
   float sd = max(dot(d, uSunDir), 0.0); // alignement avec le soleil
   col += uGlow * (pow(sd, 6.0) * 0.25 + pow(sd, 40.0) * 0.45 + pow(sd, 400.0) * 1.4); // halo en trois couches
   vec3 bright = uSunColor * smoothstep(0.99965, 0.99985, sd) * 6.0 * uSunVis; // disque solaire
+  float cloudCover = 0.0; // densité de nuage dans cette direction (cache le soleil et la lune)
+  if (uCloud > 0.01 && y > 0.0) {
+    vec2 cp = d.xz / (y + 0.16) * 0.85 + uCloudShift; // le ciel est projeté sur un plan de nuages
+    float n = fbm(cp);
+    float thr = mix(0.80, 0.16, uCloud); // plus il y a de nuages, plus le seuil est bas
+    float dens = smoothstep(thr, thr + 0.2, n);
+    float thick = smoothstep(thr, thr + 0.45, n); // épaisseur : le cœur des nuages est plus sombre
+    float n2 = fbm(cp + uSunDir.xz * 0.1); // même point, décalé vers le soleil : la différence donne le côté éclairé
+    float lit = clamp(0.55 + (n - n2) * 4.0, 0.0, 1.0);
+    float dl = smoothstep(0.0, 0.45, uDaylight);
+    vec3 lightCol = mix(vec3(1.0), uSunColor, 0.55) * dl;
+    vec3 shadeCol = mix(uHorizon, uTop, 0.35) * 0.55 * (1.0 - 0.45 * thick * uCloud);
+    vec3 cloudCol = mix(shadeCol, lightCol * (0.8 + 0.3 * lit), lit * (1.0 - 0.5 * thick * uCloud));
+    float far = smoothstep(0.02, 0.3, y); // vers l'horizon, les nuages se fondent dans la brume
+    cloudCol = mix(uHorizon, cloudCol, far);
+    cloudCover = dens * smoothstep(0.0, 0.1, y);
+    col = mix(col, cloudCol, cloudCover);
+  }
+  bright *= 1.0 - 0.95 * cloudCover; // le soleil et la lune disparaissent derrière les nuages
   float md = max(dot(d, uMoonDir), 0.0); // alignement avec la lune
   bright += vec3(0.75, 0.82, 1.0) * smoothstep(0.9996, 0.9998, md) * 1.6 * uMoonVis; // disque lunaire
   if (uMaxLight < 100.0) { // bloom actif : le ciel lui-même ne dépasse jamais 0,95 (il ne « brille » pas en entier), seuls les disques du soleil et de la lune dépassent
@@ -138,6 +183,9 @@ export class SkyDome {
         uMoonDir: { value: new THREE.Vector3(0, -1, 0) },
         uMoonVis: { value: 0 },
         uMaxLight: { value: 1000 }, // sans bloom : pas de plafond
+        uCloud: { value: 0 },
+        uCloudShift: { value: new THREE.Vector2() },
+        uDaylight: { value: 1 },
       },
       toneMapped: false, // pas de « rendu cinéma » sur le ciel : sa couleur d'horizon doit être EXACTEMENT celle de la brume (qui, elle, n'est pas retouchée)
       side: THREE.BackSide, // on voit l'intérieur de la sphère
@@ -198,6 +246,13 @@ export class SkyDome {
     this.lines.visible = false; // caché tant qu'on ne les demande pas
   }
 
+  // Nuages : couverture (0 à 1) et décalage de dérive (calculé par la scène).
+  setClouds(cover: number, shiftX: number, shiftZ: number): void {
+    const u = this.material.uniforms as Record<string, THREE.IUniform>;
+    u.uCloud!.value = cover;
+    (u.uCloudShift!.value as THREE.Vector2).set(shiftX, shiftZ);
+  }
+
   // Met à jour le ciel pour l'état donné et le recentre sur la caméra.
   update(state: SunState, camera: THREE.Camera, timeSeconds = 0): void {
     const u = this.material.uniforms as Record<string, THREE.IUniform>;
@@ -211,6 +266,7 @@ export class SkyDome {
     (u.uSunDir!.value as THREE.Vector3).set(...state.sunDirection);
     (u.uMoonDir!.value as THREE.Vector3).set(...state.moonDirection);
     u.uSunVis!.value = state.sunVisibility;
+    u.uDaylight!.value = state.daylight;
     u.uMoonVis!.value = state.starsOpacity; // la lune se montre quand les étoiles se montrent
     this.starMaterial.uniforms.uOpacity!.value = state.starsOpacity; // les étoiles apparaissent après le crépuscule
     const r = state.starRotation; // rotation du ciel : latitude, jour de l'année, heure

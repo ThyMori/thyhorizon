@@ -187,6 +187,12 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 - **Pilote automatique (P)** : tient le cap du moment (régulateur PID, `autopilotHelm`) et règle l'écoute (`autoTrim`). Il s'allume tout seul quand tu quittes la barre ; A/D à la barre le coupe. Toucher R/F (ou W/S à la barre) reprend l'écoute à la main.
 - Pas encore : l'intérieur de la cabine (la porte reste fermée), marcher sur le rouf.
 
+### 1.17.0 — Météo hors ligne évolutive (nuages, pluie, brume)
+- Le temps change tout seul, de façon cohérente avec le **lieu** (climat de Köppen : désert sec, tropiques avec saison des pluies, étés secs méditerranéens, hivers de dépressions…), la **saison** (hémisphère compris) et le **temps qui passe** (des perturbations traversent le monde en quelques jours). Logique pure : `src/core/weather.ts` (testée).
+- Visible : **nuages** qui dérivent avec le vent et se grisent (ciel couvert = pas de soleil direct, pas d'étoiles), **pluie** (traînées devant la caméra), **brume** et brouillard (visibilité réduite, surtout au petit matin par temps calme).
+- Le **vent** simulé est renforcé dans une perturbation et calmé sous un anticyclone. Le temps du lieu s'affiche dans les instruments du voilier.
+- En ligne, la vraie météo la remplacera (1.19). Essai : `?debug` puis `__thy.weather({cloud:0.9, rain:0.6})`.
+
 ## Droits / migrations
 Sans objet : jeu local, sans compte ni serveur.
 

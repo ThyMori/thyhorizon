@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.21.0 — 2026-11-24
+
+Pluie plus fine et gouttes (ploc) sur l'écran
+
 ## 1.20.1 — 2026-11-24
 
 Écoute : S borde, Z choque (inversion des touches)

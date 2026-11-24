@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 
-const DROPS = 3000; // nombre maximal de gouttes (la pluie légère n'en dessine qu'une partie)
+const DROPS = 5200; // nombre maximal de gouttes (la pluie légère n'en dessine qu'une partie)
 const BOX = 36; // côté de la boîte de pluie autour de la caméra (m)
 const HEIGHT = 22; // hauteur de la boîte (m)
 
@@ -16,7 +16,8 @@ uniform vec2 uSlant; // inclinaison due au vent (m/s vers x et z)
 uniform float uLen; // longueur de traînée (m)
 varying float vFade;
 void main() {
-  float fall = 9.0 + aSeed.x * 2.0; // vitesse de chute (m/s)
+  float fall = 8.5 + aSeed.x * 3.0; // vitesse de chute (m/s), un peu variable d'une goutte à l'autre
+  float tint = 0.45 + 0.55 * fract(aSeed.x * 91.7 + aSeed.z * 37.3); // chaque goutte a sa propre intensité (pluie plus naturelle)
   vec3 p = aSeed.xyz * vec3(${BOX.toFixed(1)}, ${HEIGHT.toFixed(1)}, ${BOX.toFixed(1)});
   p.y = mod(p.y - uTime * fall, ${HEIGHT.toFixed(1)}); // la goutte descend et se réinjecte en haut
   p.xz += uSlant * (${HEIGHT.toFixed(1)} - p.y) / fall; // plus elle est basse, plus le vent l'a poussée
@@ -24,9 +25,9 @@ void main() {
   p.xz = mod(p.xz - c, ${BOX.toFixed(1)}) + c; // boîte centrée sur la caméra, motif ancré dans le monde
   p.y += uCam.y - ${(HEIGHT * 0.45).toFixed(1)}; // la boîte suit la hauteur de la caméra
   vec3 dir = normalize(vec3(uSlant.x, -fall, uSlant.y)); // sens de la chute
-  p -= dir * uLen * aSeed.w; // la queue est au-dessus de la tête
+  p -= dir * uLen * (0.6 + 0.8 * fract(aSeed.z * 53.1)) * aSeed.w; // longueurs variées ; la queue est au-dessus de la tête
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
-  vFade = (1.0 - aSeed.w * 0.7) * (1.0 - smoothstep(${(BOX * 0.25).toFixed(1)}, ${(BOX * 0.5).toFixed(1)}, length(mv.xyz))); // effacée au loin
+  vFade = tint * (1.0 - aSeed.w) * (1.0 - smoothstep(${(BOX * 0.25).toFixed(1)}, ${(BOX * 0.5).toFixed(1)}, length(mv.xyz))); // effacée au loin
   gl_Position = projectionMatrix * mv;
 }
 `;
@@ -90,9 +91,9 @@ export class Rain {
     (u.uCam!.value as THREE.Vector3).copy(camera.position);
     u.uTime!.value = timeSeconds;
     (u.uSlant!.value as THREE.Vector2).set(windX * 0.35, windZ * 0.35); // les gouttes suivent le vent, en partie
-    u.uLen!.value = 0.35 + 0.5 * intensity;
+    u.uLen!.value = 0.45 + 0.6 * intensity;
     (u.uColor!.value as THREE.Color).copy(color).lerp(new THREE.Color(1, 1, 1), 0.35).multiplyScalar(0.25 + 0.75 * daylight);
-    u.uAlpha!.value = 0.2 + 0.45 * intensity;
+    u.uAlpha!.value = 0.35 + 0.5 * intensity; // plus de gouttes, chacune plus discrète et fondue vers la queue
     this.mesh.geometry.setDrawRange(0, Math.max(2, Math.floor(DROPS * Math.min(1, 0.12 + 0.88 * intensity)) * 2)); // pluie fine : moins de gouttes
   }
 }

@@ -225,6 +225,11 @@ Sans objet : jeu local, sans compte ni serveur.
 - Le jeu ne se met pas à jour : menu → « À jour ? Recharger ». Si ça bloque, « Réinitialiser et recharger ».
 - La souris ne se capture pas : clique dans la fenêtre du jeu ; Échap libère la souris.
 
+### 1.21.0 — Pluie plus fine et gouttes sur l'écran
+- **Gouttes sur la « lunette »** : quand il pleut, de petits « ploc » apparaissent sur l'écran (goutte qui s'écrase puis s'étale, reflet clair en bas, point brillant en haut, quelques minuscules éclaboussures) et s'effacent en 1 à 2 s ; les plus grosses coulent un peu. Plus il pleut, plus il y en a (28 au maximum). Rien sous la bruine très légère, rien en pause ou dans les menus, rien si ton appareil réduit les animations. Logique pure et testée : `src/core/lensDrops.ts` ; dessin : `src/render/lensDrops.ts` (couche 2D transparente, ne bloque ni souris ni toucher).
+- **Pluie plus fine** : plus de gouttes (5 200), chacune plus discrète, longueurs et intensités variées, traînée qui se fond vers la queue.
+- Essai : `?debug` puis `__thy.weather({cloud:0.9, rain:0.8})`.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

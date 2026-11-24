@@ -35,6 +35,7 @@ import { anyDialogOpen, bindDialog, openDialog } from './ui/dialogs';
 import { Hud } from './ui/hud';
 import { initInstall } from './pwa/install';
 import { initPwa } from './pwa/pwa';
+import { LensDrops } from './render/lensDrops';
 import { SettingsPanel } from './ui/settingsPanel';
 import { toast } from './ui/toast';
 import { ChunkManager } from './world/chunkManager';
@@ -47,6 +48,7 @@ export class Game {
   private gameHours = 0; // temps de jeu continu (heures) : fait évoluer la météo sans saut à minuit ni au changement d'année
   private weather: WeatherState = CLEAR_WEATHER; // temps actuel au lieu du joueur (adouci)
   private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
+  private readonly lens: LensDrops; // gouttes de pluie sur l'écran
   private weatherTimer = 0;
   private sea: SeaState = CALM_SEA; // état de mer actuel (suit le vent avec retard)
   private seaInit = false;
@@ -107,7 +109,8 @@ export class Game {
     this.day = save.day;
     this.origin = snapOrigin(save.x, save.z); // le rendu démarre près du joueur
 
-    this.gs = new GameScene(byId('stage')); // peut lever une erreur si WebGL est indisponible : main.ts l'affiche
+    this.gs = new GameScene(byId('stage'));
+    this.lens = new LensDrops(byId('stage')); // couche 2D au-dessus de la 3D // peut lever une erreur si WebGL est indisponible : main.ts l'affiche
     this.gs.applySettings(this.settings);
     this.gs.resize();
     this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, seed, reliefGrid, (message) =>
@@ -248,6 +251,8 @@ export class Game {
     if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
     this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
+    const sky = sunState(this.hours, this.playerLat(), this.day);
+    this.lens.update(dt, this.weather.rain, sky.daylight, this.controls.locked); // gouttes sur l'écran quand il pleut et qu'on joue
     this.gs.render();
     this.updateFps(dt);
     this.updateLoading();

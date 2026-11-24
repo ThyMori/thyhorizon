@@ -3,6 +3,7 @@
 import './style.css';
 import { Game } from './game';
 import { toast } from './ui/toast';
+import { loadCitiesBytes } from './world/citiesLoader';
 import { loadReliefGrid } from './world/reliefLoader';
 
 // Éléments ajoutés à « window » (par l'écran de secours de index.html et par les outils de développement).
@@ -18,6 +19,7 @@ declare global {
       origin(): { x: number; z: number; camera: number[] }; // origine flottante et position de la caméra (pour vérifier)
       pose(): { x: number; z: number; yaw: number; pitch: number; fly: boolean; playing: boolean }; // position et regard (pour vérifier)
       view(mode: 'first' | 'third'): string; // change de vue (essais)
+      villages(): { shown: number; names: string[]; near: { name: string; x: number; z: number; r: number; houses: number; style: string; signs: { x: number; z: number; nx: number; nz: number }[] }[] }; // villages dessinés (essais)
       edits(): { count: number; shown: number; persistent: boolean | null; worldVersion: number; list: { id: string; x: number; z: number }[] }; // constructions du joueur (essais)
       compass(): { card: number; text: string } | null; // état de la boussole (essais)
       hideUi(): void;
@@ -38,7 +40,8 @@ declare global {
 void (async () => {
   try {
     const relief = await loadReliefGrid(); // le relief réel de la Terre (≈ 0,9 Mo, mis en cache ensuite)
-    const game = new Game(relief); // peut échouer (WebGL absent, par exemple)
+    const cities = await loadCitiesBytes(); // les villes réelles du monde (≈ 1,4 Mo, mis en cache ensuite)
+    const game = new Game(relief, cities); // peut échouer (WebGL absent, par exemple)
     game.start();
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

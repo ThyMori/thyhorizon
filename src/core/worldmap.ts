@@ -156,3 +156,12 @@ export function renderNightRows(out: Uint8ClampedArray, width: number, sub: { la
     }
   }
 }
+
+// Population minimale des villes montrées sur la carte selon le zoom (pixels par degré) : le monde entier ne montre que les plus grandes, de près on voit tout.
+export function cityMinPop(scale: number): number {
+  if (scale < 4) return 2000000;
+  if (scale < 8) return 500000;
+  if (scale < 16) return 100000;
+  if (scale < 30) return 20000;
+  return 5000;
+}

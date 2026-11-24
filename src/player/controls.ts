@@ -6,7 +6,8 @@ import { clamp } from '../core/math';
 import { CROUCH_EYE_HEIGHT, EYE_HEIGHT, MoveInput, flyDelta, keyLookDelta, smoothTo, stepWalk } from '../core/movement';
 import type { SaveData } from '../core/save';
 import type { Terrain } from '../core/terrain';
-import { TreeObstacles } from '../core/treeCollide';
+import { PLAYER_RADIUS, TreeObstacles } from '../core/treeCollide';
+import type { VillageSystem } from '../core/villageSystem';
 
 const LOOK_SPEED = 0.0022; // radians par pixel de souris, à sensibilité 1
 const MAX_PITCH = 1.5; // on ne peut pas regarder plus haut/bas que ~86°
@@ -44,6 +45,7 @@ export class PlayerControls {
     private readonly element: HTMLElement, // l'élément qui capture la souris
     private readonly terrain: Terrain,
     save: SaveData,
+    private readonly villages: VillageSystem | null = null, // les villages : on n'y traverse pas les murs, et les arbres en sont absents
   ) {
     this.x = save.x;
     this.z = save.z;
@@ -51,7 +53,7 @@ export class PlayerControls {
     this.yaw = save.yaw;
     this.pitch = save.pitch;
     this.fly = save.fly;
-    this.trees = new TreeObstacles(terrain);
+    this.trees = new TreeObstacles(terrain, villages ? (cx, cz, size) => villages.blockerForChunk(cx, cz, size) : null);
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear()); // si la fenêtre perd le focus, on lâche toutes les touches
@@ -130,8 +132,9 @@ export class PlayerControls {
       } else {
         const r = stepWalk(this.terrain, this.x, this.z, this.yaw, input, dt);
         const p = this.trees.resolve(r.x, r.z); // pas de passage à travers les troncs : on glisse autour
-        this.x = p.x;
-        this.z = p.z;
+        const q = this.villages ? this.villages.resolve(p.x, p.z, PLAYER_RADIUS) : p; // ni à travers les murs des maisons
+        this.x = q.x;
+        this.z = q.z;
         if (r.blocked && this.blockedCooldown === 0 && (input.forward !== 0 || input.right !== 0)) {
           this.blockedCooldown = 4; // au plus un message toutes les 4 s
           this.onBlocked?.();

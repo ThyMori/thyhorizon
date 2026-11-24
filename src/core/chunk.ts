@@ -37,7 +37,7 @@ export interface ChunkData {
 }
 
 // Fabrique le maillage de la tuile (cx, cz) au niveau de détail donné.
-export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number): ChunkData {
+export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number, blocked: ((x: number, z: number) => boolean) | null = null): ChunkData {
   const n = LOD_CELLS[lod] ?? LOD_CELLS[LOD_CELLS.length - 1]!; // cases par côté
   const cell = CHUNK_SIZE / n; // taille d'une case en mètres
   const x0 = cx * CHUNK_SIZE; // coin ouest de la tuile dans le monde
@@ -131,7 +131,7 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
 
   // 6) Arbres : ajoutés à la suite du terrain, dans les mêmes tableaux (une seule tuile, un seul objet 3D).
   const trees: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
-  const added = addTreesForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE);
+  const added = addTreesForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE, blocked);
   if (added.count === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY };
   const base = positions.length / 3; // numéro du premier sommet d'arbre
   const allPositions = new Float32Array(positions.length + trees.positions.length);

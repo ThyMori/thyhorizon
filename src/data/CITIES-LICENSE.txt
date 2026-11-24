@@ -1,0 +1,6 @@
+cities.bin — les villes du monde de 5 000 habitants et plus (nom, position, population, pays).
+
+Source : GeoNames (https://www.geonames.org), licence Creative Commons Attribution 4.0 (CC BY 4.0) — il faut citer GeoNames.
+Données reprises sans changement depuis le fichier cities.pbf du paquet npm « all-the-cities » (licence MIT, dérivé de GeoNames).
+Transformation (scripts/build-cities.mjs) : on ne garde que les villes de 5 000 habitants et plus, triées du sud au nord, dans un format binaire compact.
+Régénérer : node scripts/build-cities.mjs chemin/vers/cities.pbf [seuil]

@@ -22,6 +22,10 @@ import { clamp } from './core/math';
 import { PlayerControls } from './player/controls';
 import { Avatar } from './render/avatar';
 import { EditObjects } from './render/editObjects';
+import { VillageObjects } from './render/villageObjects';
+import { Cities, parseCities } from './core/cities';
+import { VillageSystem } from './core/villageSystem';
+import { pointInHouse } from './core/village';
 import { EditStore } from './core/worldEdits';
 import { WORLD_VERSION, readWorldVersion, worldVersionStatus } from './core/worldVersion';
 import { EditsPersistence, openEditsDb } from './storage/editsDb';
@@ -68,9 +72,13 @@ export class Game {
   private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
   private readonly lens: LensDrops; // gouttes de pluie sur l'écran
   private readonly audio = new AudioSystem(); // ambiance sonore (démarre au premier geste)
+  private readonly cities: Cities; // les villes réelles du monde
+  private readonly villages: VillageSystem; // leurs villages
   private readonly edits = new EditStore(); // les modifications du monde faites par le joueur (cairns…)
   private editsDb: EditsPersistence | null = null; // leur enregistrement durable (null tant que la base n'est pas ouverte)
   private editObjects!: EditObjects; // leur dessin
+  private villageObjects!: VillageObjects; // le dessin des villages proches
+  private villageClock = 0; // temps depuis le dernier rafraîchissement des villages (s)
   private savedWorldVersion = WORLD_VERSION; // version du monde lue dans la sauvegarde
   private editsReadOnly = false; // vrai si la sauvegarde vient d'un jeu plus récent : on ne touche à rien
   private editClock = 0; // temps depuis le dernier rafraîchissement du dessin (s)
@@ -130,7 +138,7 @@ export class Game {
   private fpsFrames = 0; // images comptées depuis la dernière mise à jour du compteur
   private fpsTime = 0; // temps écoulé depuis la dernière mise à jour du compteur
 
-  constructor(reliefGrid: ReliefGrid) {
+  constructor(reliefGrid: ReliefGrid, citiesBytes: Uint8Array) {
     this.settings = sanitizeSettings(loadJson(SETTINGS_KEY)); // réglages sûrs, même si le stockage est abîmé
     const rawSave = loadJson(SAVE_KEY);
     this.seedText = readSavedSeed(rawSave);
@@ -138,6 +146,8 @@ export class Game {
     this.relief = createRelief(reliefGrid);
     this.terrain = createTerrain(seed, this.relief, realClimate); // le vrai relief de la Terre + un détail inventé
     this.savedWorldVersion = readWorldVersion(rawSave); // version du monde de la sauvegarde lue
+    this.cities = parseCities(citiesBytes); // les villes réelles du monde
+    this.villages = new VillageSystem(this.cities, this.terrain); // leurs villages, calculés à la demande
     const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
     this.hours = save.hours;
     this.gameHours = save.day * 24 + save.hours;
@@ -148,11 +158,11 @@ export class Game {
     this.lens = new LensDrops(byId('stage')); // couche 2D au-dessus de la 3D // peut lever une erreur si WebGL est indisponible : main.ts l'affiche
     this.gs.applySettings(this.settings);
     this.gs.resize();
-    this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, seed, reliefGrid, (message) =>
+    this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, seed, reliefGrid, citiesBytes, (message) =>
       toast(`Le terrain a rencontré un problème (${message}). Si des trous apparaissent, recharge la page.`, 'error'),
     );
     this.applyOrigin(); // le rendu (tuiles, grain du sol, vagues) apprend où est l'origine
-    this.controls = new PlayerControls(this.gs.renderer.domElement, this.terrain, save);
+    this.controls = new PlayerControls(this.gs.renderer.domElement, this.terrain, save, this.villages);
     this.controls.sensitivity = this.settings.mouseSensitivity;
     this.boat = new BoatDriver(this.gs.scene, this.terrain, this.controls);
     this.boat.onChange = (aboard) => {
@@ -364,6 +374,11 @@ export class Game {
     this.boat.update(dt, now / 1000, this.origin); // le bateau avance et pose la caméra sur le pont (s'il y a lieu)
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
     this.updateAvatar(dt, now / 1000); // bras, mains, boussole (et caméra extérieure)
+    this.villageClock += dt;
+    if (this.villageClock > 0.4) {
+      this.villageClock = 0;
+      this.villageObjects.update(this.controls.x, this.controls.z, this.origin.x, this.origin.z, (x, z) => this.terrain.heightAt(x, z)); // maisons et panneaux proches
+    }
     this.editClock += dt;
     if (this.editClock > 0.5) {
       this.editClock = 0;
@@ -431,6 +446,7 @@ export class Game {
     this.worldMap = new WorldMap({
       relief: this.relief,
       climate: realClimate,
+      cities: this.cities,
       getPlayer: () => worldToLatLon(this.controls.x, this.controls.z),
       getTime: () => (this.settings.realTime ? realSolarClock(new Date()) : { hours: this.hours, day: this.day }), // en temps réel, la carte reçoit l'heure de Lannion (référence de l'ombre de nuit)
       onGo: (lat, lon) => this.travelToLatLon(lat, lon),
@@ -486,6 +502,8 @@ export class Game {
     this.controls.onViewKey = () => this.toggleViewMode();
     this.avatar = new Avatar(this.gs.scene);
     this.editObjects = new EditObjects(this.gs.scene, this.edits);
+    this.villageObjects = new VillageObjects(this.gs.scene, this.villages, this.gs.renderer);
+    this.villages.setReserved((x, z, r) => this.edits.nearest(x, z, r) !== null); // pas de maison sur un cairn
     this.controls.onEditKey = (remove) => this.editAction(remove);
     this.edits.onChange((c) => {
       this.editClock = 99; // le dessin se met à jour tout de suite
@@ -508,6 +526,7 @@ export class Game {
     if (!db.persistent) toast('Ce navigateur ne garde pas les constructions (navigation privée ?) : elles disparaîtront au rechargement.', 'error');
     if (this.editsReadOnly) toast('Ce monde a été enregistré par une version plus récente du jeu : tu peux le visiter, pas le modifier.', 'error');
     this.editClock = 99;
+    this.villages.setReserved((x, z, r) => this.edits.nearest(x, z, r) !== null); // les constructions relues : les villages se replanifient autour
   }
 
   // K : pose un cairn devant soi ; Maj+K : retire le plus proche (à 3 m).
@@ -523,6 +542,7 @@ export class Game {
     const px = x - Math.sin(yaw) * 1.6; // 1,6 m devant (devant = direction −sin, −cos)
     const pz = z - Math.cos(yaw) * 1.6;
     if (this.terrain.heightAt(px, pz) <= 0.3) return toast('Il faut poser le cairn sur la terre ferme.');
+    if (this.villages.housesNear(px, pz, 3).some((h) => pointInHouse(h, px, pz, 0.8))) return toast('Pas dans une maison : pose le cairn dehors.');
     if (this.edits.nearest(px, pz, 0.8)) return toast('Il y a déjà un cairn ici.');
     toast(this.edits.add('cairn', px, pz, yaw, Date.now()) ? 'Cairn posé. Maj+K pour le retirer.' : 'Trop de constructions : retires-en avant d\'en poser.', 'info');
   }
@@ -874,6 +894,7 @@ export class Game {
         else this.viewBlend = 1;
         return mode;
       },
+      villages: () => ({ shown: this.villageObjects.count, names: this.villageObjects.names(), near: this.villages.near(this.controls.x, this.controls.z, 3000).map((v) => ({ name: v.name, x: Math.round(v.x), z: Math.round(v.z), r: Math.round(v.radius), houses: v.houses.length, style: v.style.id, signs: v.signs.map((s) => ({ x: Math.round(s.x), z: Math.round(s.z), nx: s.nx, nz: s.nz })) })) }),
       edits: () => ({ count: this.edits.size, shown: this.editObjects.count, persistent: this.editsDb?.persistent ?? null, worldVersion: WORLD_VERSION, list: this.edits.all().slice(0, 20).map((e) => ({ id: e.id, x: e.x, z: e.z })) }),
       compass: () => (this.compass ? { card: this.compass.card, text: compassText(bearingFromYaw(this.controls.yaw)) } : null),
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),

@@ -22,6 +22,7 @@ export interface Terrain {
   colorNoise(x: number, z: number): number; // variation douce (-1..1) pour les couleurs du sol
   forestNoise(x: number, z: number): number; // grandes taches (-1..1) : où les forêts se regroupent, où s'ouvrent les clairières
   biomeAt(x: number, z: number): Biome; // climat d'ici : couleurs de la végétation, altitude de la neige
+  climateClassAt(x: number, z: number): string; // classe de Köppen d'ici (ex. « Cfb » à Lannion) : sert au style des villages
 }
 
 // Position de départ du joueur.
@@ -95,9 +96,14 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
     return climate.biomeAt(lat, lon); // le climat réel de la Terre à cet endroit
   };
 
+  const climateClassAt = (x: number, z: number): string => {
+    const { lat, lon } = worldToLatLon(x, z);
+    return climate.classAt(lat, lon); // la classe de Köppen réelle ici
+  };
+
   const forestNoise = (x: number, z: number): number => fbm(forestN, x / 380, z / 380, 3); // taches de quelques centaines de mètres
 
-  return { seed, heightAt, realHeightAt, colorNoise, forestNoise, biomeAt };
+  return { seed, heightAt, realHeightAt, colorNoise, forestNoise, biomeAt, climateClassAt };
 }
 
 // Trouve un point de départ agréable : sur la terre ferme, juste derrière la plage, face à la mer.

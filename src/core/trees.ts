@@ -32,7 +32,7 @@ export function hash01(a: number, b: number, salt: number): number {
 }
 
 // Les arbres d'une tuile. Rien sur la plage ni dans l'eau, rien sur les pentes raides, rien au-delà de la limite des arbres (sous la limite des neiges).
-export function treesForChunk(terrain: Terrain, cx: number, cz: number, lod: number, chunkSize: number): Tree[] {
+export function treesForChunk(terrain: Terrain, cx: number, cz: number, lod: number, chunkSize: number, blocked: ((x: number, z: number) => boolean) | null = null): Tree[] {
   const cell = TREE_CELL[lod] ?? 0;
   if (cell === 0) return [];
   const n = chunkSize / cell; // cases par côté
@@ -46,6 +46,7 @@ export function treesForChunk(terrain: Terrain, cx: number, cz: number, lod: num
       const gj = cz * n + j;
       const x = x0 + (i + 0.15 + 0.7 * hash01(gi, gj, 1)) * cell;
       const z = z0 + (j + 0.15 + 0.7 * hash01(gi, gj, 2)) * cell;
+      if (blocked && blocked(x, z)) continue; // village : pas d'arbres dans les rues et les jardins
       const biome = terrain.biomeAt(x, z);
       if (biome.forest < 0.003) continue; // climat sans arbres
       // Densité locale : forêt dense = grandes taches (clairières entre elles) ; savane = arbres isolés partout.
@@ -312,8 +313,8 @@ export function addTree(b: MeshBuilder, t: Tree, lx: number, lz: number, detail 
 }
 
 // Ajoute tous les arbres d'une tuile ; renvoie leur nombre et la hauteur maximale atteinte au-dessus du sol (pour les bornes de la tuile).
-export function addTreesForChunk(b: MeshBuilder, terrain: Terrain, cx: number, cz: number, lod: number, chunkSize: number): { count: number; topY: number } {
-  const trees = treesForChunk(terrain, cx, cz, lod, chunkSize);
+export function addTreesForChunk(b: MeshBuilder, terrain: Terrain, cx: number, cz: number, lod: number, chunkSize: number, blocked: ((x: number, z: number) => boolean) | null = null): { count: number; topY: number } {
+  const trees = treesForChunk(terrain, cx, cz, lod, chunkSize, blocked);
   let topY = -Infinity;
   for (const t of trees) {
     if (b.positions.length / 3 > TREE_VERTEX_BUDGET) break; // garde-fou : les indices sont sur 16 bits, jamais plus de ~40 000 sommets d'arbres par tuile

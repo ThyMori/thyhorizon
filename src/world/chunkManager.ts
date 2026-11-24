@@ -46,6 +46,7 @@ export class ChunkManager {
     private readonly material: THREE.Material, // matériau commun à toutes les tuiles
     seed: number, // graine du monde
     reliefGrid: ReliefGrid, // le relief réel (copié dans chaque ouvrier)
+    cities: Uint8Array, // les villes du monde (copiées dans chaque ouvrier : elles écartent les arbres des villages)
     private readonly onError: (message: string) => void, // appelé en cas de problème (une seule fois)
   ) {
     const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 4 : 4; // cœurs du processeur
@@ -54,7 +55,7 @@ export class ChunkManager {
       const worker = new Worker(new URL('./chunkWorker.ts', import.meta.url), { type: 'module' }); // un ouvrier
       worker.onmessage = (event: MessageEvent<WorkerResponse>) => this.handleResponse(event.data); // réception d'une tuile
       worker.onerror = (event) => this.reportError(event.message || 'Erreur dans le worker de terrain'); // plantage de l'ouvrier
-      worker.postMessage({ type: 'init', seed, relief: reliefGrid } satisfies WorkerRequest); // on lui donne la graine et le relief réel
+      worker.postMessage({ type: 'init', seed, relief: reliefGrid, cities } satisfies WorkerRequest); // on lui donne la graine, le relief réel et les villes
       this.workers.push(worker);
     }
     this.maxInflight = count * 2; // chaque ouvrier a une file de 2 tuiles

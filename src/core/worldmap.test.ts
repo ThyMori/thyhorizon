@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { realClimate } from '../world/climateData';
 import { sunPosition } from './geo';
-import { MAX_SCALE, nightAlpha, NIGHT_ALPHA, renderNightRows, subsolarPoint, sunElevationAt, MapView, clampView, latLonToScreen, mapColor, minScale, panBy, renderMapRows, screenToLatLon, snapToLand, wrapLon, zoomAt } from './worldmap';
+import { cityMinPop, MAX_SCALE, nightAlpha, NIGHT_ALPHA, renderNightRows, subsolarPoint, sunElevationAt, MapView, clampView, latLonToScreen, mapColor, minScale, panBy, renderMapRows, screenToLatLon, snapToLand, wrapLon, zoomAt } from './worldmap';
 import { fakeRelief, loadRealRelief } from './relief.testutil';
 
 const W = 900;
@@ -130,5 +130,15 @@ describe('jour et nuit', () => {
     for (let k = 3; k < out.length; k += 4) out[k] > 100 ? dark++ : out[k] === 0 ? light++ : 0;
     expect(dark).toBeGreaterThan(300);
     expect(light).toBeGreaterThan(300);
+  });
+});
+
+describe('villes sur la carte', () => {
+  it('plus on zoome, plus on montre de petites villes', () => {
+    const scales = [1, 3, 6, 12, 25, 40];
+    const pops = scales.map(cityMinPop);
+    for (let i = 1; i < pops.length; i++) expect(pops[i]!).toBeLessThanOrEqual(pops[i - 1]!);
+    expect(cityMinPop(MAX_SCALE)).toBe(5000); // au zoom maximal : toutes les villes du jeu
+    expect(cityMinPop(1)).toBeGreaterThanOrEqual(1000000);
   });
 });

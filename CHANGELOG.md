@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.30.0 — 2026-11-24
+
+Villages des vraies villes du monde (≥ 5000 hab.) : maisons par climat, panneaux, villes sur la carte
+
 ## 1.29.0 — 2026-11-24
 
 Constructions du joueur qui restent (cairns, touche K) et numéro de version du monde

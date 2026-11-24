@@ -298,6 +298,18 @@ Sans objet : jeu local, sans compte ni serveur.
 - Navigation privée / IndexedDB bloqué : le jeu marche, mais les constructions disparaissent au rechargement (message affiché).
 - Limite : tout reste sur CET appareil et CE navigateur (pas de synchronisation entre PC et téléphone). Vider les données du site efface les constructions.
 
+## 1.30 — Les villes du monde (villages, panneaux, carte)
+
+- **Les vraies villes de 5 000 habitants et plus** (≈ 49 000) ont un village à leur place : `src/data/cities.bin` (1,4 Mo), fabriqué par `scripts/build-cities.mjs` (**ne pas le modifier à la main** ; origine et licence **GeoNames, CC BY 4.0** dans `src/data/CITIES-LICENSE.txt`, à garder aussi dans l'aide du jeu).
+- **Taille selon la population** : de 10 maisons (5 000 hab.) à 160 maisons (très grandes villes, plafonnées : Paris ou Tokyo restent jouables). Rue principale le long des courbes de niveau, rues parallèles et transversales pour les villes moyennes et grandes. Aucune maison sur une pente trop forte, sur une plage ou sur une autre maison.
+- **Recalage** : le relief du jeu est flou ; ~5 % des villes tombent en mer. Elles sont déplacées vers la terre ferme la plus proche (jusqu'à 8 km, sinon ignorées).
+- **Style des maisons selon le climat réel** (Köppen, `src/core/villageStyle.ts`) : atlantique (granit, ardoise : Bretagne), méditerranéen (ocre, tuiles), continental (bois, toits raides), aride (briques de terre, toits plats), tropical (toits à quatre pentes, chaume), polaire. Tous les villages d'un même climat se ressemblent encore : le style par pays et par région se raffinera plus tard.
+- **Panneaux** avec le vrai nom, aux deux bouts de la rue principale, tournés vers celui qui arrive (texte dessiné sur un canevas, aucun HTML).
+- **Pas d'arbres dans les villages** (même calcul dans les workers et pour la collision) ; **on ne traverse pas les murs** (collision rectangle tourné) ; les maisons ne sont pas posées sur un cairn que tu as construit (et un cairn ne se pose pas dans une maison).
+- **Carte (M)** : les villes s'affichent en points (plus on zoome, plus on voit de petites villes), les noms apparaissent à fort zoom ; un clic près d'une ville la choisit et « Y aller » t'amène dans son village.
+- Le village est **déterministe** (même ville → même plan à chaque fois) et se calcule à la demande, sans rien enregistrer. Distances réelles : Lannion–Paris = 425 km à vol d'oiseau.
+- Limites connues : pas d'intérieur (maisons pleines, portes dessinées), pas de rues dessinées au sol, pas d'église ni de bâtiments spéciaux, pas de terrain aplani sous les maisons (fondations enterrées sur 2,4 m de pente au plus), un seul style par grande famille de climat.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

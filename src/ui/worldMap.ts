@@ -3,7 +3,8 @@
 
 import type { Climate } from '../core/climate';
 import { formatCoords } from '../core/format';
-import { latLonToScreen, MapView, minScale, panBy, renderMapRows, renderNightRows, screenToLatLon, subsolarPoint, zoomAt, clampView } from '../core/worldmap';
+import type { Cities } from '../core/cities';
+import { cityMinPop, latLonToScreen, MapView, minScale, panBy, renderMapRows, renderNightRows, screenToLatLon, subsolarPoint, zoomAt, clampView } from '../core/worldmap';
 import type { Relief } from '../core/relief';
 import { byId } from './dom';
 
@@ -13,6 +14,7 @@ const MAP_H = MAP_W / 2;
 export interface WorldMapDeps {
   relief: Relief;
   climate: Climate;
+  cities: Cities; // les villes réelles (points et noms sur la carte)
   getPlayer: () => { lat: number; lon: number }; // où est le joueur
   getTime: () => { hours: number; day: number }; // heure solaire de Lannion et jour de l'année du jeu
   onGo: (lat: number, lon: number) => void; // voyage demandé
@@ -144,10 +146,33 @@ export class WorldMap {
     }
   }
 
+  // Les villes visibles à l'écran avec ce zoom, des plus grandes aux plus petites.
+  private visibleCities(): { i: number; x: number; y: number }[] {
+    const { cities } = this.deps;
+    const { view, width, height } = this;
+    const minPop = cityMinPop(view.scale);
+    const out: { i: number; x: number; y: number }[] = [];
+    for (let i = 0; i < cities.count; i++) {
+      if (cities.pop[i]! < minPop) continue;
+      const p = latLonToScreen(view, width, height, cities.lat[i]!, cities.lon[i]!);
+      if (p.x < -10 || p.x > width + 10 || p.y < -10 || p.y > height + 10) continue;
+      out.push({ i, x: p.x, y: p.y });
+    }
+    return out.sort((a, b) => cities.pop[b.i]! - cities.pop[a.i]!);
+  }
+
   private pick(sx: number, sy: number): void {
-    this.target = screenToLatLon(this.view, this.width, this.height, sx, sy);
+    // Un clic tout près d'une ville choisit cette ville (et on arrive dans son village).
+    let city: { i: number; d: number } | null = null;
+    for (const c of this.visibleCities()) {
+      const d = Math.hypot(c.x - sx, c.y - sy);
+      if (d <= 10 && (!city || d < city.d)) city = { i: c.i, d };
+    }
+    const cities = this.deps.cities;
+    this.target = city ? { lat: cities.lat[city.i]!, lon: cities.lon[city.i]! } : screenToLatLon(this.view, this.width, this.height, sx, sy);
     const h = this.deps.relief.heightAt(this.target.lat, this.target.lon);
-    this.setInfo(`${formatCoords(this.target.lat, this.target.lon)}${h < 0 ? ' — en mer : tu seras posé sur la côte la plus proche' : ''}`);
+    const label = city ? `${cities.name(city.i)} (${cities.pop[city.i]!.toLocaleString('fr-FR')} habitants) — ` : '';
+    this.setInfo(`${label}${formatCoords(this.target.lat, this.target.lon)}${h < 0 && !city ? ' — en mer : tu seras posé sur la côte la plus proche' : ''}`);
     this.goBtn.disabled = false;
     this.draw();
   }
@@ -210,6 +235,30 @@ export class WorldMap {
       }
     }
     ctx.stroke();
+    // Les villes : un point, et le nom des plus grandes quand on a zoomé.
+    if (this.ready) {
+      const list = this.visibleCities();
+      ctx.fillStyle = '#f2ead0';
+      ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+      ctx.lineWidth = 1;
+      for (const c of list) {
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, view.scale < 16 ? 2.2 : 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+      if (view.scale >= 14) {
+        ctx.font = '12px "Segoe UI", system-ui, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0,0,0,0.75)';
+        for (const c of list.slice(0, 70)) {
+          const name = this.deps.cities.name(c.i);
+          ctx.strokeText(name, c.x + 6, c.y);
+          ctx.fillText(name, c.x + 6, c.y);
+        }
+      }
+    }
     // Le joueur (rond ambre) et le lieu choisi (croix).
     const p = this.deps.getPlayer();
     const me = latLonToScreen(view, width, height, p.lat, p.lon);

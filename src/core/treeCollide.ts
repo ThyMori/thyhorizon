@@ -38,7 +38,8 @@ export function pushOutOfTrees(trees: readonly Tree[], x: number, z: number, rad
 export class TreeObstacles {
   private readonly cache = new Map<string, Tree[]>();
 
-  constructor(private readonly terrain: Terrain) {}
+  // `blockerFor` : les endroits dégagés (villages) où les arbres ne poussent pas, pour que la collision suive le dessin.
+  constructor(private readonly terrain: Terrain, private readonly blockerFor: ((cx: number, cz: number, size: number) => ((x: number, z: number) => boolean) | null) | null = null) {}
 
   // Arbres des tuiles voisines du point (x, z).
   private nearby(x: number, z: number): Tree[] {
@@ -51,7 +52,7 @@ export class TreeObstacles {
         const key = `${cx + dx},${cz + dz}`;
         let list = this.cache.get(key);
         if (!list) {
-          list = treesForChunk(this.terrain, cx + dx, cz + dz, 0, CHUNK_SIZE);
+          list = treesForChunk(this.terrain, cx + dx, cz + dz, 0, CHUNK_SIZE, this.blockerFor ? this.blockerFor(cx + dx, cz + dz, CHUNK_SIZE) : null);
           if (this.cache.size >= MAX_CACHED) this.cache.delete(this.cache.keys().next().value as string); // on oublie la plus ancienne
           this.cache.set(key, list);
         }

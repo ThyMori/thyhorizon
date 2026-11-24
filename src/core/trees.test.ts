@@ -5,7 +5,7 @@ import { CHUNK_SIZE, buildChunk } from './chunk';
 import { latLonToWorld } from './geo';
 import { loadRealRelief } from './relief.testutil';
 import { createTerrain, slopeAt } from './terrain';
-import { MeshBuilder, TREE_CELL, Tree, addTree, hash01, treesForChunk } from './trees';
+import { MeshBuilder, TREE_CELL, Tree, addTree, hash01, treesForChunk, trunkRadius } from './trees';
 
 const terrain = createTerrain(12345, loadRealRelief(), realClimate);
 
@@ -74,6 +74,26 @@ describe('placement', () => {
   });
 });
 
+describe('forme (détail réduit de loin)', () => {
+  it('l\'arbre simplifié est plus léger que l\'arbre complet', () => {
+    for (const kind of ['conifer', 'broadleaf', 'acacia'] as const) {
+      const full: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
+      const lite: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
+      const tree = { x: 0, z: 0, y: 10, kind, size: 1, seed: 0.5 };
+      addTree(full, tree, 0, 0, 0);
+      addTree(lite, tree, 0, 0, 1);
+      expect(lite.positions.length).toBeLessThan(full.positions.length);
+      for (const i of lite.indices) expect(i).toBeLessThan(lite.positions.length / 3);
+    }
+  });
+  it('le rayon du tronc est positif et croît avec la taille', () => {
+    for (const kind of ['conifer', 'broadleaf', 'acacia'] as const) {
+      expect(trunkRadius({ kind, size: 1 })).toBeGreaterThan(0.2);
+      expect(trunkRadius({ kind, size: 1.5 })).toBeGreaterThan(trunkRadius({ kind, size: 1 }));
+    }
+  });
+});
+
 describe('forme', () => {
   const kinds = ['conifer', 'broadleaf', 'acacia'] as const;
   it('fabrique des triangles valides pour chaque espèce', () => {
@@ -81,8 +101,8 @@ describe('forme', () => {
       const b: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
       addTree(b, { x: 0, z: 0, y: 10, kind, size: 1, seed: 0.5 }, 5, 7);
       const n = b.positions.length / 3;
-      expect(n).toBeGreaterThan(20);
-      expect(n).toBeLessThan(80); // quelques dizaines de sommets : léger
+      expect(n).toBeGreaterThan(60);
+      expect(n).toBeLessThan(700); // quelques centaines de sommets : étoffé mais léger
       expect(b.normals.length).toBe(b.positions.length);
       expect(b.colors.length).toBe(b.positions.length);
       expect(b.indices.length % 3).toBe(0);

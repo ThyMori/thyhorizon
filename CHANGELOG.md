@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.27.0 — 2026-11-24
+
+Arbres refaits (troncs épais, feuillage fourni, sapins, bouleaux), collision avec les troncs, touche C pour s'accroupir
+
 ## 1.26.0 — 2026-11-24
 
 Bruits du bateau : voile qui claque, craquements, pas sur le pont

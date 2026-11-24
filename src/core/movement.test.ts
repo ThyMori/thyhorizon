@@ -1,6 +1,6 @@
 // Tests du déplacement : directions, vitesse, blocage en eau profonde.
 import { describe, expect, it } from 'vitest';
-import { RUN_SPEED, WALK_SPEED, flyDelta, isWalkable, smoothTo, stepWalk, keyLookDelta } from './movement';
+import { CROUCH_EYE_HEIGHT, CROUCH_SPEED, EYE_HEIGHT, RUN_SPEED, WALK_SPEED, flyDelta, isWalkable, smoothTo, stepWalk, keyLookDelta } from './movement';
 import { hashSeed } from './noise';
 import { createTerrain, findSpawn } from './terrain';
 import { loadRealRelief } from './relief.testutil';
@@ -84,5 +84,19 @@ describe('keyLookDelta', () => {
     const [, p2] = keyLookDelta(0, 0, 1, 0, 2, 1);
     expect(p1).toBeGreaterThan(0);
     expect(p2).toBeCloseTo(2 * p1);
+  });
+});
+
+describe('accroupi', () => {
+  it('on avance plus lentement accroupi, même en courant', () => {
+    const terrain = { heightAt: () => 10 } as unknown as Parameters<typeof stepWalk>[0];
+    const walk = stepWalk(terrain, 0, 0, 0, { forward: 1, right: 0, run: false }, 1);
+    const crouch = stepWalk(terrain, 0, 0, 0, { forward: 1, right: 0, run: true, crouch: true }, 1);
+    expect(Math.abs(crouch.z)).toBeCloseTo(CROUCH_SPEED, 5);
+    expect(Math.abs(crouch.z)).toBeLessThan(Math.abs(walk.z));
+  });
+  it('les yeux sont plus bas accroupi mais restent au-dessus du sol', () => {
+    expect(CROUCH_EYE_HEIGHT).toBeLessThan(EYE_HEIGHT);
+    expect(CROUCH_EYE_HEIGHT).toBeGreaterThan(0.5);
   });
 });

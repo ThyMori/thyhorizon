@@ -5,6 +5,8 @@ import type { Terrain } from './terrain';
 
 export const EYE_HEIGHT = 1.7; // hauteur des yeux au-dessus du sol, en mètres
 export const WALK_MIN_HEIGHT = -1.2; // on ne peut pas s'aventurer là où le sol est plus bas : sans bateau, on ne nage pas
+export const CROUCH_EYE_HEIGHT = 0.95; // hauteur des yeux accroupi, en mètres
+export const CROUCH_SPEED = 1.6; // marche accroupie, en m/s (lente : on avance à pas feutrés)
 export const WALK_SPEED = 4; // marche, en m/s
 export const RUN_SPEED = 9; // course, en m/s
 export const FLY_SPEED = 25; // vol libre, en m/s
@@ -15,6 +17,7 @@ export interface MoveInput {
   forward: number; // +1 = avancer, -1 = reculer
   right: number; // +1 = pas de côté vers la droite
   run: boolean; // course ou vol rapide
+  crouch?: boolean; // accroupi : on avance lentement et on ne court pas
 }
 
 // Est-ce qu'on peut se tenir ici ?
@@ -38,7 +41,7 @@ export function stepWalk(
 ): { x: number; z: number; blocked: boolean } {
   const [f, r] = normalizeInput(input.forward, input.right); // intention normalisée
   if (f === 0 && r === 0) return { x, z, blocked: false }; // rien à faire
-  const speed = input.run ? RUN_SPEED : WALK_SPEED; // vitesse choisie
+  const speed = input.crouch ? CROUCH_SPEED : input.run ? RUN_SPEED : WALK_SPEED; // vitesse choisie (accroupi : toujours lent)
   const sinY = Math.sin(yaw); // sinus du cap
   const cosY = Math.cos(yaw); // cosinus du cap
   const dx = (-sinY * f + cosY * r) * speed * dt; // déplacement en x (devant = (-sin, -cos), droite = (cos, -sin))

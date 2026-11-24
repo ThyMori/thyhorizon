@@ -269,6 +269,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - Logique pure et testée : `src/core/boatSound.ts` ; voix dans `src/audio/ambient.ts`. Essai : `__thy.audioTest(over, life, boat)` (?debug).
 - Même limite : je ne peux pas **écouter**. Vérifié : bons déclenchements (tests), niveaux sains (efficace ≈ 0,01–0.02, crête ≤ 0,15), aucune valeur invalide. Dis-moi si les claquements, craquements ou pas sonnent faux, trop forts ou trop fréquents.
 
+### 1.27.0 — Arbres plus beaux, troncs solides, accroupi
+- **Arbres refaits, dans l'esprit de Wurm** : troncs épais, évasés au pied, légèrement tordus et rayés comme de l'écorce ; **feuillus** à grosses branches et touffes de feuillage bosselées (plusieurs nuances de vert, dessous sombre, dessus ensoleillé), quelques-uns à **écorce claire de bouleau** ; **sapins** à six étages aux branches retombantes et irrégulières ; **acacias** en fourche avec des étages plats de feuillage.
+- Les arbres proches sont détaillés ; ceux de loin gardent une forme simplifiée (même coût qu'avant à l'horizon).
+- **On ne traverse plus les arbres** : chaque tronc est un obstacle rond (rayon proportionnel à sa taille) ; on glisse autour au lieu de s'arrêter net. Même placement que le dessin : ce qu'on voit est ce qu'on heurte. Pas de collision en vol libre ni à bord.
+- **Accroupi** : touche **C** (tenue) à pied : le regard descend (0,95 m) et on avance à pas lents (1,6 m/s). En vol, C descend toujours ; à bord, C larguait déjà un ris.
+- Logique pure et testée : `src/core/treeCollide.ts` (collision, mémoire des tuiles), `src/core/trees.ts` (formes, `trunkRadius`), `src/core/movement.ts` (accroupi).
+- Limites : pas d'ombre propre ni de feuilles individuelles (maillage à couleurs de sommets, sans texture) ; on ne se heurte pas aux branches, seulement aux troncs ; les arbres lointains (tuiles moyennes) ne sont pas solides, mais on ne les atteint qu'en s'approchant, donc ils deviennent détaillés et solides avant.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

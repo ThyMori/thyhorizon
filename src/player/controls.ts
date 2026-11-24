@@ -3,9 +3,10 @@
 
 import * as THREE from 'three';
 import { clamp } from '../core/math';
-import { EYE_HEIGHT, MoveInput, flyDelta, keyLookDelta, smoothTo, stepWalk } from '../core/movement';
+import { CROUCH_EYE_HEIGHT, EYE_HEIGHT, MoveInput, flyDelta, keyLookDelta, smoothTo, stepWalk } from '../core/movement';
 import type { SaveData } from '../core/save';
 import type { Terrain } from '../core/terrain';
+import { TreeObstacles } from '../core/treeCollide';
 
 const LOOK_SPEED = 0.0022; // radians par pixel de souris, à sensibilité 1
 const MAX_PITCH = 1.5; // on ne peut pas regarder plus haut/bas que ~86°
@@ -33,6 +34,8 @@ export class PlayerControls {
   touchRun = false; // bouton « Courir » enfoncé (ou joystick à fond)
   touchUp = 0; // vol au doigt : +1 monte, -1 descend, 0 stable
   private readonly keys = new Set<string>(); // touches physiques actuellement enfoncées
+  private readonly trees: TreeObstacles; // les troncs d'arbres autour de nous (on ne les traverse pas)
+  crouching = false; // accroupi (touche C tenue, à pied) ?
   private blockedCooldown = 0; // évite d'afficher le message d'eau à chaque image
 
   constructor(
@@ -46,6 +49,7 @@ export class PlayerControls {
     this.yaw = save.yaw;
     this.pitch = save.pitch;
     this.fly = save.fly;
+    this.trees = new TreeObstacles(terrain);
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear()); // si la fenêtre perd le focus, on lâche toutes les touches
@@ -106,7 +110,9 @@ export class PlayerControls {
         forward: clamp(this.axis('KeyW') - this.axis('KeyS') + this.touchMove.forward, -1, 1), // W/Z avance, S recule (touches physiques)
         right: clamp(this.axis('KeyD') - this.axis('KeyA') + this.touchMove.right, -1, 1), // D droite, A/Q gauche
         run: this.touchRun || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'),
+        crouch: !this.fly && !this.aboard && this.keys.has('KeyC'), // C tenue : accroupi (en vol, C descend ; à bord, C largue un ris)
       };
+      this.crouching = input.crouch === true;
       const [dYaw, dPitch] = keyLookDelta(this.axis('ArrowLeft'), this.axis('ArrowRight'), this.axis('ArrowUp'), this.axis('ArrowDown'), this.sensitivity, dt); // flèches : regard
       this.yaw += dYaw; // les flèches tournent le cap, en même temps que le déplacement
       this.pitch = clamp(this.pitch + dPitch, -MAX_PITCH, MAX_PITCH);
@@ -121,16 +127,18 @@ export class PlayerControls {
         this.y = clamp(this.y, this.terrain.heightAt(this.x, this.z) + 1, 3000); // pas sous le sol, pas dans l'espace
       } else {
         const r = stepWalk(this.terrain, this.x, this.z, this.yaw, input, dt);
-        this.x = r.x;
-        this.z = r.z;
+        const p = this.trees.resolve(r.x, r.z); // pas de passage à travers les troncs : on glisse autour
+        this.x = p.x;
+        this.z = p.z;
         if (r.blocked && this.blockedCooldown === 0 && (input.forward !== 0 || input.right !== 0)) {
           this.blockedCooldown = 4; // au plus un message toutes les 4 s
           this.onBlocked?.();
         }
       }
     }
+    if (this.fly || this.aboard) this.crouching = false;
     if (!this.fly && !this.aboard) {
-      const target = this.terrain.heightAt(this.x, this.z) + EYE_HEIGHT; // hauteur des yeux voulue
+      const target = this.terrain.heightAt(this.x, this.z) + (this.crouching ? CROUCH_EYE_HEIGHT : EYE_HEIGHT); // hauteur des yeux voulue (plus bas accroupi)
       this.y = this.y > target ? smoothTo(this.y, target, 5, dt) : smoothTo(this.y, target, 14, dt); // descente douce, relief suivi vite
     }
     camera.position.set(this.x - originX, this.y, this.z - originZ); // la caméra est placée relativement à l'origine flottante

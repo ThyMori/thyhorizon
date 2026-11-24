@@ -2,11 +2,15 @@
 // suspend le son quand l'onglet est caché, et passe les niveaux du mixage au moteur.
 
 import { SoundMix } from '../core/soundMix';
+import { MusicMood } from '../core/music';
 import { Ambient } from './ambient';
+import { MusicEngine } from './music';
 
 export class AudioSystem {
   private ctx: AudioContext | null = null;
   private ambient: Ambient | null = null;
+  private music: MusicEngine | null = null; // les nappes de musique
+  private mood: MusicMood | null = null; // dernière humeur reçue
   private mix: SoundMix | null = null; // dernier mixage reçu (appliqué dès que le contexte existe)
   private failed = false; // l'audio est-il indisponible (navigateur sans Web Audio) ?
 
@@ -32,7 +36,9 @@ export class AudioSystem {
       if (!Ctor) throw new Error('Web Audio indisponible');
       this.ctx = new Ctor();
       this.ambient = new Ambient(this.ctx);
+      this.music = new MusicEngine(this.ctx);
       if (this.mix) this.ambient.apply(this.mix);
+      if (this.mood) this.music.apply(this.mood);
       void this.ctx.resume();
     } catch {
       this.failed = true; // pas de son, mais le jeu continue normalement
@@ -45,8 +51,15 @@ export class AudioSystem {
     this.ambient?.apply(mix);
   }
 
+  // Nouvelle humeur de la musique (quelques fois par seconde).
+  setMood(mood: MusicMood): void {
+    this.mood = mood;
+    this.music?.apply(mood);
+  }
+
   // À appeler à chaque image (planifie les gouttes isolées).
   tick(dt: number): void {
     this.ambient?.tick(dt);
+    this.music?.tick(dt);
   }
 }

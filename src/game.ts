@@ -39,6 +39,9 @@ import { moonState, moonText } from './core/moon';
 import { LensDrops } from './render/lensDrops';
 import { AudioSystem } from './audio/audioSystem';
 import { Ambient } from './audio/ambient';
+import { MusicEngine } from './audio/music';
+import { musicMood, newMusicState, stepMusic } from './core/music';
+import { mulberry32 } from './core/noise';
 import { shoreProximity, soundMix } from './core/soundMix';
 import { LifeInput, lifeMix } from './core/wildlife';
 import { SettingsPanel } from './ui/settingsPanel';
@@ -237,6 +240,20 @@ export class Game {
       rain: this.weather.rain,
       wind: windFelt,
     });
+    this.audio.setMood(
+      musicMood({
+        sunElevation: sun.elevationDeg,
+        hours: this.hours,
+        day: this.day,
+        cloud: this.weather.cloud,
+        rain: this.weather.rain,
+        fog: this.weather.fog,
+        wind: windFelt,
+        onWater: aboard,
+        volume: this.settings.musicVolume * this.settings.soundVolume ** 0.5, // le volume général pèse aussi, plus doucement
+        active: this.controls.locked,
+      }),
+    );
     this.audio.setMix(
       soundMix({
         windSpeed: windFelt, // à bord on entend le vent apparent
@@ -735,6 +752,29 @@ export class Game {
           peak = Math.max(peak, Math.abs(v));
         }
         return { rms: Math.sqrt(sum / data.length), peak, bad };
+      },
+      musicTest: async (scale) => {
+        // Rend 40 s de musique hors ligne et mesure : niveau, crête, valeurs invalides, accords joués.
+        const ctx = new OfflineAudioContext(2, 44100 * 40, 44100);
+        const eng = new MusicEngine(ctx, ctx.destination, mulberry32(7));
+        eng.setImmediate(true);
+        const mood = musicMood({ sunElevation: scale === 'aeolian' ? -30 : 40, hours: 13, day: 100, cloud: 0.1, rain: 0, fog: 0, wind: 3, onWater: false, volume: 1, active: true });
+        eng.apply(mood);
+        const rnd = mulberry32(11);
+        const st = newMusicState(rnd);
+        let chords = 0;
+        for (let t = 0; t < 30; t += 0.5) {
+          const c = stepMusic(st, 0.5, mood, rnd);
+          if (c) { eng.play(c, t); chords++; }
+        }
+        const buf = await ctx.startRendering();
+        let sum = 0, peak = 0, bad = 0, n = 0;
+        for (let ch = 0; ch < 2; ch++) for (const v of buf.getChannelData(ch)) {
+          if (!Number.isFinite(v)) bad++;
+          sum += v * v; n++;
+          peak = Math.max(peak, Math.abs(v));
+        }
+        return { rms: Math.sqrt(sum / n), peak, bad, chords };
       },
       real: (c) => {
         this.real = c ? { wind: c.wind ?? null, weather: c.weather ?? null, hs: c.hs ?? null, waveFrom: c.waveFrom ?? null, current: c.current ?? null, fetchedAt: Date.now() } : null; // impose des conditions réelles simulées (essais)

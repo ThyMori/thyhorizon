@@ -253,6 +253,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - Vérifié contre des dates réelles : nouvelles et pleines lunes de janvier–février 2024 et de l'an 2000, quartiers, durée du cycle ; la nouvelle lune du 18 janvier 2026 sort bien à 0 %. Limites : le Soleil du jeu ignore l'équation du temps (± 15 min, comme avant) ; calendrier de 365 jours (le 31 décembre d'une année bissextile est décalé d'un jour) ; la parallaxe de la Lune (≈ 1°) n'est pas corrigée ; le disque est grossi ≈ 4× pour être visible.
 - Essai : `?debug` puis `__thy.setDay(26)`, `__thy.setHours(19)` et `__thy.moon()` donne où regarder.
 
+### 1.25.0 — Musique d'ambiance (nappes douces)
+- Une **musique très discrète**, synthétisée dans le jeu (aucun fichier) : quelques accords tenus (4 à 8 par « moment »), parfois une note claire qui tinte avec un long écho, puis **un long silence** (1 à 3 minutes). Pas de mélodie ni de rythme : elle accompagne sans prendre la place du vent et de la mer.
+- Elle suit le monde : **gamme** selon le moment (aube lumineuse, jour franc, soir chaud, nuit sombre, ciel gris plus sobre), **timbre** plus clair en plein soleil et plus sourd la nuit ou dans la brume, **tonalité** stable plusieurs heures (elle ne change jamais au milieu d'une nappe).
+- Elle **se tait** dans la tempête (vent > 16 m/s ou pluie très forte), baisse quand le vent monte ou qu'il pleut, et s'arrête si la souris n'est pas capturée (menus).
+- Réglages → Son : curseur **Musique** (50 % par défaut ; 0 = coupée), en plus du volume général.
+- Logique pure et testée : `src/core/music.ts` (humeur, gammes, accords, déroulement jouer / se taire) ; voix et écho dans `src/audio/music.ts`.
+- Même limite qu'avant : je ne peux pas **écouter**. Vérifié : notes dans la gamme, bons silences, niveau doux (≈ 0,015 efficace, crête ≈ 0,1), aucune valeur invalide. Le côté agréable est à juger par tes oreilles. Essai : `?debug` puis `__thy.musicTest('major')`.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
@@ -261,7 +269,7 @@ Sans objet : jeu local, sans compte ni serveur.
 4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) ✅ arbres par biome (1.12.0)
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
-**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → ✅ ambiance sonore (1.22, en cours) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
+**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → ✅ ambiance sonore (1.22–1.25 : vent, mer, vie sauvage, musique ; reste les bruits du bateau) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
 
 **Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 

@@ -18,6 +18,7 @@ export interface Settings {
   showInstruments: boolean; // affiche les instruments du voilier (touche I) ; coupés, on navigue aux penons
   realWeather: boolean; // météo et houle RÉELLES du lieu (Open-Meteo, besoin d'Internet) ; sinon tout est simulé en local
   soundVolume: number; // volume du son, de 0 (coupé) à 1
+  musicVolume: number; // volume de la musique d'ambiance, de 0 (coupée) à 1
   mouseSensitivity: number; // sensibilité de la souris, de 0.5 à 2
   daysPass: boolean; // le calendrier avance-t-il (un jour de plus à chaque minuit du jeu) ?
   realTime: boolean; // « Temps réel » : l'heure et la date du jeu suivent la vraie horloge (journées de 24 h)
@@ -40,6 +41,7 @@ export const DEFAULT_SETTINGS: Settings = {
   showInstruments: true, // les instruments aident au début ; on peut les cacher pour naviguer « à l'œil »
   realWeather: false, // désactivé par défaut : rien n'est envoyé sur Internet tant que tu ne l'actives pas
   soundVolume: 0.6, // volume moyen par défaut
+  musicVolume: 0.5, // la musique reste discrète par défaut
   mouseSensitivity: 1,
   daysPass: true, // les saisons avancent lentement tant qu'on joue
   realTime: false, // par défaut, les journées sont accélérées
@@ -55,6 +57,7 @@ export const LIMITS = {
   resolution: { min: 0.5, max: 1 },
   mouseSensitivity: { min: 0.5, max: 2 },
   soundVolume: { min: 0, max: 1 },
+  musicVolume: { min: 0, max: 1 },
 } as const;
 
 const QUALITIES: readonly Quality[] = ['eco', 'balanced', 'beautiful', 'custom'];
@@ -93,6 +96,7 @@ export function sanitizeSettings(raw: unknown): Settings {
     showInstruments: bool(r.showInstruments, d.showInstruments),
     realWeather: bool(r.realWeather, d.realWeather),
     soundVolume: clamp(num(r.soundVolume, d.soundVolume), LIMITS.soundVolume.min, LIMITS.soundVolume.max),
+    musicVolume: clamp(num(r.musicVolume, d.musicVolume), LIMITS.musicVolume.min, LIMITS.musicVolume.max),
     mouseSensitivity: clamp(num(r.mouseSensitivity, d.mouseSensitivity), LIMITS.mouseSensitivity.min, LIMITS.mouseSensitivity.max),
     daysPass: bool(r.daysPass, d.daysPass),
     dayLengthMinutes: DAY_LENGTH_CHOICES.includes(num(r.dayLengthMinutes, d.dayLengthMinutes) as (typeof DAY_LENGTH_CHOICES)[number])

@@ -38,6 +38,9 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ soundVolume: 7 }).soundVolume).toBe(1);
     expect(sanitizeSettings({ soundVolume: -1 }).soundVolume).toBe(0);
     expect(sanitizeSettings({ soundVolume: 'fort' }).soundVolume).toBe(0.6);
+    expect(DEFAULT_SETTINGS.musicVolume).toBe(0.5);
+    expect(sanitizeSettings({ musicVolume: 9 }).musicVolume).toBe(1);
+    expect(sanitizeSettings({ musicVolume: 'x' }).musicVolume).toBe(0.5);
     expect(DEFAULT_SETTINGS.realWeather).toBe(false); // la météo réelle est désactivée par défaut
     expect(sanitizeSettings({ realWeather: 'oui' }).realWeather).toBe(false);
     expect(sanitizeSettings({ realWeather: true }).realWeather).toBe(true);

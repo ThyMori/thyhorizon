@@ -2,6 +2,7 @@
 // de chaque couche sonore. Logique pure (aucun son ici) : le moteur audio (src/audio/ambient.ts) ne fait que suivre ces valeurs.
 
 import { clamp, lerp, smoothstep } from './math';
+import { BoatSoundMix, SILENT_BOAT } from './boatSound';
 import { LifeMix, SILENT_LIFE } from './wildlife';
 
 // Ce que le monde dit au mixage.
@@ -15,6 +16,7 @@ export interface SoundInput {
   aboard: boolean; // le joueur est-il à bord ?
   volume: number; // volume général choisi dans les réglages, 0 à 1
   active: boolean; // le joueur joue-t-il (souris capturée) ? Sinon le son baisse (menu)
+  boat?: BoatSoundMix; // les bruits du bateau (voile, craquements, pas) déjà calculés par core/boatSound.ts ; absents = silence
   life?: LifeMix; // la vie sauvage (oiseaux, insectes…) déjà calculée par core/wildlife.ts ; absente = silence
 }
 
@@ -27,6 +29,7 @@ export interface SoundMix {
   swell: { gain: number; depth: number }; // houle qui clapote sur la coque / l'eau : niveau, creux entre deux vagues (0 à 1)
   surf: { gain: number; depth: number }; // déferlement au rivage
   hull: { gain: number; freq: number }; // eau qui file le long de la coque
+  boat: BoatSoundMix; // claquements de voile, craquements, pas
   life: LifeMix; // oiseaux, insectes, grenouilles, chouette, feuillage
 }
 
@@ -46,6 +49,7 @@ export function soundMix(i: SoundInput): SoundMix {
     swell: { gain: i.onWater ? 0.1 + 0.4 * waves : 0.06 * waves * shore, depth: lerp(0.35, 0.75, waves) },
     surf: { gain: shore * (0.1 + 0.55 * waves) * (i.onWater ? 0.45 : 1), depth: lerp(0.5, 0.85, waves) },
     hull: { gain: i.aboard ? 0.45 * smoothstep(0.3, 5, i.boatSpeed) : 0, freq: 500 + i.boatSpeed * 120 },
+    boat: i.boat ?? SILENT_BOAT,
     life: i.life ?? SILENT_LIFE,
   };
 }

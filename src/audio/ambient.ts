@@ -14,8 +14,15 @@ export class Ambient {
   private nextPlip = 0; // instant de la prochaine goutte isolée
   private plipRate = 0; // gouttes isolées par seconde
   private readonly air: GainNode; // départ vers l'« air » : petit écho de forêt pour les cris d'animaux
-  private readonly rates: Record<string, number> = { birds: 0, gulls: 0, frogs: 0, owl: 0 }; // rythmes des cris (par seconde)
+  private readonly rates: Record<string, number> = { birds: 0, gulls: 0, frogs: 0, owl: 0, flap: 0, creak: 0 }; // rythmes des cris (par seconde)
   private readonly next: Record<string, number> = {}; // instant du prochain cri de chaque espèce
+  private stepRate = 0; // pas par seconde (0 = on ne marche pas)
+  private stepLevel = 0; // niveau des pas
+  private stepWet = 0; // pont mouillé (0 à 1)
+  private nextStep = 0; // instant du prochain pas
+  private stepFoot = 0; // pied gauche (0) ou droit (1)
+  private flapLevel = 0; // niveau des claquements de voile
+  private creakLevel = 0; // niveau des craquements
   private immediate = false; // changements immédiats (essais hors ligne)
 
   constructor(private readonly ctx: BaseAudioContext, destination: AudioNode = ctx.destination, private readonly rnd: () => number = Math.random) {
@@ -258,6 +265,15 @@ export class Ambient {
     this.rates.gulls = l.gulls;
     this.rates.frogs = l.frogs;
     this.rates.owl = l.owl;
+    // Bruits du bateau.
+    const b = mix.boat;
+    this.rates.flap = b.flap.rate;
+    this.flapLevel = b.flap.level;
+    this.rates.creak = b.creak.rate;
+    this.creakLevel = b.creak.level;
+    this.stepRate = b.step.rate;
+    this.stepLevel = b.step.level;
+    this.stepWet = b.step.wet;
   }
 
   // Gouttes isolées de la pluie (petits « plic » clairs) : à appeler à chaque image avec le temps écoulé.
@@ -277,11 +293,27 @@ export class Ambient {
     this.schedule('gulls', now, ahead, (t) => this.gullCall(t));
     this.schedule('frogs', now, ahead, (t) => this.frogCall(t));
     this.schedule('owl', now, ahead, (t) => this.owlCall(t));
+    this.schedule('flap', now, ahead, (t) => this.flapCall(t));
+    this.schedule('creak', now, ahead, (t) => this.creakCall(t));
+    this.runSteps(now, ahead);
     if (this.plipRate <= 0) return;
     if (this.nextPlip < now) this.nextPlip = now;
     while (this.nextPlip < now + ahead) {
       this.plip(this.nextPlip, 0.02 + this.rnd() * 0.04);
       this.nextPlip += -Math.log(1 - this.rnd()) / this.plipRate; // intervalles aléatoires (loi de Poisson)
+    }
+  }
+
+  // Pas réguliers (et non au hasard) : un pas tous les 1/stepRate secondes, pied gauche puis pied droit.
+  private runSteps(now: number, ahead: number): void {
+    if (this.stepRate <= 0.01) {
+      this.nextStep = 0; // on s'est arrêté : le prochain pas partira dès la reprise
+      return;
+    }
+    if (this.nextStep < now) this.nextStep = now + 0.02;
+    while (this.nextStep < now + ahead) {
+      this.stepCall(this.nextStep);
+      this.nextStep += (1 / this.stepRate) * (0.96 + this.rnd() * 0.08); // légère irrégularité humaine
     }
   }
 
@@ -438,5 +470,82 @@ export class Ambient {
     o.connect(g).connect(this.master);
     o.start(at);
     o.stop(at + 0.08);
+  }
+
+  // Un claquement de voile : coup de toile sec (bruit filtré, attaque immédiate) suivi d'un petit rebond, avec un « bof » grave.
+  private flapCall(at: number): void {
+    const lvl = this.flapLevel * (0.6 + this.rnd() * 0.4); // chaque claquement a sa force
+    const out = this.ctx.createStereoPanner();
+    out.pan.value = this.rnd() * 0.5 - 0.25; // la voile est devant et au-dessus
+    out.connect(this.master);
+    const hits = 1 + Math.floor(this.rnd() * 3); // 1 à 3 coups rapprochés
+    for (let k = 0; k < hits; k++) {
+      const t = at + k * (0.07 + this.rnd() * 0.05);
+      const l = lvl * Math.pow(0.65, k);
+      this.burst(t, 0.09 + this.rnd() * 0.07, 600 + this.rnd() * 500, 0.8, l * 0.9, out); // la toile qui claque
+      this.tone(t, 150, 70, 0.1, l * 0.35, out); // le coup sourd
+    }
+  }
+
+  // Un craquement de bois : note grave en dents de scie, qui glisse, hachée par une vibration rapide (frottement), filtrée.
+  private creakCall(at: number): void {
+    const dur = 0.35 + this.rnd() * 0.7;
+    const f0 = 150 + this.rnd() * 220;
+    const o = this.ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0, at);
+    o.frequency.linearRampToValueAtTime(f0 * (0.8 + this.rnd() * 0.5), at + dur);
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 500 + this.rnd() * 500;
+    bp.Q.value = 4;
+    const g = this.ctx.createGain();
+    const lvl = this.creakLevel * 0.13 * (0.6 + this.rnd() * 0.4);
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(lvl, at + dur * 0.35);
+    g.gain.linearRampToValueAtTime(0, at + dur);
+    const chop = this.ctx.createOscillator(); // le frottement saccadé
+    chop.frequency.value = 18 + this.rnd() * 22;
+    const chopG = this.ctx.createGain();
+    chopG.gain.value = f0 * 0.12;
+    chop.connect(chopG).connect(o.frequency);
+    const pan = this.ctx.createStereoPanner();
+    pan.pan.value = this.rnd() * 1.4 - 0.7;
+    o.connect(bp).connect(g).connect(pan).connect(this.master);
+    o.start(at);
+    chop.start(at);
+    o.stop(at + dur + 0.02);
+    chop.stop(at + dur + 0.02);
+  }
+
+  // Un pas sur le pont en bois : « toc » sourd (bruit grave + note qui descend) ; mouillé : plus de chuintement. Gauche/droite alternés.
+  private stepCall(at: number): void {
+    const side = this.stepFoot === 0 ? -0.18 : 0.18;
+    this.stepFoot = 1 - this.stepFoot;
+    const out = this.ctx.createStereoPanner();
+    out.pan.value = side;
+    out.connect(this.master);
+    const lvl = this.stepLevel * (0.85 + this.rnd() * 0.3);
+    this.burst(at, 0.06, 380 + this.rnd() * 160, 0.7, lvl * 0.55, out); // le choc du pied
+    this.tone(at, 120 + this.rnd() * 25, 62, 0.11, lvl * 0.5, out); // la résonance du pont
+    if (this.stepWet > 0.05) this.burst(at + 0.015, 0.12, 2200, 0.8, lvl * 0.25 * this.stepWet, out); // éclaboussure sur le pont mouillé
+  }
+
+  // Un court souffle de bruit filtré (bande de fréquences), attaque immédiate puis extinction : base des claquements et des pas.
+  private burst(at: number, dur: number, freq: number, q: number, level: number, dest: AudioNode): void {
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.noise;
+    src.loop = true;
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.value = freq;
+    f.Q.value = q;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(level, at + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    src.connect(f).connect(g).connect(dest);
+    src.start(at, this.rnd() * (NOISE_SECONDS - 0.5)); // départ au hasard dans le bruit : deux coups ne sonnent jamais pareil
+    src.stop(at + dur + 0.02);
   }
 }

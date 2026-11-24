@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.26.0 — 2026-11-24
+
+Bruits du bateau : voile qui claque, craquements, pas sur le pont
+
 ## 1.25.0 — 2026-11-24
 
 Musique d'ambiance : nappes douces synthétisées selon l'heure et la météo

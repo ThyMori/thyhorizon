@@ -25,6 +25,7 @@ const BOARD_DISTANCE = 45; // distance maximale pour remonter sur son bateau (m)
 export class BoatDriver {
   state: BoatState | null = null; // le bateau (null tant qu'on n'en a pas mis un à l'eau)
   aboard = false; // le joueur est-il à bord ?
+  walkSpeed = 0; // vitesse de marche sur le pont (m/s, adoucie) : sert aux bruits de pas
   walking = false; // à bord mais debout sur le pont (pas à la barre) ?
   pilotOn = false; // le pilote automatique tient le cap ?
   private pilotYaw = 0; // cap tenu par le pilote (yaw)
@@ -187,13 +188,19 @@ export class BoatDriver {
           const fwd = (c.down('KeyW') ? 1 : 0) - (c.down('KeyS') ? 1 : 0) + c.touchMove.forward;
           const right = (c.down('KeyD') ? 1 : 0) - (c.down('KeyA') ? 1 : 0) + c.touchMove.right;
           const step = deckStep(rel, Math.max(-1, Math.min(1, fwd)), Math.max(-1, Math.min(1, right)), WALK_SPEED * Math.min(dt, 0.1));
+          const before = this.deck;
           this.deck = moveOnDeck(CRUISER, this.deck, step.du, step.dv);
+          const moved = Math.hypot(this.deck.u - before.u, this.deck.v - before.v) / Math.max(dt, 1e-3); // vitesse réellement parcourue (bloquée par un mur = 0)
+          this.walkSpeed += (moved - this.walkSpeed) * Math.min(1, dt * 10);
+        } else {
+          this.walkSpeed = 0;
         }
         const target = deckSurface(CRUISER, this.deck.u, this.deck.v) + WALK_EYE;
         this.eyeH += (target - this.eyeH) * Math.min(1, dt * 8); // on monte et descend les marches sans à-coup
         eye = this.view.eyeWorld(origin.x, origin.z, this.deck.u, this.eyeH, this.deck.v);
       } else {
         this.eyeH = CRUISER.eyeHeight;
+        this.walkSpeed = 0;
         eye = this.view.eyeWorld(origin.x, origin.z);
       }
       this.controls.x = eye.x;

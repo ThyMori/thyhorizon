@@ -261,6 +261,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - Logique pure et testée : `src/core/music.ts` (humeur, gammes, accords, déroulement jouer / se taire) ; voix et écho dans `src/audio/music.ts`.
 - Même limite qu'avant : je ne peux pas **écouter**. Vérifié : notes dans la gamme, bons silences, niveau doux (≈ 0,015 efficace, crête ≈ 0,1), aucune valeur invalide. Le côté agréable est à juger par tes oreilles. Essai : `?debug` puis `__thy.musicTest('major')`.
 
+### 1.26.0 — Bruits du bateau (voile, craquements, pas)
+- **Voile qui claque** : quand une voile faseye (écoute trop choquée), elle claque par coups secs rapprochés (1 à 3), plus souvent et plus fort quand le vent monte. Rien si les voiles sont affalées, bien réglées ou sans vent. Le message « borde (S) » devient donc aussi un signal sonore.
+- **Craquements** du bois et des cordages : très rares par mer d'huile, plus fréquents et plus appuyés par houle, quand le bateau roule, gîte ou file vite.
+- **Pas sur le pont** quand tu marches à bord : cadence réelle selon ta vitesse (un pas = 0,75 m), pied gauche puis droit, « toc » sourd de pont en bois ; sous la pluie le pont est mouillé (petit chuintement en plus). Rien à la barre ni arrêté, ni quand tu butes contre un obstacle.
+- Tout est silencieux hors du bateau.
+- Logique pure et testée : `src/core/boatSound.ts` ; voix dans `src/audio/ambient.ts`. Essai : `__thy.audioTest(over, life, boat)` (?debug).
+- Même limite : je ne peux pas **écouter**. Vérifié : bons déclenchements (tests), niveaux sains (efficace ≈ 0,01–0.02, crête ≤ 0,15), aucune valeur invalide. Dis-moi si les claquements, craquements ou pas sonnent faux, trop forts ou trop fréquents.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
@@ -269,7 +277,7 @@ Sans objet : jeu local, sans compte ni serveur.
 4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) ✅ arbres par biome (1.12.0)
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
-**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → ✅ ambiance sonore (1.22–1.25 : vent, mer, vie sauvage, musique ; reste les bruits du bateau) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
+**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → ✅ ambiance sonore (1.22–1.25 : vent, mer, vie sauvage, musique ; 1.26 : bruits du bateau) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
 
 **Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 

@@ -40,6 +40,7 @@ import { LensDrops } from './render/lensDrops';
 import { AudioSystem } from './audio/audioSystem';
 import { Ambient } from './audio/ambient';
 import { MusicEngine } from './audio/music';
+import { boatSoundMix } from './core/boatSound';
 import { musicMood, newMusicState, stepMusic } from './core/music';
 import { mulberry32 } from './core/noise';
 import { shoreProximity, soundMix } from './core/soundMix';
@@ -226,6 +227,7 @@ export class Game {
     const ground = this.terrain.heightAt(this.controls.x, this.controls.z);
     const sun = sunState(this.hours, lat, this.day, lon);
     const windFelt = r ? r.aws : wind.speed;
+    const bs = aboard ? this.boat.state : null; // état du bateau (voiles, gîte) pour ses bruits
     const life = lifeMix({
       cls: realClimate.classAt(lat, lon),
       lat,
@@ -265,6 +267,22 @@ export class Game {
         aboard,
         volume: this.settings.soundVolume,
         active: this.controls.locked,
+        boat: bs
+          ? boatSoundMix({
+              aboard,
+              walking: this.boat.walking,
+              walkSpeed: this.boat.walkSpeed,
+              luff: bs.luff,
+              mainUp: bs.mainUp,
+              jibOut: bs.jibOut,
+              aws: windFelt,
+              heelDeg: r ? r.heelDeg : 0,
+              heelRate: bs.heelRate,
+              boatSpeed: r ? r.speed : 0,
+              seaHs: this.sea.hs,
+              rain: this.weather.rain,
+            })
+          : undefined,
         life,
       }),
     );
@@ -736,12 +754,12 @@ export class Game {
         if (w) this.weather = { ...this.weather, ...w };
         return weatherText(this.weather);
       },
-      audioTest: async (over, life) => {
+      audioTest: async (over, life, boat) => {
         // Rend 2 s de son hors ligne (sans haut-parleur) et mesure : niveau moyen, crête, valeurs invalides. Pour vérifier le moteur sans l'écouter.
         const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);
         const amb = new Ambient(ctx);
         const base: LifeInput = { cls: 'Cfb', lat: 48.7, day: 196, sunElevation: 40, hours: 13, forest: 0.55, conifer: 0.1, land: true, snowy: false, shore: 0, rain: 0, wind: 2 };
-        const mix = soundMix({ windSpeed: 2, rain: 0, seaHs: 0.2, onWater: false, shore: 0, boatSpeed: 0, aboard: false, volume: 0.8, active: true, ...over, life: lifeMix({ ...base, ...life }) });
+        const mix = soundMix({ windSpeed: 2, rain: 0, seaHs: 0.2, onWater: false, shore: 0, boatSpeed: 0, aboard: false, volume: 0.8, active: true, ...over, life: lifeMix({ ...base, ...life }), boat: boat ? boatSoundMix({ aboard: true, walking: false, walkSpeed: 0, luff: 0, mainUp: 1, jibOut: 1, aws: 6, heelDeg: 0, heelRate: 0, boatSpeed: 0, seaHs: 0.1, rain: 0, ...boat }) : undefined });
         amb.apply(mix, true);
         amb.renderCalls(2);
         const data = (await ctx.startRendering()).getChannelData(0);

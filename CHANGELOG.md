@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.20.1 — 2026-11-24
+
+Écoute : S borde, Z choque (inversion des touches)
+
 ## 1.20.0 — 2026-11-24
 
 Courant réel (dérive, vitesse et route sur le fond) et direction réelle de la houle

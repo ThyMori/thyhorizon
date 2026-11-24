@@ -460,9 +460,9 @@ export function readout(s: BoatState, wind: Wind, current: Vec2 = NO_CURRENT): R
   let hint = '';
   if (s.aground) hint = 'Échoué : barre dans l’autre sens pour retrouver de l’eau.';
   else if (Math.abs(twa) < 35 * DEG && speed < 1.2) hint = 'Face au vent : le bateau ne peut pas avancer. Barre pour faire tomber l’étrave de côté.';
-  else if (s.luff > 0.6 && Math.abs(twa) > 35 * DEG) hint = 'La voile faseye : borde (W) jusqu’à ce qu’elle se tende.';
-  else if (alpha > 24 * DEG && awaAbs < 100 * DEG) hint = 'Voile décrochée : choque (S) un peu.';
-  else if (Math.abs(s.heel) > 28 * DEG) hint = s.reef < MAX_REEFS ? 'Trop de gîte : choque (S), abats, ou prends un ris (X).' : 'Trop de gîte : choque (S) ou abats (barre sous le vent).';
+  else if (s.luff > 0.6 && Math.abs(twa) > 35 * DEG) hint = 'La voile faseye : borde (S) jusqu’à ce qu’elle se tende.';
+  else if (alpha > 24 * DEG && awaAbs < 100 * DEG) hint = 'Voile décrochée : choque (Z) un peu.';
+  else if (Math.abs(s.heel) > 28 * DEG) hint = s.reef < MAX_REEFS ? 'Trop de gîte : choque (Z), abats, ou prends un ris (X).' : 'Trop de gîte : choque (Z) ou abats (barre sous le vent).';
   else if (aw.speed > 11 && s.reef === 0 && s.mainUp > 0.9 && s.jibOut > 0.9) hint = 'Le vent monte : pense à prendre un ris (X) ou à rouler un peu de foc (U).';
   else if (s.mainTarget === 0 && s.jibTarget === 0 && speed < 0.5) hint = 'Plus de voile : Y hisse la grand-voile, U déroule le foc.';
   return {

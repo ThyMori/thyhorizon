@@ -158,7 +158,7 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 
 ### 1.13.0 — Le voilier jouable (simulation maritime, étape 1)
 - **B** près de l'eau : met un voilier de croisière de 9,5 m à l'eau (l'eau profonde la plus proche, côté regard) et te fait monter à bord. **B** à moins de 18 m d'une côte : tu débarques, le bateau reste amarré (remonte avec **B** à moins de 45 m). Aussi : bouton « Voilier » du menu.
-- Première personne sur le pont, au poste de barre. **A/D** : barre (elle revient au milieu quand on lâche ; **Espace** la recentre). **W** borde l'écoute, **S** la choque. Flèches et souris : regarder autour. Le pont tourne avec le bateau, la caméra gîte avec lui.
+- Première personne sur le pont, au poste de barre. **A/D** : barre (elle revient au milieu quand on lâche ; **Espace** la recentre). **S** borde l'écoute, **Z** (touche W en QWERTY) la choque. Flèches et souris : regarder autour. Le pont tourne avec le bateau, la caméra gîte avec lui.
 - **Le vent** (`src/core/wind.ts`) est simulé d'après les grandes ceintures de la Terre (alizés, vents d'ouest, vents d'est polaires) + météo lente (variation avec le lieu et l'heure) + rafales. Même lieu + même instant = même vent. Au large de Lannion on obtient typiquement 10 à 20 nœuds d'ouest-sud-ouest.
 - **La physique** (`src/core/sailing.ts`, tests dans `sailing.test.ts`) : vent apparent = vent vrai − vitesse du bateau ; voile = aile (portance, traînée, décrochage à ~18°) ; l'angle de la bôme est min(écoute, angle du vent) donc une écoute trop choquée fait faseyer la voile ; quille = aile verticale (dérive 1 à 9°) ; résistance de coque avec vagues qui explosent vers 7 nœuds (vitesse de coque) ; gîte (couple de la voile contre redressement) qui crée de la barre au vent ; safran qui ne dirige que si le bateau avance ; échouage quand la coque touche le fond (profondeur < 1,6 m). Réglages mesurés par tests (12 nœuds de vent) : ≈ 5,3 nœuds au travers, ≈ 4,2 nœuds à 45° du vent vrai, ≈ 4,8 nœuds vent arrière, gîte ≈ 15° au près, impossible d'avancer face au vent.
 - **Instruments** (en bas à droite) : rose (bateau, voile, vent vrai fin, vent apparent épais), cap compas, vitesse en nœuds, vent vrai et apparent (force + angle + bord), gîte, écoute, allure (au près, au travers, au largue…) et un conseil quand ça ne va pas (voile qui faseye, décrochée, trop de gîte, face au vent, échoué).
@@ -184,7 +184,7 @@ Réglage unique, à faire par toi : dépôt GitHub → Settings → Pages → «
 
 ### 1.16.0 — Marcher sur le pont et pilote automatique
 - **E** : quitte la barre et te laisse marcher sur le pont (WASD ; **R** borde, **F** choque l'écoute). **E** près de la roue la reprend. Le rouf, la roue et les filières bloquent le passage (`src/core/deck.ts`, testé) ; le sol est plus bas dans le cockpit.
-- **Pilote automatique (P)** : tient le cap du moment (régulateur PID, `autopilotHelm`) et règle l'écoute (`autoTrim`). Il s'allume tout seul quand tu quittes la barre ; A/D à la barre le coupe. Toucher R/F (ou W/S à la barre) reprend l'écoute à la main.
+- **Pilote automatique (P)** : tient le cap du moment (régulateur PID, `autopilotHelm`) et règle l'écoute (`autoTrim`). Il s'allume tout seul quand tu quittes la barre ; A/D à la barre le coupe. Toucher R/F (ou S/Z à la barre) reprend l'écoute à la main.
 - Pas encore : l'intérieur de la cabine (la porte reste fermée), marcher sur le rouf.
 
 ### 1.17.0 — Météo hors ligne évolutive (nuages, pluie, brume)

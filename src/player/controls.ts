@@ -111,7 +111,7 @@ export class PlayerControls {
       this.yaw += dYaw; // les flèches tournent le cap, en même temps que le déplacement
       this.pitch = clamp(this.pitch + dPitch, -MAX_PITCH, MAX_PITCH);
       if (this.aboard) {
-        // À bord : pas de marche, le bateau place la caméra (les touches A/D/W/S servent à barrer et régler la voile).
+        // À bord : pas de marche, le bateau place la caméra (les touches A/D/Z/S servent à barrer et régler la voile).
       } else if (this.fly) {
         const up = clamp(this.axis('Space') - (this.keys.has('KeyC') || this.keys.has('ControlLeft') ? 1 : 0) + this.touchUp, -1, 1); // Espace monte, C/Ctrl descend
         const [dx, dy, dz] = flyDelta(this.yaw, this.pitch, { ...input, up }, dt);

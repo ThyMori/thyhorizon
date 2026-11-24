@@ -105,7 +105,7 @@ export class BoatDriver {
     this.aboard = true;
     this.view?.setAboard(true); // les penons se voient des deux côtés de la voile
     this.onChange?.(true);
-    toast('À bord ! A/D : barre · W/S : écoute · E : quitter la barre et marcher · P : pilote automatique · B : débarquer.');
+    toast('À bord ! A/D : barre · S borde · Z choque · E : quitter la barre et marcher · P : pilote automatique · B : débarquer.');
   }
 
   // Descend à terre si le bord est proche, sinon explique quoi faire.
@@ -214,9 +214,9 @@ export class BoatDriver {
     const c = this.controls;
     const right = c.down('KeyD') || c.down('ArrowRight') ? 1 : 0; // D : barre à droite (le bateau tourne à tribord)
     const left = c.down('KeyA') ? 1 : 0; // A (ou Q sur AZERTY, même touche physique) : à gauche
-    // Réglage de l'écoute : à la barre W/S ; debout sur le pont, R (border) et F (choquer) car W/S servent à marcher.
-    const ease = (this.walking ? c.down('KeyF') : c.down('KeyS')) ? 1 : 0;
-    const pull = (this.walking ? c.down('KeyR') : c.down('KeyW')) ? 1 : 0;
+    // Réglage de l'écoute : à la barre S (border) et Z/W (choquer) ; debout sur le pont, R (border) et F (choquer) car W/S servent à marcher.
+    const ease = (this.walking ? c.down('KeyF') : c.down('KeyW')) ? 1 : 0; // à la barre : Z (touche physique W) choque
+    const pull = (this.walking ? c.down('KeyR') : c.down('KeyS')) ? 1 : 0; // à la barre : S borde
     const input: BoatInput = { helm: this.walking ? 0 : right - left, trim: ease - pull, center: !this.walking && c.down('Space') };
     // Le pilote : à la barre, toucher A/D le coupe ; sinon il donne l'ordre de barre.
     if (this.pilotOn && !this.walking && (right || left || input.center)) this.setPilot(false, boat);

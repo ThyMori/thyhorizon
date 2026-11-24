@@ -36,6 +36,9 @@ import { Hud } from './ui/hud';
 import { initInstall } from './pwa/install';
 import { initPwa } from './pwa/pwa';
 import { LensDrops } from './render/lensDrops';
+import { AudioSystem } from './audio/audioSystem';
+import { Ambient } from './audio/ambient';
+import { shoreProximity, soundMix } from './core/soundMix';
 import { SettingsPanel } from './ui/settingsPanel';
 import { toast } from './ui/toast';
 import { ChunkManager } from './world/chunkManager';
@@ -49,6 +52,9 @@ export class Game {
   private weather: WeatherState = CLEAR_WEATHER; // temps actuel au lieu du joueur (adouci)
   private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
   private readonly lens: LensDrops; // gouttes de pluie sur l'écran
+  private readonly audio = new AudioSystem(); // ambiance sonore (démarre au premier geste)
+  private soundTimer = 0;
+  private shore = 0; // proximité du rivage (0 à 1), recalculée quelques fois par seconde
   private weatherTimer = 0;
   private sea: SeaState = CALM_SEA; // état de mer actuel (suit le vent avec retard)
   private seaInit = false;
@@ -196,6 +202,31 @@ export class Game {
     this.boat.sea = this.sea;
   }
 
+  // Ambiance sonore : quelques fois par seconde, le monde est traduit en niveaux sonores (vent, pluie, mer, rivage, coque).
+  private updateSound(dt: number): void {
+    this.audio.tick(dt); // gouttes isolées de la pluie
+    this.soundTimer -= dt;
+    if (this.soundTimer > 0) return;
+    this.soundTimer = 0.25;
+    const aboard = this.boat.aboard;
+    this.shore = shoreProximity((x, z) => this.terrain.heightAt(x, z), this.controls.x, this.controls.z); // loin du rivage = 0
+    const r = aboard ? this.boat.getReadout() : null; // instruments : vent apparent et vitesse
+    const wind = this.boat.wind;
+    this.audio.setMix(
+      soundMix({
+        windSpeed: r ? r.aws : wind.speed, // à bord on entend le vent apparent
+        rain: this.weather.rain,
+        seaHs: this.sea.hs,
+        onWater: aboard,
+        shore: this.shore,
+        boatSpeed: r ? r.speed : 0,
+        aboard,
+        volume: this.settings.soundVolume,
+        active: this.controls.locked,
+      }),
+    );
+  }
+
   // Gère la météo réelle : rien si l'option est coupée ; sinon une requête quand la case de 0,5° change ou que la réponse vieillit.
   private manageReal(lat: number, lon: number): void {
     if (this.realDebug) return; // essais : on garde les conditions imposées
@@ -252,6 +283,7 @@ export class Game {
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
     this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
     const sky = sunState(this.hours, this.playerLat(), this.day);
+    this.updateSound(dt);
     this.lens.update(dt, this.weather.rain, sky.daylight, this.controls.locked); // gouttes sur l'écran quand il pleut et qu'on joue
     this.gs.render();
     this.updateFps(dt);
@@ -649,6 +681,20 @@ export class Game {
         this.weatherTimer = 0;
         if (w) this.weather = { ...this.weather, ...w };
         return weatherText(this.weather);
+      },
+      audioTest: async (over) => {
+        // Rend 2 s de son hors ligne (sans haut-parleur) et mesure : niveau moyen, crête, valeurs invalides. Pour vérifier le moteur sans l'écouter.
+        const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);
+        const amb = new Ambient(ctx);
+        amb.apply(soundMix({ windSpeed: 6, rain: 0, seaHs: 1, onWater: true, shore: 0.5, boatSpeed: 2, aboard: true, volume: 0.8, active: true, ...over }), true);
+        const data = (await ctx.startRendering()).getChannelData(0);
+        let sum = 0, peak = 0, bad = 0;
+        for (const v of data) {
+          if (!Number.isFinite(v)) bad++;
+          sum += v * v;
+          peak = Math.max(peak, Math.abs(v));
+        }
+        return { rms: Math.sqrt(sum / data.length), peak, bad };
       },
       real: (c) => {
         this.real = c ? { wind: c.wind ?? null, weather: c.weather ?? null, hs: c.hs ?? null, waveFrom: c.waveFrom ?? null, current: c.current ?? null, fetchedAt: Date.now() } : null; // impose des conditions réelles simulées (essais)

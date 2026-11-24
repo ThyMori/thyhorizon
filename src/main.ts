@@ -19,6 +19,7 @@ declare global {
       hideUi(): void;
       boat(): { aboard: boolean; state: Record<string, unknown> | null; wind: { speed: number; from: number }; board(): void }; // le voilier (pour vérifier)
       sea(hs: number): string; // impose une mer de hauteur significative hs (m) pour les essais
+      audioTest(over?: Record<string, unknown>): Promise<{ rms: number; peak: number; bad: number }>; // rend du son hors ligne et le mesure (essais)
       real(c: { wind?: { speed: number; from: number } | null; weather?: { front: number; cloud: number; rain: number; fog: number; pressure: number } | null; hs?: number | null; waveFrom?: number | null; current?: { x: number; z: number } | null } | null): string; // impose des conditions « réelles » (essais)
       weather(w: { cloud?: number; rain?: number; fog?: number; windScale?: number } | null): string; // impose le temps (essais)
       play(on: boolean): void; // fait « jouer » sans capture de souris (essais automatiques)

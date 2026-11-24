@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.22.0 — 2026-11-24
+
+Son : ambiance synthétisée (vent, pluie, houle, déferlement, coque) et volume
+
 ## 1.21.0 — 2026-11-24
 
 Pluie plus fine et gouttes (ploc) sur l'écran

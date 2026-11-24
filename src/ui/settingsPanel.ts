@@ -34,6 +34,7 @@ export class SettingsPanel {
   private readonly daysPass = byId<HTMLInputElement>('set-dayspass');
   private readonly dayLength = byId<HTMLSelectElement>('set-daylength');
   private readonly sensitivity = byId<HTMLInputElement>('set-sensitivity');
+  private readonly volume = byId<HTMLInputElement>('set-volume'); // volume du son
 
   constructor(private readonly bridge: SettingsBridge) {
     // Un changement de qualité remplace d'un coup distance, ombres et netteté.
@@ -49,6 +50,7 @@ export class SettingsPanel {
     this.realWeather.addEventListener('change', () => this.apply({ ...bridge.getSettings(), realWeather: this.realWeather.checked }));
     this.instruments.addEventListener('change', () => this.apply({ ...bridge.getSettings(), showInstruments: this.instruments.checked }));
     this.sensitivity.addEventListener('input', () => this.apply({ ...bridge.getSettings(), mouseSensitivity: Number(this.sensitivity.value) / 100 }));
+    this.volume.addEventListener('input', () => this.apply({ ...bridge.getSettings(), soundVolume: Number(this.volume.value) / 100 }));
     this.dayLength.addEventListener('change', () => this.apply({ ...bridge.getSettings(), dayLengthMinutes: Number(this.dayLength.value) }));
     this.day.addEventListener('input', () => {
       bridge.setDay(Number(this.day.value)); // la date change tout de suite (saison, hauteur du soleil)
@@ -82,6 +84,8 @@ export class SettingsPanel {
     this.instruments.checked = s.showInstruments;
     this.realWeather.checked = s.realWeather;
     this.dayLength.value = String(s.dayLengthMinutes);
+    this.volume.value = String(Math.round(s.soundVolume * 100));
+    byId('out-volume').textContent = s.soundVolume === 0 ? 'coupé' : `${Math.round(s.soundVolume * 100)} %`;
     this.sensitivity.value = String(Math.round(s.mouseSensitivity * 100));
     byId('out-sensitivity').textContent = `${Math.round(s.mouseSensitivity * 100)} %`;
     const h = this.bridge.getHours();

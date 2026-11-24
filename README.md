@@ -230,6 +230,13 @@ Sans objet : jeu local, sans compte ni serveur.
 - **Pluie plus fine** : plus de gouttes (5 200), chacune plus discrète, longueurs et intensités variées, traînée qui se fond vers la queue.
 - Essai : `?debug` puis `__thy.weather({cloud:0.9, rain:0.8})`.
 
+### 1.22.0 — Son : ambiance synthétisée (vent, pluie, mer)
+- Tout le son est **synthétisé par le navigateur** (Web Audio) : aucun fichier à télécharger, gratuit, hors ligne. Il démarre au premier clic ou appui sur une touche (règle des navigateurs), se coupe quand l'onglet est caché, et baisse dans les menus.
+- Couches : **vent** (souffle dont le timbre ondule avec les rafales, ressenti en vent apparent à bord, sifflement dans le gréement quand il forcit), **pluie** (chuintement + corps grave + gouttes isolées « plic »), **houle** (clapotis qui respire au rythme des vagues, selon la hauteur réelle de la mer), **déferlement au rivage** (la vague monte, déferle, se retire ; plus fort près de l'eau et avec la mer forte), **eau le long de la coque** (selon la vitesse).
+- **Réglages → Son → Volume** (0 = coupé). Logique pure et testée : `src/core/soundMix.ts` (niveaux selon le monde, proximité du rivage) ; moteur : `src/audio/ambient.ts` ; démarrage : `src/audio/audioSystem.ts`.
+- Pas encore (prochaines versions) : oiseaux, insectes, grenouilles selon l'heure et le biome ; nappes de musique douces ; bruits du bateau (craquements, voiles) et pas sur le pont.
+- Limite honnête : je ne peux pas **écouter** le résultat. Vérifié : niveaux cohérents, aucune valeur invalide, pas de saturation, volume 0 = silence. Le **rendu agréable** reste à juger par tes oreilles : dis-moi ce qui est trop fort, trop aigu ou trop répétitif.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
@@ -238,7 +245,7 @@ Sans objet : jeu local, sans compte ni serveur.
 4. Biomes : a) ✅ climat réel → couleurs du sol, neige, désert, glace (1.9.0) ; b) ✅ arbres par biome (1.12.0)
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
-**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
+**Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → ✅ ambiance sonore (1.22, en cours) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
 
 **Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 

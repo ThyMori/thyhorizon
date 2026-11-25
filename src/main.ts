@@ -19,6 +19,7 @@ declare global {
       origin(): { x: number; z: number; camera: number[] }; // origine flottante et position de la caméra (pour vérifier)
       pose(): { x: number; z: number; yaw: number; pitch: number; fly: boolean; playing: boolean }; // position et regard (pour vérifier)
       view(mode: 'first' | 'third'): string; // change de vue (essais)
+      water(): { ground: number; surface: number; depth: number }; // eau douce sous le joueur (essais)
       villages(): { shown: number; names: string[]; near: { name: string; x: number; z: number; r: number; houses: number; style: string; signs: { x: number; z: number; boards: number }[] }[] }; // villages dessinés (essais)
       edits(): { count: number; shown: number; persistent: boolean | null; worldVersion: number; list: { id: string; x: number; z: number }[] }; // constructions du joueur (essais)
       compass(): { card: number; text: string } | null; // état de la boussole (essais)

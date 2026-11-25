@@ -47,7 +47,7 @@ function distToLine(a: Pt, b: Pt, x: number, z: number): number {
 const corridor = (len: number): number => Math.min(2500, 0.3 * len + 300);
 
 // Tas binaire minimal (file de priorité) pour la recherche A*.
-class Heap {
+export class Heap {
   private readonly f: number[] = [];
   private readonly k: number[] = [];
   get size(): number {
@@ -97,9 +97,9 @@ const passable = (h: number): boolean => h >= MIN_LAND && h <= MAX_LAND;
 function lineOk(t: Terrain, p: Pt, q: Pt): boolean {
   const len = Math.hypot(q.x - p.x, q.z - p.z);
   const n = Math.max(1, Math.ceil(len / 15));
-  let prev = t.heightAt(p.x, p.z);
+  let prev = t.coarseHeightAt(p.x, p.z);
   for (let i = 1; i <= n; i++) {
-    const h = t.heightAt(p.x + ((q.x - p.x) * i) / n, p.z + ((q.z - p.z) * i) / n);
+    const h = t.coarseHeightAt(p.x + ((q.x - p.x) * i) / n, p.z + ((q.z - p.z) * i) / n);
     if (!passable(h) || Math.abs(h - prev) / (len / n) > 0.22) return false;
     prev = h;
   }
@@ -158,7 +158,7 @@ export function routePath(t: Terrain, a: Pt, b: Pt): Pt[] | null {
     const k = keyOf(i, j);
     let h = heights.get(k);
     if (h === undefined) {
-      h = t.heightAt(a.x + i * step, a.z + j * step);
+      h = t.coarseHeightAt(a.x + i * step, a.z + j * step); // sans les rivières (plus rapide) : les chemins les traversent à gué
       heights.set(k, h);
     }
     return h;

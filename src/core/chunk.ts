@@ -3,7 +3,7 @@
 // aussi bien dans un worker (calcul en arrière-plan) que dans les tests.
 
 import { lerpRgb, clamp, smoothstep } from './math';
-import { dirtColor, terrainColor } from './palette';
+import { dirtColor, terrainColor, waterColor } from './palette';
 import { DirtSeg, distToSeg } from './roads';
 import { MeshBuilder, addTreesForChunk } from './trees';
 import type { Terrain } from './terrain';
@@ -36,6 +36,52 @@ export interface ChunkData {
   indices: Uint16Array; // triangles
   minY: number; // altitude minimale (jupes comprises)
   maxY: number; // altitude maximale
+}
+
+// Ajoute la surface de l'eau douce (rivières, lacs) de la tuile : des carrés plats au niveau de l'eau, partout où le sol est plus bas qu'elle.
+// Les sommets sont partagés entre carrés voisins. Renvoie l'altitude la plus haute de l'eau (−Infinity s'il n'y en a pas).
+function addWater(b: MeshBuilder, terrain: Terrain, heights: Float32Array, ew: number, w: number, n: number, cell: number, x0: number, z0: number): number {
+  const ws = new Float32Array(w * w); // hauteur de l'eau à chaque sommet (NaN = pas d'eau)
+  const hs = new Float32Array(w * w); // altitude du sol à chaque sommet
+  for (let j = 0; j < w; j++) {
+    for (let i = 0; i < w; i++) {
+      ws[j * w + i] = terrain.waterSurfaceAt(x0 + i * cell, z0 + j * cell);
+      hs[j * w + i] = heights[(j + 1) * ew + (i + 1)]!;
+    }
+  }
+  const vid = new Int32Array(w * w).fill(-1); // numéro du sommet d'eau créé pour ce coin (−1 = pas encore)
+  let top = -Infinity;
+  const vertex = (i: number, j: number, y: number): number => {
+    const k = j * w + i;
+    if (vid[k]! >= 0) return vid[k]!; // déjà créé par un carré voisin
+    const id = b.positions.length / 3;
+    b.positions.push(i * cell, y, j * cell);
+    b.normals.push(0, 1, 0);
+    b.colors.push(...waterColor(y - hs[k]!));
+    vid[k] = id;
+    if (y > top) top = y;
+    return id;
+  };
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const ks = [j * w + i, j * w + i + 1, (j + 1) * w + i, (j + 1) * w + i + 1]; // nord-ouest, nord-est, sud-ouest, sud-est
+      let wet = false;
+      let sum = 0;
+      let count = 0;
+      for (const k of ks) {
+        const s = ws[k]!;
+        if (Number.isNaN(s)) continue;
+        sum += s;
+        count++;
+        if (s > hs[k]! + 0.03) wet = true; // l'eau affleure au-dessus du sol en ce coin
+      }
+      if (!wet) continue;
+      const mean = sum / count; // niveau moyen du carré, pour les coins sans mesure
+      const ids = ks.map((k, c) => vertex(i + (c % 2), j + (c >> 1), Number.isNaN(ws[k]!) ? mean : ws[k]!));
+      b.indices.push(ids[0]!, ids[2]!, ids[1]!, ids[1]!, ids[2]!, ids[3]!); // deux triangles, face vers le haut (comme le terrain)
+    }
+  }
+  return top;
 }
 
 // Fabrique le maillage de la tuile (cx, cz) au niveau de détail donné.
@@ -150,8 +196,9 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
 
   // 6) Arbres : ajoutés à la suite du terrain, dans les mêmes tableaux (une seule tuile, un seul objet 3D).
   const trees: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
+  const waterTop = terrain.hasWaterNear(x0, z0, CHUNK_SIZE) ? addWater(trees, terrain, heights, ew, w, n, cell, x0, z0) : -Infinity; // l'eau douce d'abord (le constructeur numérote les sommets tout seul)
   const added = addTreesForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE, blocked);
-  if (added.count === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY };
+  if (trees.positions.length === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY };
   const base = positions.length / 3; // numéro du premier sommet d'arbre
   const allPositions = new Float32Array(positions.length + trees.positions.length);
   allPositions.set(positions);
@@ -165,5 +212,5 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
   const allIndices = new Uint16Array(indices.length + trees.indices.length);
   allIndices.set(indices);
   for (let k = 0; k < trees.indices.length; k++) allIndices[indices.length + k] = trees.indices[k]! + base;
-  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY) };
+  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY, waterTop) };
 }

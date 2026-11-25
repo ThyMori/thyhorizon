@@ -45,7 +45,7 @@ describe('recalage', () => {
       const a = system.anchor(i);
       if (!a) continue;
       tested++;
-      expect(terrain.heightAt(a.x, a.z)).toBeGreaterThanOrEqual(5);
+      expect(terrain.coarseHeightAt(a.x, a.z)).toBeGreaterThanOrEqual(5);
       expect(Math.hypot(a.x - cities.x[i]!, a.z - cities.z[i]!)).toBeLessThanOrEqual(MAX_SNAP + 1);
     }
     expect(tested).toBeGreaterThan(50);

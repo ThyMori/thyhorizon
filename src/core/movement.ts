@@ -1,6 +1,7 @@
 // Déplacement du joueur à pied et en vol libre. Logique pure : testable sans navigateur.
 // Convention du regard : yaw = 0 regarde le nord (-z), yaw = π/2 regarde l'ouest (-x) ; pitch > 0 regarde vers le haut.
 
+import { MAX_WALK_DEPTH } from './hydro';
 import type { Terrain } from './terrain';
 
 export const EYE_HEIGHT = 1.7; // hauteur des yeux au-dessus du sol, en mètres
@@ -21,8 +22,12 @@ export interface MoveInput {
 }
 
 // Est-ce qu'on peut se tenir ici ?
-export const isWalkable = (terrain: Terrain, x: number, z: number): boolean =>
-  terrain.heightAt(x, z) >= WALK_MIN_HEIGHT;
+export const isWalkable = (terrain: Terrain, x: number, z: number): boolean => {
+  const h = terrain.heightAt(x, z); // altitude du sol (lit de rivière compris)
+  if (h < WALK_MIN_HEIGHT) return false; // mer profonde
+  const s = terrain.waterSurfaceAt(x, z); // eau douce ici ?
+  return Number.isNaN(s) || s - h <= MAX_WALK_DEPTH; // un gué se traverse à pied, une eau profonde non
+};
 
 // Ramène un vecteur d'entrée à une longueur de 1 au maximum (pour que la diagonale ne soit pas plus rapide).
 function normalizeInput(forward: number, right: number): [number, number] {

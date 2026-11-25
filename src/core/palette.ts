@@ -30,6 +30,16 @@ export function dirtColor(variation: number, ground: Rgb): Rgb {
   return [r * 0.8 + ground[0] * 0.2, g * 0.8 + ground[1] * 0.2, b * 0.8 + ground[2] * 0.2]; // 80 % terre, 20 % sol voisin
 }
 
+// Eau douce (sRGB) : claire et verte sur les hauts-fonds, sombre et bleutée en profondeur.
+const WATER_SHALLOW: Rgb = [0.34, 0.48, 0.44];
+const WATER_DEEP: Rgb = [0.1, 0.25, 0.33];
+
+// Couleur de l'eau d'une rivière ou d'un lac selon sa profondeur (m), en lumière linéaire.
+export function waterColor(depth: number): Rgb {
+  const c = lerpRgb(WATER_SHALLOW, WATER_DEEP, smoothstep(0.1, 5, depth));
+  return [srgbToLinear(c[0]), srgbToLinear(c[1]), srgbToLinear(c[2])];
+}
+
 // Couleur du sol en LUMIÈRE LINÉAIRE (le format attendu par les sommets du maillage Three.js).
 // h = altitude, ny = composante verticale de la normale (1 = plat), variation = bruit -1..1, biome = climat d'ici.
 export function terrainColor(h: number, ny: number, variation: number, biome: Biome = DEFAULT_BIOME): Rgb {

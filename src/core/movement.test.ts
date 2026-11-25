@@ -89,7 +89,7 @@ describe('keyLookDelta', () => {
 
 describe('accroupi', () => {
   it('on avance plus lentement accroupi, même en courant', () => {
-    const terrain = { heightAt: () => 10 } as unknown as Parameters<typeof stepWalk>[0];
+    const terrain = { heightAt: () => 10, waterSurfaceAt: () => NaN } as unknown as Parameters<typeof stepWalk>[0];
     const walk = stepWalk(terrain, 0, 0, 0, { forward: 1, right: 0, run: false }, 1);
     const crouch = stepWalk(terrain, 0, 0, 0, { forward: 1, right: 0, run: true, crouch: true }, 1);
     expect(Math.abs(crouch.z)).toBeCloseTo(CROUCH_SPEED, 5);

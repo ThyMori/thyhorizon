@@ -325,6 +325,16 @@ Sans objet : jeu local, sans compte ni serveur.
 - Ce ne sont pas les vrais tracés du monde (pas de données OpenStreetMap) : ce sont de vraies liaisons entre de vraies villes.
 - Limites : pas de pont (un chemin ne traverse jamais l'eau, il contourne ou n'existe pas), pas de chemin vers une ville à plus de 35 km, une seule largeur.
 
+## 1.33 — Rivières et lacs (hydrographie réaliste, étape 1)
+
+- Des **rivières** et des **lacs** sont calculés à partir du relief du jeu : l'eau s'écoule de chaque point vers son voisin le plus bas jusqu'à la mer, les cuvettes se remplissent en lacs jusqu'à leur col puis débordent (`core/hydro.ts`).
+- Une rivière apparaît quand environ 1 km² de terrain s'y déverse ; elle s'élargit vers l'aval (3 à 28 m). Dans les climats secs (désert) il faut un bassin 8 fois plus grand, donc peu de rivières.
+- Le **lit est creusé** dans le sol (`Terrain.heightAt` en tient compte partout : marche, arbres, maisons) et l'**eau est dessinée** dans les tuiles (carrés plats, couleur selon la profondeur).
+- **Marche** : on traverse à gué une eau de 1,2 m au plus ; au-delà (lacs, grandes rivières) on ne marche plus. Les arbres s'écartent de l'eau et de ses rives, les maisons aussi.
+- Ce ne sont pas les vraies rivières : elles sont plausibles et cohérentes avec la côte et le relief du jeu. Les vrais grands fleuves viendront ensuite (étape A).
+- Limites actuelles : pas encore d'eau animée ni de reflets, pas de ponts (les chemins de terre traversent les rivières « à gué » même si elles sont profondes), pas de bateau sur les rivières, les lacs sont rares, la carte n'affiche pas l'eau douce.
+- Calcul par blocs de 8 km (60 à 120 ms chacun), préparés à l'avance autour du joueur.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

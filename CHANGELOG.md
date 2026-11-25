@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.33.0 — 2026-11-25
+
+rivières et lacs réalistes (écoulement vers la mer, lacs dans les cuvettes), lit creusé, eau dessinée, marche à gué
+
 ## 1.32.0 — 2026-11-25
 
 chemins de terre entre les villes voisines, rues de village en terre, arbres écartés

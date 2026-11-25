@@ -374,6 +374,7 @@ export class Game {
     this.boat.update(dt, now / 1000, this.origin); // le bateau avance et pose la caméra sur le pont (s'il y a lieu)
     this.controls.update(dt, this.gs.camera, this.origin.x, this.origin.z);
     this.updateAvatar(dt, now / 1000); // bras, mains, boussole (et caméra extérieure)
+    this.terrain.warmWater(this.controls.x, this.controls.z, 3500); // prépare les calculs des rivières et lacs autour du joueur (un bloc par image au plus : pas d'à-coup en arrivant)
     this.villageClock += dt;
     if (this.villageClock > 0.4) {
       this.villageClock = 0;
@@ -451,7 +452,7 @@ export class Game {
       getTime: () => (this.settings.realTime ? realSolarClock(new Date()) : { hours: this.hours, day: this.day }), // en temps réel, la carte reçoit l'heure de Lannion (référence de l'ombre de nuit)
       groundAt: (lat, lon) => {
         const w = latLonToWorld(lat, lon);
-        return this.terrain.heightAt(w.x, w.z); // le terrain du jeu (pas la grille floue)
+        return this.terrain.coarseHeightAt(w.x, w.z); // le terrain du jeu (pas la grille floue), sans les rivières : la carte survole de grandes zones
       },
       onGo: (lat, lon, city) => this.travelToLatLon(lat, lon, city),
     });
@@ -918,6 +919,7 @@ export class Game {
         else this.viewBlend = 1;
         return mode;
       },
+      water: () => ({ ground: this.terrain.heightAt(this.controls.x, this.controls.z), surface: this.terrain.waterSurfaceAt(this.controls.x, this.controls.z), depth: this.terrain.waterDepthAt(this.controls.x, this.controls.z) }), // eau douce sous le joueur (essais)
       villages: () => ({ shown: this.villageObjects.count, names: this.villageObjects.names(), near: this.villages.near(this.controls.x, this.controls.z, 3000).map((v) => ({ name: v.name, x: Math.round(v.x), z: Math.round(v.z), r: Math.round(v.radius), houses: v.houses.length, style: v.style.id, signs: v.signs.map((s) => ({ x: Math.round(s.x), z: Math.round(s.z), boards: s.boards.length })) })) }),
       edits: () => ({ count: this.edits.size, shown: this.editObjects.count, persistent: this.editsDb?.persistent ?? null, worldVersion: WORLD_VERSION, list: this.edits.all().slice(0, 20).map((e) => ({ id: e.id, x: e.x, z: e.z })) }),
       compass: () => (this.compass ? { card: this.compass.card, text: compassText(bearingFromYaw(this.controls.yaw)) } : null),

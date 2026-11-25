@@ -89,7 +89,8 @@ function suitable(t: Terrain, x: number, z: number, maxSlope: number): boolean {
 }
 
 // Place le centre du village : sur la position réelle si elle est convenable, sinon sur le point convenable le plus proche (en spirale). null si rien à moins de MAX_SNAP.
-export function findAnchor(t: Terrain, x0: number, z0: number): { x: number; z: number } | null {
+export function findAnchor(terrain: Terrain, x0: number, z0: number): { x: number; z: number } | null {
+  const t: Terrain = { ...terrain, heightAt: terrain.coarseHeightAt }; // le recalage regarde de loin : relief sans les rivières (plus rapide)
   for (const maxSlope of [0.3, 0.5]) {
     if (suitable(t, x0, z0, maxSlope)) return { x: x0, z: z0 }; // la position réelle convient
     for (let r = 60; r <= MAX_SNAP; r += r < 600 ? 60 : 200) {
@@ -194,6 +195,7 @@ export function layoutVillage(c: CityInfo, anchor: { x: number; z: number }, t: 
     const lo = Math.min(...corners);
     const hi = Math.max(...corners);
     if (lo < 3.5 || hi - lo > 2.4) continue;
+    if (corners.length > 0 && [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 0]].some(([a, b]) => !Number.isNaN(t.waterSurfaceAt(cd.x + c * a! * cd.w * 0.5 - s * b! * cd.d * 0.5, cd.z + s * a! * cd.w * 0.5 + c * b! * cd.d * 0.5)))) continue; // pas de maison dans une rivière ou un lac, ni sur sa rive
     // Pas sur une autre rue ni sur une autre maison.
     if (streets.some((st) => distToStreet(st, cd.x, cd.z) < STREET_HALF + 0.45 * Math.min(cd.w, cd.d))) continue;
     if (houses.some((h) => Math.hypot(h.x - cd.x, h.z - cd.z) < 0.44 * (Math.hypot(h.w, h.d) + Math.hypot(cd.w, cd.d)) + 0.8)) continue;

@@ -36,8 +36,8 @@ describe('terrain', () => {
     let maxTibet = -Infinity;
     for (let i = 0; i < 40; i++) {
       for (let j = 0; j < 40; j++) {
-        maxAlps = Math.max(maxAlps, terrain.heightAt(alps.x + (i - 20) * 3000, alps.z + (j - 20) * 3000));
-        maxTibet = Math.max(maxTibet, terrain.heightAt(tibet.x + (i - 20) * 3000, tibet.z + (j - 20) * 3000));
+        maxAlps = Math.max(maxAlps, terrain.coarseHeightAt(alps.x + (i - 20) * 3000, alps.z + (j - 20) * 3000));
+        maxTibet = Math.max(maxTibet, terrain.coarseHeightAt(tibet.x + (i - 20) * 3000, tibet.z + (j - 20) * 3000));
       }
     }
     expect(maxAlps).toBeGreaterThan(2000);

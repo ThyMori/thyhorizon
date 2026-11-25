@@ -9,6 +9,7 @@ import { worldToLatLon } from './geo';
 import { clamp, smoothstep } from './math';
 import { Noise2D, fbm } from './noise';
 import { Biome, Climate, uniformClimate } from './climate';
+import { Hydro } from './hydro';
 import type { Relief } from './relief';
 
 // Niveau de la mer.
@@ -17,7 +18,12 @@ export const SEA_LEVEL = 0;
 // Un terrain : des fonctions qui répondent à « quelle altitude ici ? ».
 export interface Terrain {
   readonly seed: number; // graine utilisée
-  heightAt(x: number, z: number): number; // altitude du sol en (x, z), en mètres
+  heightAt(x: number, z: number): number; // altitude du sol en (x, z), en mètres (lits des rivières creusés)
+  coarseHeightAt(x: number, z: number): number; // altitude SANS les rivières : plus rapide, pour les calculs sur de grandes zones (chemins, carte, recalage des villes)
+  waterSurfaceAt(x: number, z: number): number; // hauteur de l'eau d'une rivière ou d'un lac en (x, z) (NaN = ni eau ni rive)
+  waterDepthAt(x: number, z: number): number; // profondeur de l'eau douce ici (0 = à sec)
+  hasWaterNear(x0: number, z0: number, size: number): boolean; // y a-t-il de l'eau douce dans ce carré ? (rapide)
+  warmWater(x: number, z: number, r: number): boolean; // prépare à l'avance les calculs d'eau près d'ici (un bloc à la fois) ; true s'il a travaillé
   realHeightAt(x: number, z: number): number; // altitude réelle lissée (sans détail inventé), en mètres
   colorNoise(x: number, z: number): number; // variation douce (-1..1) pour les couleurs du sol
   forestNoise(x: number, z: number): number; // grandes taches (-1..1) : où les forêts se regroupent, où s'ouvrent les clairières
@@ -42,7 +48,7 @@ const sharpenShore = (h: number): number => {
 };
 
 // Fabrique un terrain à partir d'une graine et du relief réel.
-export function createTerrain(seed: number, relief: Relief, climate: Climate = uniformClimate()): Terrain {
+export function createTerrain(seed: number, relief: Relief, climate: Climate = uniformClimate(), withWater = true): Terrain {
   const hillNoise = new Noise2D(seed + 23); // grandes collines
   const midNoise = new Noise2D(seed + 29); // collines moyennes
   const smallNoise = new Noise2D(seed + 37); // bosses
@@ -58,7 +64,7 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
     return sharpenShore(relief.heightAt(lat, lon));
   };
 
-  const heightAt = (x: number, z: number): number => {
+  const coarseHeightAt = (x: number, z: number): number => {
     const { lat, lon } = worldToLatLon(x, z);
     const real = relief.heightAt(lat, lon); // altitude réelle (m)
     const shaped = sharpenShore(real); // redressée près de la mer
@@ -88,6 +94,21 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
 
   const realHeightAt = (x: number, z: number): number => base(x, z);
 
+  // Eau douce : rivières et lacs calculés sur ce relief. Un climat sec demande un bassin plus grand pour qu'une rivière apparaisse.
+  const hydro = withWater
+    ? new Hydro(coarseHeightAt, (x, z) => {
+        const { lat, lon } = worldToLatLon(x, z);
+        const c = climate.classAt(lat, lon);
+        return c.startsWith('B') ? 8 : c.startsWith('E') ? 2 : 1; // désert : 8 fois plus ; polaire : 2 fois plus
+      })
+    : null;
+  const heightAt = hydro ? (x: number, z: number): number => coarseHeightAt(x, z) + hydro.deltaAt(x, z) : coarseHeightAt;
+  const waterSurfaceAt = (x: number, z: number): number => (hydro ? hydro.surfaceAt(x, z) : NaN);
+  const waterDepthAt = (x: number, z: number): number => {
+    const s = waterSurfaceAt(x, z);
+    return Number.isNaN(s) ? 0 : Math.max(0, s - heightAt(x, z));
+  };
+
   const colorNoise = (x: number, z: number): number =>
     fbm(colorN, x * 0.045, z * 0.045, 3) * 0.7 + fbm(colorN, x * 0.5, z * 0.5, 1) * 0.3; // taches larges + grain fin
 
@@ -103,7 +124,11 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
 
   const forestNoise = (x: number, z: number): number => fbm(forestN, x / 380, z / 380, 3); // taches de quelques centaines de mètres
 
-  return { seed, heightAt, realHeightAt, colorNoise, forestNoise, biomeAt, climateClassAt };
+  return {
+    seed, heightAt, coarseHeightAt, waterSurfaceAt, waterDepthAt, realHeightAt, colorNoise, forestNoise, biomeAt, climateClassAt,
+    hasWaterNear: (x0, z0, size) => (hydro ? hydro.hasWater(x0, z0, size) : false),
+    warmWater: (x, z, r) => (hydro ? hydro.warm(x, z, r) : false),
+  };
 }
 
 // Trouve un point de départ agréable : sur la terre ferme, juste derrière la plage, face à la mer.

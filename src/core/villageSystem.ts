@@ -80,16 +80,18 @@ export class VillageSystem {
     return out;
   }
 
-  // Fonction « cet endroit est-il dégagé ? » pour une tuile : pas d'arbre dans un village ni sur un chemin (null s'il n'y a rien près : les arbres sont alors inchangés).
+  // Fonction « cet endroit est-il dégagé ? » pour une tuile : pas d'arbre dans un village, sur un chemin, ni dans l'eau (null s'il n'y a rien près : les arbres sont alors inchangés).
   blockerForChunk(cx: number, cz: number, size: number): ((x: number, z: number) => boolean) | null {
     const half = size / 2;
     const mx = cx * size + half;
     const mz = cz * size + half;
     const list = this.clearings(mx, mz, half * 1.5);
     const roads = this.roads.segmentsNear(mx, mz, half * 1.5);
-    if (list.length === 0 && roads.length === 0) return null;
+    const water = this.terrain.hasWaterNear(cx * size, cz * size, size); // rivière ou lac dans la tuile ?
+    if (list.length === 0 && roads.length === 0 && !water) return null;
     const lim = ROAD_HALF + ROAD_TREE_MARGIN; // distance au milieu du chemin sous laquelle on n'a pas d'arbre
-    return (x, z) => list.some((d) => (x - d.x) ** 2 + (z - d.z) ** 2 < d.r * d.r) || roads.some((s) => distToSeg(s, x, z) < lim);
+    const t = this.terrain;
+    return (x, z) => list.some((d) => (x - d.x) ** 2 + (z - d.z) ** 2 < d.r * d.r) || roads.some((s) => distToSeg(s, x, z) < lim) || (water && !Number.isNaN(t.waterSurfaceAt(x, z))); // pas d'arbre dans l'eau ni sur la rive
   }
 
   // Les tronçons de terre (chemins entre villes et rues de villages) qui touchent la tuile (cx, cz) : pour peindre le sol.

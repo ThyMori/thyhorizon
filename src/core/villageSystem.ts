@@ -2,6 +2,7 @@
 // Sert à trois choses : dessiner les villages, enlever les arbres dedans, empêcher de traverser les murs. Logique pure.
 
 import { Cities } from './cities';
+import { DirtSeg, ROAD_HALF, ROAD_TREE_MARGIN, RoadSystem, distToSeg } from './roads';
 import { CLEAR_MARGIN, CityInfo, MAX_SNAP, House, Village, findAnchor, layoutVillage, pushOutOfHouses, villageSize } from './village';
 import type { Terrain } from './terrain';
 
@@ -19,8 +20,11 @@ export class VillageSystem {
   private readonly villages = new Map<number, Village | null>(); // plans déjà calculés
   private reserved: ((x: number, z: number, r: number) => boolean) | null = null; // « cet endroit est déjà construit par le joueur »
   private version = 0; // change quand les plans sont invalidés
+  readonly roads: RoadSystem; // les chemins de terre qui relient les villes
 
-  constructor(private readonly cities: Cities, private readonly terrain: Terrain) {}
+  constructor(private readonly cities: Cities, private readonly terrain: Terrain) {
+    this.roads = new RoadSystem(cities, terrain, (i) => this.anchor(i)); // les chemins partent des centres recalés des villages
+  }
 
   get stamp(): number {
     return this.version; // les affichages comparent ce numéro pour savoir s'ils doivent se refaire
@@ -76,12 +80,26 @@ export class VillageSystem {
     return out;
   }
 
-  // Fonction « cet endroit est-il dégagé ? » pour une tuile (null s'il n'y a aucun village près : les arbres sont alors inchangés).
+  // Fonction « cet endroit est-il dégagé ? » pour une tuile : pas d'arbre dans un village ni sur un chemin (null s'il n'y a rien près : les arbres sont alors inchangés).
   blockerForChunk(cx: number, cz: number, size: number): ((x: number, z: number) => boolean) | null {
     const half = size / 2;
-    const list = this.clearings(cx * size + half, cz * size + half, half * 1.5);
-    if (list.length === 0) return null;
-    return (x, z) => list.some((d) => (x - d.x) ** 2 + (z - d.z) ** 2 < d.r * d.r);
+    const mx = cx * size + half;
+    const mz = cz * size + half;
+    const list = this.clearings(mx, mz, half * 1.5);
+    const roads = this.roads.segmentsNear(mx, mz, half * 1.5);
+    if (list.length === 0 && roads.length === 0) return null;
+    const lim = ROAD_HALF + ROAD_TREE_MARGIN; // distance au milieu du chemin sous laquelle on n'a pas d'arbre
+    return (x, z) => list.some((d) => (x - d.x) ** 2 + (z - d.z) ** 2 < d.r * d.r) || roads.some((s) => distToSeg(s, x, z) < lim);
+  }
+
+  // Les tronçons de terre (chemins entre villes et rues de villages) qui touchent la tuile (cx, cz) : pour peindre le sol.
+  dirtForChunk(cx: number, cz: number, size: number): DirtSeg[] {
+    const half = size / 2;
+    const mx = cx * size + half;
+    const mz = cz * size + half;
+    const out = this.roads.segmentsNear(mx, mz, half * 1.5);
+    for (const v of this.near(mx, mz, half * 1.5)) out.push(...v.streets);
+    return out;
   }
 
   // Les villages qui touchent le disque (x, z, r), plans complets.

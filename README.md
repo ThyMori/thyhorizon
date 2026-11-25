@@ -317,6 +317,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - **Carte** : zoom jusqu'à 12 000 pixels par degré (≈ 9 m par pixel) ; à partir de ≈ 1 km par pixel, la carte dessine le **vrai terrain du jeu** (côtes et altitudes telles que tu les verras), calculé par petits morceaux (rien ne fige). Les coordonnées affichées gagnent des décimales avec le zoom. Si le point choisi est à terre dans le jeu, on arrive **exactement dessus** (plus de recalage sur la grille floue) ; en mer, on est posé sur la côte la plus proche.
 - Limites : la couche de détail est un aplat de couleurs (pas d'arbres, ni de maisons) ; le village ne bouge pas en fonction de ce que tu construis, mais une maison n'est jamais posée sur un cairn.
 
+## 1.32 — Chemins de terre entre les villes
+
+- Chaque ville est reliée à ses voisines par un **chemin de terre** (jusqu'à 35 km). Deux villes sont reliées si aucune troisième ville n'est plus proche des deux : des liaisons courtes, sans croisement inutile (`core/roads.ts`, `RoadSystem`). Exemple : Lannion ↔ Perros-Guirec, Guingamp, Saint-Martin-des-Champs.
+- Le tracé suit le relief (recherche A* : pentes douces, jamais dans l'eau, ni au-dessus de 2 300 m), puis est lissé. Il est identique à chaque visite et dans les deux sens.
+- Le chemin est **peint sur le sol** (couleur de terre, 4,4 m de large), les **arbres s'écartent** de ses bords, et les **rues des villages** sont aussi en terre.
+- Ce ne sont pas les vrais tracés du monde (pas de données OpenStreetMap) : ce sont de vraies liaisons entre de vraies villes.
+- Limites : pas de pont (un chemin ne traverse jamais l'eau, il contourne ou n'existe pas), pas de chemin vers une ville à plus de 35 km, une seule largeur.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.32.0 — 2026-11-25
+
+chemins de terre entre les villes voisines, rues de village en terre, arbres écartés
+
 ## 1.31.0 — 2026-11-25
 
 Panneau au centre du village, style médiéval (colombage, surplomb), carte avec zoom profond et arrivée précise

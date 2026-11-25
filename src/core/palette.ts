@@ -18,6 +18,18 @@ const SEABED_DEEP: Rgb = [0.03, 0.1, 0.14]; // fond profond, sombre et bleuté
 // Biome par défaut (climat océanique : les verts d'origine du jeu), utilisé quand on n'en précise pas.
 const DEFAULT_BIOME: Biome = { grassDark: GRASS_DARK, grassLight: GRASS_LIGHT, snowLine: 2450, forest: 0.55, conifer: 0.1, acacia: 0 };
 
+// Terre battue des chemins et des rues de village (sRGB).
+const DIRT: Rgb = [0.47, 0.37, 0.25];
+
+// Couleur d'un chemin de terre, en lumière linéaire : la terre, nuancée par le bruit, légèrement teintée par le sol d'à côté (`ground`, déjà linéaire).
+export function dirtColor(variation: number, ground: Rgb): Rgb {
+  const k = 1 + 0.1 * variation; // nuance : ±10 %
+  const r = srgbToLinear(clamp(DIRT[0] * k, 0, 1));
+  const g = srgbToLinear(clamp(DIRT[1] * k, 0, 1));
+  const b = srgbToLinear(clamp(DIRT[2] * k, 0, 1));
+  return [r * 0.8 + ground[0] * 0.2, g * 0.8 + ground[1] * 0.2, b * 0.8 + ground[2] * 0.2]; // 80 % terre, 20 % sol voisin
+}
+
 // Couleur du sol en LUMIÈRE LINÉAIRE (le format attendu par les sommets du maillage Three.js).
 // h = altitude, ny = composante verticale de la normale (1 = plat), variation = bruit -1..1, biome = climat d'ici.
 export function terrainColor(h: number, ny: number, variation: number, biome: Biome = DEFAULT_BIOME): Rgb {

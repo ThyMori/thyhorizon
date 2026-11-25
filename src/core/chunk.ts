@@ -2,7 +2,9 @@
 // Logique pure : elle ne touche ni au navigateur ni à Three.js. Elle tourne donc
 // aussi bien dans un worker (calcul en arrière-plan) que dans les tests.
 
-import { terrainColor } from './palette';
+import { lerpRgb, clamp, smoothstep } from './math';
+import { dirtColor, terrainColor } from './palette';
+import { DirtSeg, distToSeg } from './roads';
 import { MeshBuilder, addTreesForChunk } from './trees';
 import type { Terrain } from './terrain';
 
@@ -37,7 +39,7 @@ export interface ChunkData {
 }
 
 // Fabrique le maillage de la tuile (cx, cz) au niveau de détail donné.
-export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number, blocked: ((x: number, z: number) => boolean) | null = null): ChunkData {
+export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number, blocked: ((x: number, z: number) => boolean) | null = null, dirt: readonly DirtSeg[] | null = null): ChunkData {
   const n = LOD_CELLS[lod] ?? LOD_CELLS[LOD_CELLS.length - 1]!; // cases par côté
   const cell = CHUNK_SIZE / n; // taille d'une case en mètres
   const x0 = cx * CHUNK_SIZE; // coin ouest de la tuile dans le monde
@@ -59,6 +61,8 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
   const normals = new Float32Array(vertexCount * 3);
   const colors = new Float32Array(vertexCount * 3);
   const skirt = 6 + cell * 2; // profondeur des jupes en mètres
+  const reach = 6 + cell * 1.5; // marge : un tronçon plus loin que ça de la tuile ne la touche pas
+  const near = (dirt ?? []).filter((s) => Math.min(s.x1, s.x2) - reach < x0 + CHUNK_SIZE && Math.max(s.x1, s.x2) + reach > x0 && Math.min(s.z1, s.z2) - reach < z0 + CHUNK_SIZE && Math.max(s.z1, s.z2) + reach > z0); // tronçons qui touchent cette tuile
   let minY = Infinity; // plus bas point
   let maxY = -Infinity; // plus haut point
 
@@ -77,7 +81,22 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
       const ny = inv; // composante verticale de la normale unitaire
       positions.set([i * cell, h, j * cell], v * 3); // position locale
       normals.set([-dhdx * inv, ny, -dhdz * inv], v * 3); // normale unitaire
-      const c = terrainColor(h, ny, terrain.colorNoise(x0 + i * cell, z0 + j * cell), terrain.biomeAt(x0 + i * cell, z0 + j * cell)); // couleur du sol ici (selon le climat)
+      const wx = x0 + i * cell; // position de ce sommet dans le monde
+      const wz = z0 + j * cell;
+      const noise = terrain.colorNoise(wx, wz);
+      let c = terrainColor(h, ny, noise, terrain.biomeAt(wx, wz)); // couleur du sol ici (selon le climat)
+      if (near.length > 0 && h > 0.3) {
+        // Chemins et rues en terre : on mélange la couleur de la terre selon la distance au tronçon le plus proche.
+        let t = 0; // 1 = en plein chemin
+        for (const s of near) {
+          const w = Math.max(s.half, cell * 0.8); // à grande distance, le chemin reste visible (un peu élargi)
+          const d = distToSeg(s, wx, wz);
+          if (d > w * 1.25) continue; // hors du chemin
+          const k = (1 - smoothstep(w * 0.7, w * 1.25, d)) * clamp(s.half / w, 0.35, 1); // plus fin quand la case est grosse
+          if (k > t) t = k;
+        }
+        if (t > 0) c = lerpRgb(c, dirtColor(noise, c), t * smoothstep(0.3, 1.2, h)); // pas de terre dans l'eau
+      }
       colors.set(c, v * 3);
       if (h < minY) minY = h; // met à jour les bornes d'altitude
       if (h > maxY) maxY = h;

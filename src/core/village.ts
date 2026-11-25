@@ -3,6 +3,7 @@
 // Repère : monde du jeu (x = est, z = sud). Une maison a un repère local : u (le long de la rue, « largeur » w) et v (vers l'arrière, « profondeur » d).
 
 import { Rgb, clamp } from './math';
+import type { DirtSeg } from './roads';
 import { Terrain, slopeAt } from './terrain';
 import { hash01 } from './trees';
 import { RoofKind, VillageStyle, styleForClass } from './villageStyle';
@@ -10,6 +11,7 @@ import { RoofKind, VillageStyle, styleForClass } from './villageStyle';
 export const MAX_SNAP = 8000; // distance maximale (m) dont on déplace une ville en mer vers la côte ; au-delà, on l'ignore
 export const CLEAR_MARGIN = 22; // les arbres s'écartent de cette distance autour du village (m)
 export const STREET_HALF = 3.5; // demi-largeur d'une rue (m)
+export const STREET_DIRT_HALF = 3; // demi-largeur de la terre peinte sur une rue (m)
 export const PLAZA = 6; // rayon de la place centrale, dégagée de maisons (m)
 
 // Combien de maisons et quel rayon pour une ville de `pop` habitants (plafonné : une métropole reste jouable).
@@ -65,6 +67,7 @@ export interface Village {
   style: VillageStyle;
   houses: House[];
   signs: Sign[];
+  streets: DirtSeg[]; // les rues, en terre (peintes sur le sol)
 }
 
 export interface CityInfo {
@@ -236,7 +239,8 @@ export function layoutVillage(c: CityInfo, anchor: { x: number; z: number }, t: 
       ],
     });
   }
-  return { id: c.id, name: c.name, pop: c.pop, x: anchor.x, z: anchor.z, radius, style, houses, signs };
+  const dirtStreets: DirtSeg[] = streets.map((st) => ({ x1: st.cx - st.ux * st.half, z1: st.cz - st.uz * st.half, x2: st.cx + st.ux * st.half, z2: st.cz + st.uz * st.half, half: STREET_DIRT_HALF })); // chaque rue devient un tronçon de terre
+  return { id: c.id, name: c.name, pop: c.pop, x: anchor.x, z: anchor.z, radius, style, houses, signs, streets: dirtStreets };
 }
 
 // Le point (x, z) est-il dans la maison (ou à moins de `margin` mètres de ses murs) ?

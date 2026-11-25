@@ -37,7 +37,7 @@ ctx.onmessage = (event) => {
   }
   if (!terrain) return; // pas encore initialisé : on ignore
   try {
-    const data = buildChunk(terrain, msg.cx, msg.cz, msg.lod, villages ? villages.blockerForChunk(msg.cx, msg.cz, CHUNK_SIZE) : null); // calcul du maillage (sans arbres dans les villages)
+    const data = buildChunk(terrain, msg.cx, msg.cz, msg.lod, villages ? villages.blockerForChunk(msg.cx, msg.cz, CHUNK_SIZE) : null, villages ? villages.dirtForChunk(msg.cx, msg.cz, CHUNK_SIZE) : null); // calcul du maillage (sans arbres dans les villages ni sur les chemins, avec la terre peinte)
     // Les tableaux sont TRANSFÉRÉS (pas copiés) : plus rapide, et le worker n'en a plus besoin.
     ctx.postMessage({ ok: true, data }, [data.positions.buffer, data.normals.buffer, data.colors.buffer, data.indices.buffer]);
   } catch (error) {

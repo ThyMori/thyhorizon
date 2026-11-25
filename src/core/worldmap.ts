@@ -15,7 +15,8 @@ export interface MapView {
   scale: number;
 }
 
-export const MAX_SCALE = 40; // zoom maximal : 40 pixels par degré (≈ 2,8 km par pixel)
+export const MAX_SCALE = 12000; // zoom maximal : 12 000 pixels par degré (≈ 9 m par pixel)
+export const DETAIL_MIN_SCALE = 100; // à partir de ce zoom (≈ 1 km par pixel), on dessine le terrain réel du jeu au lieu de la grille floue
 
 // Ramène une longitude dans −180 … 180.
 export const wrapLon = (lon: number): number => ((((lon + 180) % 360) + 360) % 360) - 180;
@@ -164,4 +165,34 @@ export function cityMinPop(scale: number): number {
   if (scale < 16) return 100000;
   if (scale < 30) return 20000;
   return 5000;
+}
+
+// Nombre de décimales à afficher pour les coordonnées selon le zoom (plus on zoome, plus on est précis).
+export function coordDigits(scale: number): number {
+  if (scale < 60) return 2; // ≈ 1 km
+  if (scale < 600) return 3; // ≈ 100 m
+  if (scale < 6000) return 4; // ≈ 10 m
+  return 5; // ≈ 1 m
+}
+
+// Colore la couche de détail : `heights` est la grille des altitudes du terrain du jeu (w × h cases), `spacing` la distance entre deux cases (m).
+// `biomeAt(i, j)` donne le climat de la case (null = mer). Lumière venue du nord-ouest, comme sur la carte du monde.
+export function renderDetailRows(out: Uint8ClampedArray, heights: Float32Array, w: number, h: number, y0: number, y1: number, spacing: number, biomeAt: (i: number, j: number) => Parameters<typeof terrainColor>[3]): void {
+  for (let j = y0; j < y1; j++) {
+    for (let i = 0; i < w; i++) {
+      const hc = heights[j * w + i]!;
+      let shade = 1;
+      if (hc >= 0) {
+        const hE = Math.max(0, heights[j * w + Math.min(w - 1, i + 1)]!);
+        const hS = Math.max(0, heights[Math.min(h - 1, j + 1) * w + i]!);
+        shade = clamp(1 + (1.5 * (hE - hc + (hS - hc))) / Math.max(spacing, 1), 0.6, 1.35);
+      }
+      const [r, g, b] = mapColor(hc, hc >= 0 ? biomeAt(i, j) : undefined, shade);
+      const k = (j * w + i) * 4;
+      out[k] = r;
+      out[k + 1] = g;
+      out[k + 2] = b;
+      out[k + 3] = 255;
+    }
+  }
 }

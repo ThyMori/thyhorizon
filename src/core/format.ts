@@ -11,8 +11,8 @@ export function formatHours(hours: number): string {
 }
 
 // Latitude et longitude → « 48,73° N, 3,46° O ».
-export function formatCoords(lat: number, lon: number): string {
-  const part = (v: number, plus: string, minus: string): string => `${Math.abs(v).toFixed(2).replace('.', ',')}° ${v >= 0 ? plus : minus}`; // une coordonnée avec son point cardinal
+export function formatCoords(lat: number, lon: number, digits = 2): string {
+  const part = (v: number, plus: string, minus: string): string => `${Math.abs(v).toFixed(digits).replace('.', ',')}° ${v >= 0 ? plus : minus}`; // une coordonnée avec son point cardinal
   return `${part(lat, 'N', 'S')}, ${part(lon, 'E', 'O')}`; // nord/sud puis est/ouest
 }
 

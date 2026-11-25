@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.31.0 — 2026-11-25
+
+Panneau au centre du village, style médiéval (colombage, surplomb), carte avec zoom profond et arrivée précise
+
 ## 1.30.0 — 2026-11-24
 
 Villages des vraies villes du monde (≥ 5000 hab.) : maisons par climat, panneaux, villes sur la carte

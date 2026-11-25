@@ -78,13 +78,32 @@ describe('plan de Lannion', () => {
       }
     }
   });
-  it('a des panneaux avec le vrai nom, tournés vers l\'extérieur', () => {
-    expect(v.signs.length).toBeGreaterThanOrEqual(1);
-    for (const s of v.signs) {
-      expect(s.name).toBe('Lannion');
-      expect(Math.hypot(s.nx, s.nz)).toBeCloseTo(1, 5);
-      const out = (s.x - v.x) * s.nx + (s.z - v.z) * s.nz; // le panneau regarde dans le sens opposé au centre
-      expect(out).toBeGreaterThan(0);
+  it('a un panneau au centre du village, avec le vrai nom et des planches dans les quatre directions', () => {
+    expect(v.signs.length).toBe(1);
+    const sg = v.signs[0]!;
+    expect(sg.name).toBe('Lannion');
+    expect(Math.hypot(sg.x - v.x, sg.z - v.z)).toBeLessThan(0.01); // au centre
+    expect(sg.boards.length).toBe(4);
+    for (const bd of sg.boards) expect(Math.hypot(bd.nx, bd.nz)).toBeCloseTo(1, 5);
+    // Quatre directions : deux paires opposées, perpendiculaires entre elles.
+    const [a, b, c, d] = sg.boards;
+    expect(a!.nx + b!.nx).toBeCloseTo(0, 5);
+    expect(a!.nz + b!.nz).toBeCloseTo(0, 5);
+    expect(a!.nx * c!.nx + a!.nz * c!.nz).toBeCloseTo(0, 5);
+    expect(c!.nx + d!.nx).toBeCloseTo(0, 5);
+  });
+  it('la place centrale est dégagée de maisons', () => {
+    for (const h of v.houses) expect(Math.hypot(h.x - v.x, h.z - v.z)).toBeGreaterThan(5);
+  });
+  it('style médiéval : colombage, surplomb et pierre pour les maisons à étage', () => {
+    expect(v.houses.some((h) => h.timber)).toBe(true);
+    for (const h of v.houses) {
+      if (h.stories >= 2) {
+        expect(h.jetty).toBeGreaterThan(0);
+        expect(h.stone).not.toBeNull();
+      } else {
+        expect(h.jetty).toBe(0);
+      }
     }
   });
   it('est identique à chaque fois (déterministe)', () => {

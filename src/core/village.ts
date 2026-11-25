@@ -10,6 +10,7 @@ import { RoofKind, VillageStyle, styleForClass } from './villageStyle';
 export const MAX_SNAP = 8000; // distance maximale (m) dont on déplace une ville en mer vers la côte ; au-delà, on l'ignore
 export const CLEAR_MARGIN = 22; // les arbres s'écartent de cette distance autour du village (m)
 export const STREET_HALF = 3.5; // demi-largeur d'une rue (m)
+export const PLAZA = 6; // rayon de la place centrale, dégagée de maisons (m)
 
 // Combien de maisons et quel rayon pour une ville de `pop` habitants (plafonné : une métropole reste jouable).
 export function villageSize(pop: number): { houses: number; radius: number } {
@@ -33,15 +34,25 @@ export interface House {
   roof: RoofKind;
   pitch: number;
   chimney: boolean;
+  timber: boolean; // colombage : poutres sombres apparentes sur les façades
+  jetty: number; // surplomb de l'étage sur la rue et l'arrière (m), 0 = aucun
+  stone: Rgb | null; // couleur du rez-de-chaussée en pierre (null = comme les murs)
   seed: number; // nombre stable pour les petits détails
 }
 
+// Une planche de panneau, tournée vers (nx, nz) (vecteur unitaire) ; level 0 = en bas, 1 = au-dessus.
+export interface Board {
+  nx: number;
+  nz: number;
+  level: 0 | 1;
+}
+
+// Le panneau du village : un poteau au centre, avec des planches vers les quatre directions (on le voit de toutes les rues).
 export interface Sign {
   x: number; // pied du poteau
   z: number;
-  nx: number; // direction vers laquelle le panneau est tourné (vecteur unitaire)
-  nz: number;
   name: string;
+  boards: Board[];
 }
 
 export interface Village {
@@ -169,6 +180,7 @@ export function layoutVillage(c: CityInfo, anchor: { x: number; z: number }, t: 
     if (houses.length >= target) break;
     const reach = 0.5 * Math.hypot(cd.w, cd.d);
     if (cd.dist + reach > radius) continue; // hors du village
+    if (cd.dist - reach < PLAZA) continue; // la place centrale (avec le panneau) reste dégagée
     // Densité : au bord du village, on laisse des vides.
     const edge = cd.dist / radius;
     if (hash01(sa, sb, 8000 + cd.key) > 1 - 0.55 * edge * edge) continue;
@@ -191,7 +203,7 @@ export function layoutVillage(c: CityInfo, anchor: { x: number; z: number }, t: 
       z: cd.z,
       w: cd.w,
       d: cd.d,
-      yaw: cd.yaw,
+      yaw: cd.yaw + (hash01(sa, sb, 15000 + cd.key) - 0.5) * 0.09, // les maisons ne sont jamais parfaitement alignées
       doorSide: cd.door,
       stories,
       wallH: stories * style.storyHeight,
@@ -202,17 +214,27 @@ export function layoutVillage(c: CityInfo, anchor: { x: number; z: number }, t: 
       roof: style.roof,
       pitch: style.pitch * (0.9 + 0.2 * hash01(sa, sb, 12000 + cd.key)),
       chimney: style.roof === 'gable' && hash01(sa, sb, 13000 + cd.key) < style.chimneys,
+      timber: hash01(sa, sb, 16000 + cd.key) < style.timber,
+      jetty: stories >= 2 ? style.jetty : 0,
+      stone: stories >= 2 ? style.stone : null,
       seed: hash01(sa, sb, 14000 + cd.key),
     });
   }
 
-  // Deux panneaux, un à chaque bout de la rue principale, tournés vers celui qui arrive.
+  // Le panneau : un poteau au milieu de la rue, au centre du village, avec une planche vers chaque direction (le long de la rue et en travers).
   const signs: Sign[] = [];
-  for (const dir of [-1, 1]) {
-    const x = anchor.x + ux * dir * (radius + 9) + nx * 5;
-    const z = anchor.z + uz * dir * (radius + 9) + nz * 5;
-    if (t.heightAt(x, z) < 3) continue; // pas dans l'eau
-    signs.push({ x, z, nx: ux * dir, nz: uz * dir, name: c.name });
+  if (t.heightAt(anchor.x, anchor.z) >= 3) {
+    signs.push({
+      x: anchor.x,
+      z: anchor.z,
+      name: c.name,
+      boards: [
+        { nx: ux, nz: uz, level: 0 },
+        { nx: -ux, nz: -uz, level: 0 },
+        { nx: nx, nz: nz, level: 1 },
+        { nx: -nx, nz: -nz, level: 1 },
+      ],
+    });
   }
   return { id: c.id, name: c.name, pop: c.pop, x: anchor.x, z: anchor.z, radius, style, houses, signs };
 }

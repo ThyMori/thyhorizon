@@ -5,6 +5,7 @@ import { formatCoords, formatCount, formatDistance, formatHours } from './format
 describe('formatCoords', () => {
   it('écrit latitude et longitude avec leurs points cardinaux', () => {
     expect(formatCoords(48.73, -3.46)).toBe('48,73° N, 3,46° O');
+    expect(formatCoords(48.73, -3.46, 4)).toBe('48,7300° N, 3,4600° O'); // plus de précision quand on zoome
     expect(formatCoords(-33.9, 151.2)).toBe('33,90° S, 151,20° E');
   });
 });

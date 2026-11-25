@@ -2,7 +2,7 @@
 // Positions en repère du rendu (monde − origine flottante) : jamais de coordonnée du monde pour la carte graphique.
 
 import * as THREE from 'three';
-import { SIGN_H, SIGN_W, SIGN_Y, buildVillageMesh } from '../core/villageMesh';
+import { BOARD_OFFSET, SIGN_H, SIGN_W, boardBaseY, buildVillageMesh } from '../core/villageMesh';
 import type { Village } from '../core/village';
 import type { VillageSystem } from '../core/villageSystem';
 
@@ -109,12 +109,15 @@ export class VillageObjects {
       signMaterial = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.85, metalness: 0 });
       const plane = new THREE.PlaneGeometry(SIGN_W - 0.1, SIGN_H - 0.08);
       for (const sg of v.signs) {
-        const m = new THREE.Mesh(plane, signMaterial);
         const ground = groundAt(sg.x, sg.z);
-        m.position.set(sg.x - v.x + sg.nx * 0.045, ground + SIGN_Y + SIGN_H / 2, sg.z - v.z + sg.nz * 0.045); // un peu devant la planche
-        m.rotation.y = Math.atan2(sg.nx, sg.nz); // la face avant regarde vers (nx, nz)
-        m.castShadow = false;
-        group.add(m);
+        for (const bd of sg.boards) {
+          const m = new THREE.Mesh(plane, signMaterial);
+          const d = BOARD_OFFSET + 0.045; // un peu devant la planche
+          m.position.set(sg.x - v.x + bd.nx * d, boardBaseY(ground, bd.level) + SIGN_H / 2, sg.z - v.z + bd.nz * d);
+          m.rotation.y = Math.atan2(bd.nx, bd.nz); // la face avant regarde vers (nx, nz)
+          m.castShadow = false;
+          group.add(m);
+        }
       }
     }
     this.scene.add(group);

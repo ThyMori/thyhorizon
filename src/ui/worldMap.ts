@@ -4,7 +4,7 @@
 import type { Climate } from '../core/climate';
 import { formatCoords } from '../core/format';
 import type { Cities } from '../core/cities';
-import { cityMinPop, latLonToScreen, MapView, minScale, panBy, renderMapRows, renderNightRows, screenToLatLon, subsolarPoint, zoomAt, clampView } from '../core/worldmap';
+import { cityMinPop, coordDigits, DETAIL_MIN_SCALE, renderDetailRows, latLonToScreen, MapView, minScale, panBy, renderMapRows, renderNightRows, screenToLatLon, subsolarPoint, zoomAt, clampView } from '../core/worldmap';
 import type { Relief } from '../core/relief';
 import { byId } from './dom';
 
@@ -17,7 +17,8 @@ export interface WorldMapDeps {
   cities: Cities; // les villes réelles (points et noms sur la carte)
   getPlayer: () => { lat: number; lon: number }; // où est le joueur
   getTime: () => { hours: number; day: number }; // heure solaire de Lannion et jour de l'année du jeu
-  onGo: (lat: number, lon: number) => void; // voyage demandé
+  groundAt: (lat: number, lon: number) => number; // altitude du terrain du jeu (m) : sert à la couche de détail et à l'arrivée précise
+  onGo: (lat: number, lon: number, city: number | null) => void; // voyage demandé (city = numéro de la ville choisie, s'il y en a une)
 }
 
 export class WorldMap {
@@ -33,6 +34,11 @@ export class WorldMap {
   private building = false;
   private view: MapView = { lat: 20, lon: 0, scale: 1 };
   private target: { lat: number; lon: number } | null = null; // lieu choisi
+  private targetCity: number | null = null; // ville choisie (si le clic était sur une ville)
+  private readonly detail = document.createElement('canvas'); // le terrain du jeu, en gros plan
+  private detailView: { view: MapView; w: number; h: number; step: number } | null = null; // vue pour laquelle il a été calculé
+  private detailGen = 0; // numéro du calcul en cours (un nouveau calcul annule l'ancien)
+  private detailTimer = 0;
   private dragging = false;
   private moved = 0; // distance parcourue pendant l'appui (pour distinguer clic et glissement)
   private lastX = 0;
@@ -62,11 +68,11 @@ export class WorldMap {
     c.addEventListener('pointercancel', () => (this.dragging = false));
     c.addEventListener('wheel', (e) => {
       e.preventDefault();
-      this.view = zoomAt(this.view, this.width, this.height, e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015)); // zoom doux autour du curseur
+      this.view = zoomAt(this.view, this.width, this.height, e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0025)); // zoom autour du curseur
       this.draw();
     }, { passive: false });
-    byId('map-zoom-in').addEventListener('click', () => this.zoomCenter(1.6));
-    byId('map-zoom-out').addEventListener('click', () => this.zoomCenter(1 / 1.6));
+    byId('map-zoom-in').addEventListener('click', () => this.zoomCenter(2));
+    byId('map-zoom-out').addEventListener('click', () => this.zoomCenter(1 / 2));
     byId('map-here').addEventListener('click', () => this.centerOnPlayer());
     this.goBtn.addEventListener('click', () => this.go());
     const nightBtn = byId<HTMLButtonElement>('map-night');
@@ -83,17 +89,18 @@ export class WorldMap {
   // À appeler à l'ouverture de la fenêtre : taille, vue centrée sur le joueur, fabrication de l'image si besoin.
   open(): void {
     this.target = null;
+    this.targetCity = null;
     this.goBtn.disabled = true;
     this.updateNight();
     this.resize();
     this.centerOnPlayer();
-    this.setInfo('Glisse pour te déplacer, molette pour zoomer, clique pour choisir un lieu.');
+    this.setInfo('Glisse pour te déplacer, molette pour zoomer (jusqu\'à ≈ 9 m par pixel), clique pour choisir un lieu.');
     if (!this.ready) this.build();
   }
 
   // Touche Entrée : voyage vers le lieu choisi (si la carte est ouverte).
   go(): void {
-    if (this.target) this.deps.onGo(this.target.lat, this.target.lon);
+    if (this.target) this.deps.onGo(this.target.lat, this.target.lon, this.targetCity);
   }
 
   // Calcule l'ombre de la nuit pour l'heure et la date du jeu.
@@ -142,7 +149,7 @@ export class WorldMap {
       this.draw();
     } else {
       const p = screenToLatLon(this.view, this.width, this.height, e.offsetX, e.offsetY);
-      if (!this.target) this.setInfo(formatCoords(p.lat, p.lon)); // coordonnées sous le curseur
+      if (!this.target) this.setInfo(formatCoords(p.lat, p.lon, coordDigits(this.view.scale))); // coordonnées sous le curseur
     }
   }
 
@@ -169,10 +176,14 @@ export class WorldMap {
       if (d <= 10 && (!city || d < city.d)) city = { i: c.i, d };
     }
     const cities = this.deps.cities;
+    this.targetCity = city ? city.i : null;
     this.target = city ? { lat: cities.lat[city.i]!, lon: cities.lon[city.i]! } : screenToLatLon(this.view, this.width, this.height, sx, sy);
-    const h = this.deps.relief.heightAt(this.target.lat, this.target.lon);
+    const deep = this.view.scale >= DETAIL_MIN_SCALE; // zoom assez fort : on se fie au terrain du jeu, pas à la grille floue
+    const h = deep ? this.deps.groundAt(this.target.lat, this.target.lon) : this.deps.relief.heightAt(this.target.lat, this.target.lon);
     const label = city ? `${cities.name(city.i)} (${cities.pop[city.i]!.toLocaleString('fr-FR')} habitants) — ` : '';
-    this.setInfo(`${label}${formatCoords(this.target.lat, this.target.lon)}${h < 0 && !city ? ' — en mer : tu seras posé sur la côte la plus proche' : ''}`);
+    const where = formatCoords(this.target.lat, this.target.lon, coordDigits(this.view.scale));
+    const alt = deep && !city ? (h >= 3 ? ` — altitude ${Math.round(h)} m : tu arriveras exactement ici` : ' — en mer ou sur la plage : tu seras posé sur la terre la plus proche') : !deep && h < 0 && !city ? ' — en mer : tu seras posé sur la côte la plus proche' : '';
+    this.setInfo(`${label}${where}${alt}`);
     this.goBtn.disabled = false;
     this.draw();
   }
@@ -202,6 +213,72 @@ export class WorldMap {
     step();
   }
 
+  // La couche de détail (terrain du jeu), posée à sa place même si on a bougé depuis son calcul.
+  private drawDetail(): void {
+    const { ctx, width, height, view } = this;
+    if (view.scale < DETAIL_MIN_SCALE) return;
+    this.scheduleDetail();
+    const d = this.detailView;
+    if (!d) return;
+    const tl = screenToLatLon(d.view, width, height, 0, 0); // coin haut-gauche de l'image (lat/lon)
+    const br = screenToLatLon(d.view, width, height, d.w * d.step, d.h * d.step); // coin bas-droite
+    const a = latLonToScreen(view, width, height, tl.lat, tl.lon);
+    const b = latLonToScreen(view, width, height, br.lat, br.lon);
+    if (b.x <= a.x || b.y <= a.y) return; // fenêtre incohérente (passage par la ligne de changement de date)
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.detail, a.x, a.y, b.x - a.x, b.y - a.y);
+  }
+
+  // Programme le calcul de la couche de détail quand la vue ne bouge plus.
+  private scheduleDetail(): void {
+    const d = this.detailView;
+    const v = this.view;
+    if (d && d.view.lat === v.lat && d.view.lon === v.lon && d.view.scale === v.scale && d.w * d.step >= this.width) return; // déjà à jour
+    window.clearTimeout(this.detailTimer);
+    this.detailTimer = window.setTimeout(() => this.startDetail(), 140);
+  }
+
+  // Calcule l'altitude du terrain du jeu sur toute la fenêtre (une case tous les 4 pixels), par morceaux pour garder l'écran réactif.
+  private startDetail(): void {
+    const gen = ++this.detailGen;
+    const view = { ...this.view };
+    const { width, height } = this;
+    const step = view.scale >= 1000 ? 3 : 4; // case de 3 ou 4 pixels : plus fin quand on est très zoomé (côtes moins en escalier)
+    const w = Math.ceil(width / step);
+    const h = Math.ceil(height / step);
+    const heights = new Float32Array(w * h);
+    let y = 0;
+    const work = (): void => {
+      if (gen !== this.detailGen) return; // un calcul plus récent a pris le relais
+      const t0 = performance.now(); // on travaille ~14 ms par passage : l'écran reste fluide, et on avance vite si le navigateur est libre
+      while (y < h && (y === 0 || performance.now() - t0 < 14)) {
+        for (let x = 0; x < w; x++) {
+          const p = screenToLatLon(view, width, height, (x + 0.5) * step, (y + 0.5) * step);
+          heights[y * w + x] = this.deps.groundAt(p.lat, p.lon);
+        }
+        y++;
+      }
+      if (y < h) {
+        window.setTimeout(work, 0);
+        return;
+      }
+      // Les altitudes sont prêtes : on colore.
+      this.detail.width = w;
+      this.detail.height = h;
+      const dctx = this.detail.getContext('2d')!;
+      const img = dctx.createImageData(w, h);
+      const spacing = (111320 / view.scale) * step; // distance entre deux cases (m)
+      renderDetailRows(img.data, heights, w, h, 0, h, spacing, (i, j) => {
+        const p = screenToLatLon(view, width, height, (i + 0.5) * step, (j + 0.5) * step);
+        return this.deps.climate.biomeAt(p.lat, p.lon);
+      });
+      dctx.putImageData(img, 0, 0);
+      this.detailView = { view, w, h, step };
+      this.draw();
+    };
+    work();
+  }
+
   private draw(): void {
     const { ctx, width, height, view } = this;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -217,6 +294,7 @@ export class WorldMap {
         ctx.drawImage(this.image, x0, y0, w, 180 * view.scale);
         if (this.showNight) ctx.drawImage(this.night, x0, y0, w, 180 * view.scale); // l'ombre de la nuit par-dessus
       }
+      this.drawDetail();
     }
     // Quadrillage léger tous les 30°.
     ctx.strokeStyle = 'rgba(255,255,255,0.14)';

@@ -310,6 +310,13 @@ Sans objet : jeu local, sans compte ni serveur.
 - Le village est **déterministe** (même ville → même plan à chaque fois) et se calcule à la demande, sans rien enregistrer. Distances réelles : Lannion–Paris = 425 km à vol d'oiseau.
 - Limites connues : pas d'intérieur (maisons pleines, portes dessinées), pas de rues dessinées au sol, pas d'église ni de bâtiments spéciaux, pas de terrain aplani sous les maisons (fondations enterrées sur 2,4 m de pente au plus), un seul style par grande famille de climat.
 
+## 1.31 — Panneaux au centre, style médiéval, carte à fort zoom
+
+- **Panneaux au centre du village** : un poteau au milieu de la rue principale, sur une place dégagée de maisons (rayon 6 m), avec quatre planches (deux le long de la rue, deux en travers, sur deux hauteurs) : on lit le nom depuis toutes les rues. Les planches sont devant le poteau (il ne cache pas le texte). Choisir une ville sur la carte t'amène sur la place, face au panneau.
+- **Style médiéval** (`villageStyle.ts`, `villageMesh.ts`) : colombage (poutres sombres, croix de saint André) sur 60 à 75 % des maisons en climat océanique ou continental, étages en surplomb (0,4 m), rez-de-chaussée en pierre, toits plus raides, maisons jusqu'à 3 étages, légères irrégularités d'alignement. Méditerranée, désert, tropiques et pôles gardent leur style propre, un peu plus ancien. Pas d'église ni de château encore.
+- **Carte** : zoom jusqu'à 12 000 pixels par degré (≈ 9 m par pixel) ; à partir de ≈ 1 km par pixel, la carte dessine le **vrai terrain du jeu** (côtes et altitudes telles que tu les verras), calculé par petits morceaux (rien ne fige). Les coordonnées affichées gagnent des décimales avec le zoom. Si le point choisi est à terre dans le jeu, on arrive **exactement dessus** (plus de recalage sur la grille floue) ; en mer, on est posé sur la côte la plus proche.
+- Limites : la couche de détail est un aplat de couleurs (pas d'arbres, ni de maisons) ; le village ne bouge pas en fonction de ce que tu construis, mais une maison n'est jamais posée sur un cairn.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

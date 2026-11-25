@@ -5,7 +5,7 @@ import { hashSeed } from './noise';
 import { loadRealRelief } from './relief.testutil';
 import { createTerrain } from './terrain';
 import { VillageSystem } from './villageSystem';
-import { SIGN_H, SIGN_Y, buildVillageMesh } from './villageMesh';
+import { BOARD_OFFSET, SIGN_H, SIGN_Y, buildVillageMesh } from './villageMesh';
 import { realClimate } from '../world/climateData';
 
 const terrain = createTerrain(hashSeed('horizon'), loadRealRelief(), realClimate);
@@ -35,19 +35,22 @@ describe('maillage de village', () => {
   });
   it('reste léger (même une grande ville)', () => {
     const paris = buildVillageMesh(system.village(idOf('Paris', 'FR'))!, (x, z) => terrain.heightAt(x, z));
-    expect(paris.positions.length / 3).toBeLessThan(80000);
+    expect(paris.positions.length / 3).toBeLessThan(120000);
   });
   it('les maisons restent proches du centre du village (positions relatives)', () => {
     for (let i = 0; i < m.positions.length; i += 3) expect(Math.hypot(m.positions[i]!, m.positions[i + 2]!)).toBeLessThan(v.radius + 40);
   });
-  it('les poteaux de panneaux montent à la hauteur du panneau', () => {
+  it('le poteau du panneau monte plus haut que les deux niveaux de planches', () => {
     const sg = v.signs[0]!;
     const g = terrain.heightAt(sg.x, sg.z);
     let max = -Infinity;
     for (let i = 0; i < m.positions.length; i += 3) {
       if (Math.hypot(m.positions[i]! - (sg.x - v.x), m.positions[i + 2]! - (sg.z - v.z)) < 0.2) max = Math.max(max, m.positions[i + 1]!);
     }
-    expect(max).toBeGreaterThan(g + SIGN_Y + SIGN_H);
+    expect(max).toBeGreaterThan(g + SIGN_Y + 2 * SIGN_H);
+  });
+  it('les planches sont devant le poteau (le poteau ne cache pas le texte)', () => {
+    expect(BOARD_OFFSET).toBeGreaterThan(0.09 + 0.03); // demi-poteau + demi-épaisseur de planche
   });
   it('les toits plats et à quatre pentes se fabriquent aussi (désert, tropiques)', () => {
     for (const [name, c] of [['Cairo', 'EG'], ['Singapore', 'SG'], ['Manaus', 'BR']] as const) {

@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { realClimate } from '../world/climateData';
 import { sunPosition } from './geo';
-import { cityMinPop, MAX_SCALE, nightAlpha, NIGHT_ALPHA, renderNightRows, subsolarPoint, sunElevationAt, MapView, clampView, latLonToScreen, mapColor, minScale, panBy, renderMapRows, screenToLatLon, snapToLand, wrapLon, zoomAt } from './worldmap';
+import { coordDigits, DETAIL_MIN_SCALE, renderDetailRows, cityMinPop, MAX_SCALE, nightAlpha, NIGHT_ALPHA, renderNightRows, subsolarPoint, sunElevationAt, MapView, clampView, latLonToScreen, mapColor, minScale, panBy, renderMapRows, screenToLatLon, snapToLand, wrapLon, zoomAt } from './worldmap';
 import { fakeRelief, loadRealRelief } from './relief.testutil';
 
 const W = 900;
@@ -140,5 +140,49 @@ describe('villes sur la carte', () => {
     for (let i = 1; i < pops.length; i++) expect(pops[i]!).toBeLessThanOrEqual(pops[i - 1]!);
     expect(cityMinPop(MAX_SCALE)).toBe(5000); // au zoom maximal : toutes les villes du jeu
     expect(cityMinPop(1)).toBeGreaterThanOrEqual(1000000);
+  });
+});
+
+describe('zoom profond et couche de détail', () => {
+  it('on peut zoomer bien plus qu\'avant (≈ 9 m par pixel) et le monde reste cadré', () => {
+    expect(MAX_SCALE).toBeGreaterThanOrEqual(10000);
+    const v = clampView({ lat: 48.73, lon: -3.46, scale: 1e9 }, 1000, 600);
+    expect(v.scale).toBe(MAX_SCALE);
+    const z = zoomAt({ lat: 48.73, lon: -3.46, scale: 20 }, 1000, 600, 300, 200, 100000);
+    expect(z.scale).toBe(MAX_SCALE);
+  });
+  it('un zoom autour du curseur garde le lieu sous le curseur, même très zoomé', () => {
+    const view: MapView = { lat: 48.7, lon: -3.4, scale: 3000 };
+    const before = screenToLatLon(view, 1000, 600, 700, 150);
+    const z = zoomAt(view, 1000, 600, 700, 150, 3);
+    const after = screenToLatLon(z, 1000, 600, 700, 150);
+    expect(after.lat).toBeCloseTo(before.lat, 6);
+    expect(after.lon).toBeCloseTo(before.lon, 6);
+  });
+  it('plus de décimales quand on zoome', () => {
+    const d = [1, 50, 100, 1000, 5000, 12000].map(coordDigits);
+    for (let i = 1; i < d.length; i++) expect(d[i]!).toBeGreaterThanOrEqual(d[i - 1]!);
+    expect(coordDigits(MAX_SCALE)).toBeGreaterThanOrEqual(5);
+    expect(DETAIL_MIN_SCALE).toBeGreaterThan(40);
+  });
+  it('la couche de détail : mer bleue, terre colorée, relief ombré', () => {
+    const w = 4;
+    const h = 3;
+    const heights = new Float32Array([-50, -50, 10, 10, -50, 20, 60, 80, -50, 20, 60, 80]);
+    const out = new Uint8ClampedArray(w * h * 4);
+    renderDetailRows(out, heights, w, h, 0, h, 100, () => undefined);
+    const px = (i: number, j: number): number[] => [out[(j * w + i) * 4]!, out[(j * w + i) * 4 + 1]!, out[(j * w + i) * 4 + 2]!, out[(j * w + i) * 4 + 3]!];
+    const sea = px(0, 0);
+    expect(sea[2]!).toBeGreaterThan(sea[0]!); // la mer est plus bleue que rouge
+    expect(px(3, 2)[3]).toBe(255); // tout est opaque
+    expect(px(3, 1)).not.toEqual(px(2, 0)); // la terre n'a pas la couleur de la mer
+    // La pente change l'éclairage : un versant qui monte vers l'est/sud est plus sombre qu'un plat.
+    const flat = new Float32Array(w * h).fill(30);
+    const flatOut = new Uint8ClampedArray(w * h * 4);
+    renderDetailRows(flatOut, flat, w, h, 0, h, 100, () => undefined);
+    const slope = new Float32Array([30, 60, 90, 120, 30, 60, 90, 120, 30, 60, 90, 120]);
+    const slopeOut = new Uint8ClampedArray(w * h * 4);
+    renderDetailRows(slopeOut, slope, w, h, 0, h, 100, () => undefined);
+    expect(slopeOut[4 * 1]!).not.toBe(flatOut[4 * 1]!);
   });
 });

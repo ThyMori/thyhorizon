@@ -449,7 +449,11 @@ export class Game {
       cities: this.cities,
       getPlayer: () => worldToLatLon(this.controls.x, this.controls.z),
       getTime: () => (this.settings.realTime ? realSolarClock(new Date()) : { hours: this.hours, day: this.day }), // en temps réel, la carte reçoit l'heure de Lannion (référence de l'ombre de nuit)
-      onGo: (lat, lon) => this.travelToLatLon(lat, lon),
+      groundAt: (lat, lon) => {
+        const w = latLonToWorld(lat, lon);
+        return this.terrain.heightAt(w.x, w.z); // le terrain du jeu (pas la grille floue)
+      },
+      onGo: (lat, lon, city) => this.travelToLatLon(lat, lon, city),
     });
     bindDialog(this.mapDialog, () => this.onDialogClosed());
     this.mapDialog.addEventListener('keydown', (e) => {
@@ -765,7 +769,27 @@ export class Game {
   }
 
   // Voyage vers une latitude / longitude choisie sur la carte : si c'est la mer, on se pose sur la côte la plus proche.
-  private travelToLatLon(lat: number, lon: number): void {
+  private travelToLatLon(lat: number, lon: number, city: number | null = null): void {
+    // Une ville choisie : on arrive sur la place du village, face au panneau.
+    const village = city !== null ? this.villages.village(city) : null;
+    if (village) {
+      const sign = village.signs[0];
+      const b = sign?.boards[0];
+      const ux = b ? b.nx : 0;
+      const uz = b ? b.nz : 1;
+      const x = village.x + ux * 6;
+      const z = village.z + uz * 6;
+      this.mapDialog.close();
+      this.teleport(x, z, `${village.name} :`, Math.atan2(ux, uz)); // on regarde vers le poteau
+      return;
+    }
+    // Zoom précis : si le terrain du jeu est bien à terre à l'endroit cliqué, on y va exactement.
+    const exact = latLonToWorld(lat, lon);
+    if (this.terrain.heightAt(exact.x, exact.z) >= 3) {
+      this.mapDialog.close();
+      this.teleport(exact.x, exact.z, 'Voyage terminé.');
+      return;
+    }
     const land = snapToLand(this.relief, Math.max(-89.5, Math.min(89.5, lat)), lon);
     if (!land) {
       toast('Il n\'y a pas de terre à proximité de ce point de l\'océan. Choisis un autre endroit.', 'error');
@@ -790,11 +814,11 @@ export class Game {
   }
 
   // Place le joueur au sol, face au nord.
-  private teleport(x: number, z: number, message: string): void {
+  private teleport(x: number, z: number, message: string, yaw = 0): void {
     this.boat.leave(); // le voyage nous sort du bateau (il reste là où il est)
     this.controls.x = x;
     this.controls.z = z;
-    this.controls.yaw = 0;
+    this.controls.yaw = yaw;
     this.controls.pitch = 0.04;
     this.controls.y = this.terrain.heightAt(x, z) + 1.7;
     this.controls.fly = false;
@@ -894,7 +918,7 @@ export class Game {
         else this.viewBlend = 1;
         return mode;
       },
-      villages: () => ({ shown: this.villageObjects.count, names: this.villageObjects.names(), near: this.villages.near(this.controls.x, this.controls.z, 3000).map((v) => ({ name: v.name, x: Math.round(v.x), z: Math.round(v.z), r: Math.round(v.radius), houses: v.houses.length, style: v.style.id, signs: v.signs.map((s) => ({ x: Math.round(s.x), z: Math.round(s.z), nx: s.nx, nz: s.nz })) })) }),
+      villages: () => ({ shown: this.villageObjects.count, names: this.villageObjects.names(), near: this.villages.near(this.controls.x, this.controls.z, 3000).map((v) => ({ name: v.name, x: Math.round(v.x), z: Math.round(v.z), r: Math.round(v.radius), houses: v.houses.length, style: v.style.id, signs: v.signs.map((s) => ({ x: Math.round(s.x), z: Math.round(s.z), boards: s.boards.length })) })) }),
       edits: () => ({ count: this.edits.size, shown: this.editObjects.count, persistent: this.editsDb?.persistent ?? null, worldVersion: WORLD_VERSION, list: this.edits.all().slice(0, 20).map((e) => ({ id: e.id, x: e.x, z: e.z })) }),
       compass: () => (this.compass ? { card: this.compass.card, text: compassText(bearingFromYaw(this.controls.yaw)) } : null),
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),

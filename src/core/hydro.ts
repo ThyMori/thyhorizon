@@ -6,7 +6,7 @@
 // Le résultat est ensuite « rastérisé » par petites tuiles de 128 m (une case de 2 m) : de combien le sol est creusé, et à quelle hauteur est l'eau.
 
 import { clamp, smoothstep } from './math';
-import { Heap } from './roads';
+import { Heap, distToSeg } from './roads';
 
 export const NODE = 128; // écart entre deux nœuds (m)
 export const BLOCK_NODES = 64; // nœuds par côté d'un bloc
@@ -22,6 +22,8 @@ export const RIVER_MIN_ACC = 64; // une rivière commence quand 64 nœuds (≈ 1
 const FLOOD_CAP = 5000; // plafond de nœuds noyés par un lac (sécurité)
 const MIN_LAKE_CELLS = 24; // un lac a au moins 24 nœuds (≈ 0,4 km²)…
 const MIN_LAKE_DEPTH = 5; // …et au moins 5 m de profondeur ; sinon c'est une flaque que l'eau traverse sans la montrer
+export const FORD_DEPTH = 0.4; // sur un chemin qui traverse l'eau (gué aménagé), le fond est remonté à 0,4 m sous la surface
+export const FORD_MARGIN = 2.5; // le gué déborde de la largeur du chemin de cette marge, avec une pente douce
 export const MAX_WALK_DEPTH = 1.2; // au-delà de cette profondeur d'eau, on ne marche plus
 
 // Les 8 voisins d'un nœud et leur distance en nœuds.
@@ -36,6 +38,12 @@ const carveBelow = (w: number): number => riverDepth(w) + 0.8; // le fond est so
 
 // Petit bruit stable par nœud : départage les paliers parfaitement plats.
 const tie = (i: number, j: number): number => (((Math.imul(i, 73856093) ^ Math.imul(j, 19349663)) >>> 0) % 1000) * 2e-6;
+
+// Un tronçon de chemin (pour les gués) : de (x1, z1) à (x2, z2), avec sa demi-largeur.
+export interface RoadLine {
+  x1: number; z1: number; x2: number; z2: number; half: number;
+}
+export type RoadProvider = (x: number, z: number, r: number) => readonly RoadLine[]; // les tronçons de chemin qui touchent le disque (x, z, r)
 
 // Un tronçon de rivière : de (x1, z1) à (x2, z2), largeurs, hauteurs du fond aux deux bouts, profondeur d'eau.
 interface RiverSeg {
@@ -64,7 +72,7 @@ export class HydroBlock {
   readonly wet: Uint8Array; // tuiles du bloc qui contiennent de l'eau (rivière ou lac), 64 × 64
   riverCount = 0; // nombre de nœuds de rivière dans le bloc (pour les tests)
 
-  constructor(readonly bx: number, readonly bz: number, private readonly coarse: (x: number, z: number) => number, private readonly threshold: (x: number, z: number) => number) {
+  constructor(readonly bx: number, readonly bz: number, private readonly coarse: (x: number, z: number) => number, private readonly threshold: (x: number, z: number) => number, private readonly roads: RoadProvider | null = null) {
     this.W = BLOCK_NODES + 2 * HALO_NODES;
     this.i0 = bx * BLOCK_NODES - HALO_NODES;
     this.j0 = bz * BLOCK_NODES - HALO_NODES;
@@ -346,6 +354,29 @@ export class HydroBlock {
         }
       }
     }
+    // Gués aménagés : là où un chemin traverse l'eau (rivière ou lac), le fond est remonté pour qu'on passe à pied.
+    if (any && this.roads) {
+      const lines = this.roads(x0 + TILE / 2, z0 + TILE / 2, TILE);
+      if (lines.length > 0) {
+        for (let b = 0; b < RW; b++) {
+          for (let a = 0; a < RW; a++) {
+            const i = b * RW + a;
+            if (Number.isNaN(surf[i]!)) continue; // pas d'eau ici
+            const x = x0 + a * RES;
+            const z = z0 + b * RES;
+            let k = 0; // 1 sur le chemin, 0 à la fin de la marge
+            for (const l of lines) {
+              const d = distToSeg(l, x, z);
+              if (d < l.half + FORD_MARGIN) k = Math.max(k, 1 - smoothstep(l.half, l.half + FORD_MARGIN, d));
+            }
+            if (k <= 0) continue;
+            const ground = base[i]! + delta[i]!; // sol actuel (lit déjà creusé)
+            const target = surf[i]! - FORD_DEPTH; // sol voulu : juste sous la surface
+            if (ground < target) delta[i] = delta[i]! + k * (target - ground);
+          }
+        }
+      }
+    }
     return any ? { delta, surf } : null;
   }
 }
@@ -359,7 +390,18 @@ export class Hydro {
   private lastTz = Number.NaN;
   stats = { blocks: 0, tiles: 0 }; // pour les tests et le debug
 
+  private roads: RoadProvider | null = null; // les chemins (pour aménager des gués)
+
   constructor(private readonly coarse: (x: number, z: number) => number, private readonly threshold: (x: number, z: number) => number = () => 1) {}
+
+  // Branche les chemins : là où ils traversent l'eau, le fond est remonté (gué). Les blocs et tuiles déjà calculés sont oubliés (ils se refont avec les gués).
+  setRoads(roads: RoadProvider): void {
+    this.roads = roads;
+    this.blocks.clear();
+    this.tiles.clear();
+    this.lastTile = null;
+    this.lastTx = Number.NaN;
+  }
 
   // Le bloc de drainage (bx, bz), calculé la première fois.
   block(bx: number, bz: number): HydroBlock {
@@ -373,7 +415,7 @@ export class Hydro {
         this.lastTile = null;
         this.lastTx = Number.NaN;
       }
-      b = new HydroBlock(bx, bz, this.coarse, this.threshold);
+      b = new HydroBlock(bx, bz, this.coarse, this.threshold, this.roads);
       this.blocks.set(key, b);
       this.stats.blocks++;
     }

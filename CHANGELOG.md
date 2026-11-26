@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.35.0 — 2026-11-26
+
+gués aménagés : un chemin qui traverse une rivière ou un lac passe sur un fond remonté (0,4 m d'eau au plus)
+
 ## 1.34.0 — 2026-11-26
 
 eau douce animée : rides qui suivent le courant, reflets du ciel et du soleil, rives transparentes

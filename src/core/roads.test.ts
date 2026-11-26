@@ -8,6 +8,7 @@ import { loadRealRelief } from './relief.testutil';
 import { DirtSeg, ROAD_HALF, ROAD_RANGE, RoadSystem, distToSeg, routePath } from './roads';
 import { createTerrain } from './terrain';
 import { VillageSystem } from './villageSystem';
+import { isWalkable } from './movement';
 import { realClimate } from '../world/climateData';
 
 const terrain = createTerrain(hashSeed('horizon'), loadRealRelief(), realClimate);
@@ -170,5 +171,51 @@ describe('RoadSystem', () => {
   it('est constructible seul avec une fonction de centres', () => {
     const r = new RoadSystem(cities, terrain, (i) => system.anchor(i));
     expect(r.neighbours(lannion)).toEqual(roads.neighbours(lannion));
+  });
+});
+
+describe('gués', () => {
+  // Un terrain frais SANS chemins branchés : les rivières sont telles quelles.
+  const plain = createTerrain(hashSeed('horizon'), loadRealRelief(), realClimate);
+  const withFords = createTerrain(hashSeed('horizon'), loadRealRelief(), realClimate);
+  const sys = new VillageSystem(cities, withFords); // branche les chemins : les gués sont aménagés
+  it('partout sur les chemins de Lannion, l\'eau est franchissable (gué de 0,5 m au plus) ; sans gué, elle ne l\'est pas toujours', () => {
+    const l = idOf('Lannion', 'FR');
+    let wetPlain = 0; // points d'eau profonde sur les chemins, sans gué
+    let wetFord = 0; // les mêmes avec gués
+    let samples = 0;
+    for (const j of sys.roads.neighbours(l)) {
+      const path = sys.roads.path(l, j)!;
+      for (let k = 0; k + 1 < path.length; k++) {
+        const p = path[k]!;
+        const q = path[k + 1]!;
+        const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / 3));
+        for (let s = 0; s < n; s++) {
+          const x = p.x + ((q.x - p.x) * s) / n;
+          const z = p.z + ((q.z - p.z) * s) / n;
+          samples++;
+          if (plain.waterDepthAt(x, z) > 0.5) wetPlain++;
+          if (withFords.waterDepthAt(x, z) > 0.5) wetFord++;
+          expect(isWalkable(withFords, x, z)).toBe(true);
+        }
+      }
+    }
+    expect(samples).toBeGreaterThan(1000);
+    expect(wetPlain).toBeGreaterThan(0); // il y a bien des traversées d'eau profonde à aménager
+    expect(wetFord).toBe(0); // et plus aucune une fois les gués faits
+  });
+  it('loin des chemins, les rivières ne changent pas', () => {
+    const r = withFords.coarseHeightAt(0, 0); // (appel quelconque pour amorcer)
+    expect(Number.isFinite(r)).toBe(true);
+    let same = 0;
+    let total = 0;
+    for (let k = 0; k < 300; k++) {
+      const x = 3000 + (k % 20) * 40;
+      const z = -3000 + Math.floor(k / 20) * 40;
+      if (sys.roads.segmentsNear(x, z, 40).length > 0) continue; // près d'un chemin : on saute
+      total++;
+      if (plain.heightAt(x, z) === withFords.heightAt(x, z)) same++;
+    }
+    expect(same).toBe(total);
   });
 });

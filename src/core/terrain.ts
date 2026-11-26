@@ -9,7 +9,7 @@ import { worldToLatLon } from './geo';
 import { clamp, smoothstep } from './math';
 import { Noise2D, fbm } from './noise';
 import { Biome, Climate, uniformClimate } from './climate';
-import { Hydro } from './hydro';
+import { Hydro, RoadProvider } from './hydro';
 import type { Relief } from './relief';
 
 // Niveau de la mer.
@@ -23,6 +23,7 @@ export interface Terrain {
   waterSurfaceAt(x: number, z: number): number; // hauteur de l'eau d'une rivière ou d'un lac en (x, z) (NaN = ni eau ni rive)
   waterDepthAt(x: number, z: number): number; // profondeur de l'eau douce ici (0 = à sec)
   hasWaterNear(x0: number, z0: number, size: number): boolean; // y a-t-il de l'eau douce dans ce carré ? (rapide)
+  setRoads(roads: RoadProvider): void; // branche les chemins de terre : là où ils traversent l'eau, un gué est aménagé (fond remonté)
   warmWater(x: number, z: number, r: number): boolean; // prépare à l'avance les calculs d'eau près d'ici (un bloc à la fois) ; true s'il a travaillé
   realHeightAt(x: number, z: number): number; // altitude réelle lissée (sans détail inventé), en mètres
   colorNoise(x: number, z: number): number; // variation douce (-1..1) pour les couleurs du sol
@@ -128,6 +129,7 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
     seed, heightAt, coarseHeightAt, waterSurfaceAt, waterDepthAt, realHeightAt, colorNoise, forestNoise, biomeAt, climateClassAt,
     hasWaterNear: (x0, z0, size) => (hydro ? hydro.hasWater(x0, z0, size) : false),
     warmWater: (x, z, r) => (hydro ? hydro.warm(x, z, r) : false),
+    setRoads: (roads) => hydro?.setRoads(roads),
   };
 }
 

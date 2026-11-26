@@ -342,6 +342,13 @@ Sans objet : jeu local, sans compte ni serveur.
 - Les rides se raccordent d'une tuile à l'autre (période de 4 096 m) et le courant descend la pente de la rivière.
 - Limites : le reflet est celui du ciel, pas des arbres ni des collines ; pas de bruit d'eau ni de sensation de courant sur le joueur ; l'eau n'est pas encore animée sur la carte.
 
+## 1.35 — Gués aménagés sur les chemins
+
+- Là où un chemin de terre traverse une rivière ou un lac, le fond est **remonté** pour former un **gué** : l'eau n'y dépasse jamais 0,4 m, avec une pente douce de 2,5 m de chaque côté (`FORD_DEPTH`, `FORD_MARGIN` dans `core/hydro.ts`). Le fond du gué prend la couleur de la terre du chemin, l'eau coule par-dessus.
+- Tous les chemins entre villes sont donc **franchissables à pied** (testé sur les trois chemins de Lannion).
+- Le reste de la rivière ne change pas, et les villes dont les rues croisent l'eau ne sont pas concernées pour l'instant.
+- Pas de pont visible : un gué convient aux rivières de 3 à 28 m ; de vrais ponts (planches, pierre) viendront plus tard si tu en veux.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

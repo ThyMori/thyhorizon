@@ -24,6 +24,7 @@ export class VillageSystem {
 
   constructor(private readonly cities: Cities, private readonly terrain: Terrain) {
     this.roads = new RoadSystem(cities, terrain, (i) => this.anchor(i)); // les chemins partent des centres recalés des villages
+    terrain.setRoads((x, z, r) => this.roads.segmentsNear(x, z, r)); // là où un chemin traverse l'eau, le terrain aménage un gué
   }
 
   get stamp(): number {

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.34.0 — 2026-11-26
+
+eau douce animée : rides qui suivent le courant, reflets du ciel et du soleil, rives transparentes
+
 ## 1.33.0 — 2026-11-25
 
 rivières et lacs réalistes (écoulement vers la mer, lacs dans les cuvettes), lit creusé, eau dessinée, marche à gué

@@ -14,6 +14,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { WeatherState, CLEAR_WEATHER, fogFactor } from '../core/weather';
 import type { SeaState } from '../core/sea';
+import { FreshWater } from './freshWater';
 import { Ocean } from './ocean';
 import { Rain } from './rain';
 import { SkyDome, toColor } from './sky';
@@ -86,6 +87,7 @@ export class GameScene {
   private readonly hemi = new THREE.HemisphereLight(0xffffff, 0x554433, 0.5); // lumière du ciel et du sol
   private readonly sky = new SkyDome();
   private readonly ocean = new Ocean();
+  readonly freshWater = new FreshWater(); // matériau animé des rivières et des lacs
   private readonly rain = new Rain(); // pluie autour de la caméra
   private readonly surfTime = new THREE.Uniform(0); // temps de l'écume de rivage
   private readonly surfStrength = new THREE.Uniform(0.4); // force de l'écume de rivage (dépend de l'état de mer)
@@ -287,6 +289,7 @@ export class GameScene {
     this.rain.update(this.camera, timeSeconds, this.weather.rain, state.daylight, this.tmpColor, this.windX, this.windZ);
     this.sky.update(state, this.camera, timeSeconds);
     this.ocean.update(timeSeconds, state, this.camera);
+    this.freshWater.update(timeSeconds, state); // rides et reflets des rivières et des lacs
   }
 
   render(): void {

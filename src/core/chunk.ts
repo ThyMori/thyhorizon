@@ -3,7 +3,7 @@
 // aussi bien dans un worker (calcul en arrière-plan) que dans les tests.
 
 import { lerpRgb, clamp, smoothstep } from './math';
-import { dirtColor, terrainColor, waterColor } from './palette';
+import { dirtColor, terrainColor } from './palette';
 import { DirtSeg, distToSeg } from './roads';
 import { MeshBuilder, addTreesForChunk } from './trees';
 import type { Terrain } from './terrain';
@@ -36,11 +36,26 @@ export interface ChunkData {
   indices: Uint16Array; // triangles
   minY: number; // altitude minimale (jupes comprises)
   maxY: number; // altitude maximale
+  water?: WaterMesh; // la surface de l'eau douce (rivières, lacs), absente s'il n'y en a pas : maillage à part, animé par un shader
 }
 
-// Ajoute la surface de l'eau douce (rivières, lacs) de la tuile : des carrés plats au niveau de l'eau, partout où le sol est plus bas qu'elle.
-// Les sommets sont partagés entre carrés voisins. Renvoie l'altitude la plus haute de l'eau (−Infinity s'il n'y en a pas).
-function addWater(b: MeshBuilder, terrain: Terrain, heights: Float32Array, ew: number, w: number, n: number, cell: number, x0: number, z0: number): number {
+// La surface de l'eau douce d'une tuile : maillage à part (matériau animé et transparent).
+export interface WaterMesh {
+  positions: Float32Array; // x,y,z de chaque sommet, relatifs au coin de la tuile
+  indices: Uint16Array; // triangles
+  depth: Float32Array; // profondeur de l'eau à chaque sommet (m, 0 sur la rive)
+  flow: Float32Array; // courant à chaque sommet : (x, z) en m/s, (0, 0) dans un lac
+  world: Float32Array; // position dans le monde (x, z) modulo WATER_PERIOD : pour que les rides se raccordent d'une tuile à l'autre
+  minY: number; // eau la plus basse
+  maxY: number; // eau la plus haute
+}
+
+export const WATER_PERIOD = 4096; // les rides se répètent tous les 4 096 m (un nombre entier de fois pour chaque ride)
+
+
+// Fabrique la surface de l'eau douce (rivières, lacs) de la tuile : des carrés plats au niveau de l'eau, partout où le sol est plus bas qu'elle.
+// Les sommets sont partagés entre carrés voisins. Renvoie null s'il n'y a pas d'eau.
+function buildWater(terrain: Terrain, heights: Float32Array, ew: number, w: number, n: number, cell: number, x0: number, z0: number): WaterMesh | null {
   const ws = new Float32Array(w * w); // hauteur de l'eau à chaque sommet (NaN = pas d'eau)
   const hs = new Float32Array(w * w); // altitude du sol à chaque sommet
   for (let j = 0; j < w; j++) {
@@ -50,16 +65,39 @@ function addWater(b: MeshBuilder, terrain: Terrain, heights: Float32Array, ew: n
     }
   }
   const vid = new Int32Array(w * w).fill(-1); // numéro du sommet d'eau créé pour ce coin (−1 = pas encore)
-  let top = -Infinity;
+  const pos: number[] = [];
+  const depth: number[] = [];
+  const flow: number[] = [];
+  const world: number[] = [];
+  const idx: number[] = [];
+  let lo = Infinity;
+  let hi = -Infinity;
+  // Pente de la surface de l'eau en un sommet (différence centrée sur 2 cases, ou d'un seul côté au bord ; 0 si pas de mesure).
+  const slope = (i: number, j: number, di: number, dj: number): number => {
+    const a = i - 2 * di >= 0 && j - 2 * dj >= 0 ? ws[(j - 2 * dj) * w + (i - 2 * di)]! : NaN;
+    const b = i + 2 * di < w && j + 2 * dj < w ? ws[(j + 2 * dj) * w + (i + 2 * di)]! : NaN;
+    const c = ws[j * w + i]!;
+    if (!Number.isNaN(a) && !Number.isNaN(b)) return (b - a) / (4 * cell);
+    if (!Number.isNaN(b)) return (b - c) / (2 * cell);
+    if (!Number.isNaN(a)) return (c - a) / (2 * cell);
+    return 0;
+  };
   const vertex = (i: number, j: number, y: number): number => {
     const k = j * w + i;
     if (vid[k]! >= 0) return vid[k]!; // déjà créé par un carré voisin
-    const id = b.positions.length / 3;
-    b.positions.push(i * cell, y, j * cell);
-    b.normals.push(0, 1, 0);
-    b.colors.push(...waterColor(y - hs[k]!));
+    const id = pos.length / 3;
+    pos.push(i * cell, y, j * cell);
+    depth.push(Math.max(0, y - hs[k]!));
+    // Le courant descend la pente de la surface : vitesse de 0,3 à 2 m/s selon la pente ; nul dans un lac (surface plate).
+    const gx = slope(i, j, 1, 0);
+    const gz = slope(i, j, 0, 1);
+    const g = Math.hypot(gx, gz);
+    const speed = g > 1e-4 ? clamp(0.3 + g * 50, 0.3, 2) : 0;
+    flow.push(g > 1e-4 ? (-gx / g) * speed : 0, g > 1e-4 ? (-gz / g) * speed : 0);
+    world.push((((x0 + i * cell) % WATER_PERIOD) + WATER_PERIOD) % WATER_PERIOD, (((z0 + j * cell) % WATER_PERIOD) + WATER_PERIOD) % WATER_PERIOD);
     vid[k] = id;
-    if (y > top) top = y;
+    if (y < lo) lo = y;
+    if (y > hi) hi = y;
     return id;
   };
   for (let j = 0; j < n; j++) {
@@ -78,10 +116,11 @@ function addWater(b: MeshBuilder, terrain: Terrain, heights: Float32Array, ew: n
       if (!wet) continue;
       const mean = sum / count; // niveau moyen du carré, pour les coins sans mesure
       const ids = ks.map((k, c) => vertex(i + (c % 2), j + (c >> 1), Number.isNaN(ws[k]!) ? mean : ws[k]!));
-      b.indices.push(ids[0]!, ids[2]!, ids[1]!, ids[1]!, ids[2]!, ids[3]!); // deux triangles, face vers le haut (comme le terrain)
+      idx.push(ids[0]!, ids[2]!, ids[1]!, ids[1]!, ids[2]!, ids[3]!); // deux triangles, face vers le haut (comme le terrain)
     }
   }
-  return top;
+  if (idx.length === 0) return null;
+  return { positions: new Float32Array(pos), indices: new Uint16Array(idx), depth: new Float32Array(depth), flow: new Float32Array(flow), world: new Float32Array(world), minY: lo, maxY: hi };
 }
 
 // Fabrique le maillage de la tuile (cx, cz) au niveau de détail donné.
@@ -196,9 +235,9 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
 
   // 6) Arbres : ajoutés à la suite du terrain, dans les mêmes tableaux (une seule tuile, un seul objet 3D).
   const trees: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
-  const waterTop = terrain.hasWaterNear(x0, z0, CHUNK_SIZE) ? addWater(trees, terrain, heights, ew, w, n, cell, x0, z0) : -Infinity; // l'eau douce d'abord (le constructeur numérote les sommets tout seul)
+  const water = terrain.hasWaterNear(x0, z0, CHUNK_SIZE) ? buildWater(terrain, heights, ew, w, n, cell, x0, z0) ?? undefined : undefined; // l'eau douce : maillage à part
   const added = addTreesForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE, blocked);
-  if (trees.positions.length === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY };
+  if (trees.positions.length === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY: water ? Math.max(maxY, water.maxY) : maxY, water };
   const base = positions.length / 3; // numéro du premier sommet d'arbre
   const allPositions = new Float32Array(positions.length + trees.positions.length);
   allPositions.set(positions);
@@ -212,5 +251,5 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
   const allIndices = new Uint16Array(indices.length + trees.indices.length);
   allIndices.set(indices);
   for (let k = 0; k < trees.indices.length; k++) allIndices[indices.length + k] = trees.indices[k]! + base;
-  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY, waterTop) };
+  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY, water ? water.maxY : -Infinity), water };
 }

@@ -1,6 +1,6 @@
 // Tests de l'hydrographie : écoulement vers le bas, lacs dans les cuvettes, rivières creusées, continuité entre blocs, marche à gué, arbres, maillage.
 import { describe, expect, it } from 'vitest';
-import { CHUNK_SIZE, buildChunk } from './chunk';
+import { CHUNK_SIZE, WATER_PERIOD, buildChunk } from './chunk';
 import { loadRealCities } from './cities.testutil';
 import { BLOCK_NODES, BLOCK_SIZE, HALO_NODES, Hydro, HydroBlock, MAX_WALK_DEPTH, NODE, RES, RW, TILE, riverDepth, riverWidth } from './hydro';
 import { isWalkable } from './movement';
@@ -158,19 +158,38 @@ describe('arbres et maillage', () => {
     expect(block).not.toBeNull();
     expect(block!(r.x, r.z)).toBe(true);
   });
-  it('la tuile d\'une rivière contient des sommets d\'eau en plus', () => {
+  it('la tuile d\'une rivière a une surface d\'eau à part, au-dessus du lit', () => {
     const cx = Math.floor(r.x / CHUNK_SIZE);
     const cz = Math.floor(r.z / CHUNK_SIZE);
     const withWater = buildChunk(terrain, cx, cz, 0, null, null);
     const without = buildChunk(dry, cx, cz, 0, null, null);
-    expect(withWater.positions.length).toBeGreaterThan(without.positions.length - 3000 * 0); // contient au moins le terrain
-    const terrainVertices = 65 * 65 + 4 * 65;
-    expect(withWater.positions.length / 3).toBeGreaterThan(terrainVertices + 20); // des sommets d'eau ont été ajoutés
-    // chaque sommet d'eau est au-dessus du sol à côté de lui : on vérifie les couleurs (bleu > rouge)
-    let blue = 0;
-    for (let v = terrainVertices; v < withWater.positions.length / 3; v++) if (withWater.colors[v * 3 + 2]! > withWater.colors[v * 3]!) blue++;
-    expect(blue).toBeGreaterThan(10);
-    expect(withWater.indices.length).toBeGreaterThan(without.indices.length - 1);
+    expect(without.water).toBeUndefined(); // sans eau douce, pas de surface d'eau
+    const w = withWater.water!;
+    expect(w).toBeDefined();
+    const count = w.positions.length / 3;
+    expect(count).toBeGreaterThan(20);
+    expect(w.depth.length).toBe(count);
+    expect(w.flow.length).toBe(count * 2);
+    expect(w.world.length).toBe(count * 2);
+    expect(w.indices.length % 3).toBe(0);
+    for (const v of [...w.depth, ...w.flow, ...w.positions]) expect(Number.isFinite(v)).toBe(true);
+    for (let v = 0; v < count; v++) {
+      expect(w.world[v * 2]!).toBeGreaterThanOrEqual(0);
+      expect(w.world[v * 2]!).toBeLessThan(WATER_PERIOD);
+    }
+    expect(Math.max(...w.depth)).toBeGreaterThan(0.2); // de l'eau où l'on peut se mouiller
+    expect(withWater.maxY).toBeGreaterThanOrEqual(w.maxY);
+  });
+  it('le courant d\'une rivière descend vers l\'aval (pas de courant dans un lac)', () => {
+    const cx = Math.floor(r.x / CHUNK_SIZE);
+    const cz = Math.floor(r.z / CHUNK_SIZE);
+    const w = buildChunk(terrain, cx, cz, 0, null, null).water!;
+    let moving = 0;
+    for (let v = 0; v < w.positions.length / 3; v++) if (Math.hypot(w.flow[v * 2]!, w.flow[v * 2 + 1]!) > 0.2) moving++;
+    expect(moving).toBeGreaterThan(5); // une rivière coule
+    // Les surfaces d'eau voisines de deux tuiles voisines donnent la même position dans le monde modulo la période.
+    const a = buildChunk(terrain, cx, cz, 0, null, null).water!;
+    expect(a.world[0]! % 1).toBeCloseTo(0, 5); // à 1 m près en x : les cases font 1 m
   });
   it('une tuile sans eau reste identique', () => {
     const a = buildChunk(terrain, 1000, 1000, 1, null, null); // en mer ou ailleurs : sans rivière

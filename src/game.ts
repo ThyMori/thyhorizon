@@ -158,7 +158,7 @@ export class Game {
     this.lens = new LensDrops(byId('stage')); // couche 2D au-dessus de la 3D // peut lever une erreur si WebGL est indisponible : main.ts l'affiche
     this.gs.applySettings(this.settings);
     this.gs.resize();
-    this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, seed, reliefGrid, citiesBytes, (message) =>
+    this.chunks = new ChunkManager(this.gs.scene, this.gs.terrainMaterial, this.gs.freshWater.material, seed, reliefGrid, citiesBytes, (message) =>
       toast(`Le terrain a rencontré un problème (${message}). Si des trous apparaissent, recharge la page.`, 'error'),
     );
     this.applyOrigin(); // le rendu (tuiles, grain du sol, vagues) apprend où est l'origine

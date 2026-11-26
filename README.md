@@ -335,6 +335,13 @@ Sans objet : jeu local, sans compte ni serveur.
 - Limites actuelles : pas encore d'eau animée ni de reflets, pas de ponts (les chemins de terre traversent les rivières « à gué » même si elles sont profondes), pas de bateau sur les rivières, les lacs sont rares, la carte n'affiche pas l'eau douce.
 - Calcul par blocs de 8 km (60 à 120 ms chacun), préparés à l'avance autour du joueur.
 
+## 1.34 — Eau animée et reflets
+
+- La surface des rivières et des lacs est un maillage à part avec son propre matériau (`render/freshWater.ts`), animé : des **rides** qui suivent le courant de la rivière (dans un lac, une légère brise les pousse).
+- La surface **reflète le ciel** (plus on regarde rasant, plus elle reflète), le **soleil scintille** sur les rides, l'eau est **transparente** près de la rive (on voit le fond) et **opaque** en profondeur, avec une fine bande claire le long de la rive. Elle s'assombrit la nuit et se fond dans la brume.
+- Les rides se raccordent d'une tuile à l'autre (période de 4 096 m) et le courant descend la pente de la rivière.
+- Limites : le reflet est celui du ciel, pas des arbres ni des collines ; pas de bruit d'eau ni de sensation de courant sur le joueur ; l'eau n'est pas encore animée sur la carte.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

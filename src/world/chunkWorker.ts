@@ -39,7 +39,9 @@ ctx.onmessage = (event) => {
   try {
     const data = buildChunk(terrain, msg.cx, msg.cz, msg.lod, villages ? villages.blockerForChunk(msg.cx, msg.cz, CHUNK_SIZE) : null, villages ? villages.dirtForChunk(msg.cx, msg.cz, CHUNK_SIZE) : null); // calcul du maillage (sans arbres dans les villages ni sur les chemins, avec la terre peinte)
     // Les tableaux sont TRANSFÉRÉS (pas copiés) : plus rapide, et le worker n'en a plus besoin.
-    ctx.postMessage({ ok: true, data }, [data.positions.buffer, data.normals.buffer, data.colors.buffer, data.indices.buffer]);
+    const transfer: Transferable[] = [data.positions.buffer, data.normals.buffer, data.colors.buffer, data.indices.buffer];
+    if (data.water) transfer.push(data.water.positions.buffer, data.water.indices.buffer, data.water.depth.buffer, data.water.flow.buffer, data.water.world.buffer); // l'eau douce aussi
+    ctx.postMessage({ ok: true, data }, transfer);
   } catch (error) {
     ctx.postMessage({ ok: false, cx: msg.cx, cz: msg.cz, lod: msg.lod, message: String(error) }, []); // on prévient le jeu
   }

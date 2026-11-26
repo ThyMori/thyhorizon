@@ -12,6 +12,7 @@ interface Entry {
   cx: number; // indice de tuile en x
   cz: number; // indice de tuile en z
   mesh: THREE.Mesh | null; // objet 3D affiché (null tant que rien n'est arrivé)
+  water: THREE.Mesh | null; // surface de l'eau douce de la tuile (null s'il n'y en a pas)
   lod: number; // niveau de détail du mesh affiché
   requested: number | null; // niveau de détail en cours de calcul (null = rien en cours)
 }
@@ -44,6 +45,7 @@ export class ChunkManager {
   constructor(
     private readonly scene: THREE.Scene, // la scène où ajouter les tuiles
     private readonly material: THREE.Material, // matériau commun à toutes les tuiles
+    private readonly waterMaterial: THREE.Material, // matériau animé de l'eau douce
     seed: number, // graine du monde
     reliefGrid: ReliefGrid, // le relief réel (copié dans chaque ouvrier)
     cities: Uint8Array, // les villes du monde (copiées dans chaque ouvrier : elles écartent les arbres des villages)
@@ -67,6 +69,7 @@ export class ChunkManager {
     for (const e of this.entries.values()) {
       if (!e.mesh) continue; // pas encore affichée
       this.placeMesh(e.mesh, e.cx, e.cz); // nouvelle position relative
+      if (e.water) this.placeMesh(e.water, e.cx, e.cz);
     }
   }
 
@@ -145,7 +148,7 @@ export class ChunkManager {
       if (this.inflight >= this.maxInflight) return; // les ouvriers sont occupés
       let e = this.entries.get(w.key);
       if (!e) {
-        e = { cx: w.cx, cz: w.cz, mesh: null, lod: -1, requested: null }; // première fois qu'on voit cette tuile
+        e = { cx: w.cx, cz: w.cz, mesh: null, water: null, lod: -1, requested: null }; // première fois qu'on voit cette tuile
         this.entries.set(w.key, e);
       }
       if (e.mesh && e.lod === w.lod) continue; // déjà au bon détail
@@ -187,6 +190,8 @@ export class ChunkManager {
       e.mesh = mesh;
       e.lod = d.lod;
       this.scene.add(mesh);
+      e.water = this.createWater(d); // l'eau douce, s'il y en a
+      if (e.water) this.scene.add(e.water);
       installed++;
     }
   }
@@ -209,11 +214,36 @@ export class ChunkManager {
     return mesh;
   }
 
+  // Fabrique la surface de l'eau douce d'une tuile (null s'il n'y en a pas).
+  private createWater(d: ChunkData): THREE.Mesh | null {
+    const w = d.water;
+    if (!w) return null;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(w.positions, 3));
+    g.setAttribute('aDepth', new THREE.BufferAttribute(w.depth, 1)); // profondeur
+    g.setAttribute('aFlow', new THREE.BufferAttribute(w.flow, 2)); // courant
+    g.setAttribute('aWorld', new THREE.BufferAttribute(w.world, 2)); // position dans le monde (modulo)
+    g.setIndex(new THREE.BufferAttribute(w.indices, 1));
+    const half = CHUNK_SIZE / 2;
+    const hy = (w.maxY - w.minY) / 2 + 1;
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(half, (w.minY + w.maxY) / 2, half), Math.sqrt(2 * half * half + hy * hy) + 1);
+    const mesh = new THREE.Mesh(g, this.waterMaterial);
+    this.placeMesh(mesh, d.cx, d.cz);
+    mesh.matrixAutoUpdate = false;
+    mesh.renderOrder = 9; // après le terrain opaque, avant la mer
+    return mesh;
+  }
+
   // Retire l'objet 3D d'une tuile et libère sa mémoire.
   private removeMesh(e: Entry): void {
     if (!e.mesh) return;
     this.scene.remove(e.mesh);
     e.mesh.geometry.dispose(); // libère la mémoire de la carte graphique
+    if (e.water) {
+      this.scene.remove(e.water);
+      e.water.geometry.dispose();
+      e.water = null;
+    }
     e.mesh = null;
     e.lod = -1;
   }

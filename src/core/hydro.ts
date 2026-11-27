@@ -24,6 +24,10 @@ const MIN_LAKE_CELLS = 24; // un lac a au moins 24 nœuds (≈ 0,4 km²)…
 const MIN_LAKE_DEPTH = 5; // …et au moins 5 m de profondeur ; sinon c'est une flaque que l'eau traverse sans la montrer
 export const FORD_DEPTH = 0.4; // sur un chemin qui traverse l'eau (gué aménagé), le fond est remonté à 0,4 m sous la surface
 export const FORD_MARGIN = 2.5; // le gué déborde de la largeur du chemin de cette marge, avec une pente douce
+export const BRIDGE_MIN_W = 9; // un pont de bois n'enjambe que les rivières larges d'au moins 9 m (les autres gardent leur gué)
+export const BRIDGE_CLEAR = 1.1; // le tablier est 1,1 m au-dessus de l'eau
+export const BRIDGE_HALF_W = 2; // demi-largeur du tablier (4 m)
+export const BRIDGE_MAX_L = 40; // demi-longueur maximale d'un pont (m)
 export const MAX_WALK_DEPTH = 1.2; // au-delà de cette profondeur d'eau, on ne marche plus
 
 // Les 8 voisins d'un nœud et leur distance en nœuds.
@@ -53,10 +57,34 @@ interface RiverSeg {
   depth: number;
 }
 
+// Un pont : centré en (x, z) sur le chemin, orienté selon (dx, dz) (vecteur unitaire du chemin), de demi-longueur len.
+export interface Bridge {
+  x: number; z: number; dx: number; dz: number;
+  len: number; // demi-longueur totale (m)
+  flat: number; // demi-longueur de la partie plate au-dessus de l'eau
+  midY: number; // hauteur du tablier au-dessus de l'eau
+  endY0: number; endY1: number; // hauteur du sol aux deux rampes (côté −u et côté +u)
+  halfW: number; // demi-largeur
+}
+
+// Hauteur du tablier du pont en (x, z) (NaN = hors du pont).
+export function bridgeDeckAt(b: Bridge, x: number, z: number): number {
+  const rx = x - b.x;
+  const rz = z - b.z;
+  const u = rx * b.dx + rz * b.dz; // position le long du pont
+  const v = -rx * b.dz + rz * b.dx; // position en travers
+  if (Math.abs(v) > b.halfW || Math.abs(u) > b.len) return NaN;
+  const au = Math.abs(u);
+  if (au <= b.flat) return b.midY;
+  const t = (au - b.flat) / Math.max(b.len - b.flat, 0.01); // 0 au bout de la partie plate, 1 au bout de la rampe
+  return b.midY + ((u < 0 ? b.endY0 : b.endY1) - b.midY) * t;
+}
+
 // Le raster d'une tuile : de combien le sol est modifié, et la hauteur de l'eau (NaN = pas d'eau ni de rive).
 export interface HydroTile {
   delta: Float32Array;
   surf: Float32Array;
+  bridges: Bridge[]; // les ponts qui touchent cette tuile
 }
 
 export class HydroBlock {
@@ -251,7 +279,7 @@ export class HydroBlock {
     const b1 = H[k]! - carveBelow(w1); // (dans une flaque traversée, le fond peut remonter un peu : on ne bâtit jamais de digue)
     const seg: RiverSeg = { x1: this.nodeX(k), z1: this.nodeZ(k), x2: this.nodeX(nx), z2: this.nodeZ(nx), w1, w2, b1, b2, depth: riverDepth(Math.max(w1, w2)) };
     this.riverCount++;
-    const margin = Math.max(w1, w2) / 2 + 2 + 0.5 * Math.max(w1, w2) + 2;
+    const margin = Math.max(w1, w2) / 2 + 2 + 0.5 * Math.max(w1, w2) + 2 + (this.roads && Math.max(w1, w2) >= BRIDGE_MIN_W ? BRIDGE_MAX_L + BRIDGE_HALF_W : 0); // marge plus large si un pont peut s'y poser
     const tx0 = Math.floor((Math.min(seg.x1, seg.x2) - margin) / TILE);
     const tx1 = Math.floor((Math.max(seg.x1, seg.x2) + margin) / TILE);
     const tz0 = Math.floor((Math.min(seg.z1, seg.z2) - margin) / TILE);
@@ -285,6 +313,55 @@ export class HydroBlock {
         }
       }
     }
+  }
+
+  // Le dessous d'un pont (tablier élargi de la marge des gués) : pas de gué là.
+  private underBridge(b: Bridge, x: number, z: number): boolean {
+    const rx = x - b.x;
+    const rz = z - b.z;
+    return Math.abs(rx * b.dx + rz * b.dz) <= b.len && Math.abs(-rx * b.dz + rz * b.dx) <= b.halfW + FORD_MARGIN;
+  }
+
+  // Les ponts de la tuile : croisements entre un tronçon de rivière large et un chemin (le même calcul dans toutes les tuiles voisines, donc le même pont).
+  private findBridges(segs: readonly RiverSeg[], x0: number, z0: number): Bridge[] {
+    const out: Bridge[] = [];
+    if (!this.roads) return out;
+    const wide = segs.filter((s) => Math.max(s.w1, s.w2) >= BRIDGE_MIN_W);
+    if (wide.length === 0) return out;
+    const reach = TILE / 2 + BRIDGE_MAX_L + BRIDGE_HALF_W + 4;
+    const lines = this.roads(x0 + TILE / 2, z0 + TILE / 2, reach * 1.5);
+    for (const l of lines) {
+      const rx = l.x2 - l.x1;
+      const rz = l.z2 - l.z1;
+      const rl = Math.hypot(rx, rz);
+      if (rl < 1e-6) continue;
+      for (const s of wide) {
+        const sx = s.x2 - s.x1;
+        const sz = s.z2 - s.z1;
+        const den = sx * rz - sz * rx; // produit vectoriel des deux directions
+        if (Math.abs(den) < 1e-9) continue; // parallèles
+        const t = ((l.x1 - s.x1) * rz - (l.z1 - s.z1) * rx) / den; // position sur la rivière
+        const u = ((l.x1 - s.x1) * sz - (l.z1 - s.z1) * sx) / den; // position sur le chemin
+        if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+        const px = l.x1 + rx * u;
+        const pz = l.z1 + rz * u;
+        if (Math.abs(px - (x0 + TILE / 2)) > reach || Math.abs(pz - (z0 + TILE / 2)) > reach) continue; // trop loin pour toucher cette tuile
+        if (out.some((o) => Math.hypot(o.x - px, o.z - pz) < 3)) continue; // déjà trouvé (jointure entre deux tronçons)
+        const dx = rx / rl;
+        const dz = rz / rl;
+        const w = s.w1 + (s.w2 - s.w1) * t;
+        const sin = Math.max(Math.abs(den) / (Math.hypot(sx, sz) * rl), 0.35); // sinus de l'angle de croisement
+        const halfSpan = Math.min((w / 2 + 2 + 0.5 * w) / sin, BRIDGE_MAX_L);
+        const surface = s.b1 + (s.b2 - s.b1) * t + s.depth;
+        out.push({
+          x: px, z: pz, dx, dz,
+          len: halfSpan, flat: Math.max(0, halfSpan - 5), midY: surface + BRIDGE_CLEAR,
+          endY0: this.coarse(px - dx * halfSpan, pz - dz * halfSpan), endY1: this.coarse(px + dx * halfSpan, pz + dz * halfSpan),
+          halfW: BRIDGE_HALF_W,
+        });
+      }
+    }
+    return out;
   }
 
   // Le raster de la tuile (tx, tz) : null si elle ne contient pas d'eau.
@@ -354,6 +431,8 @@ export class HydroBlock {
         }
       }
     }
+    // Ponts : là où un chemin croise une rivière large, un pont enjambe l'eau.
+    const bridges = this.findBridges(segs, x0, z0);
     // Gués aménagés : là où un chemin traverse l'eau (rivière ou lac), le fond est remonté pour qu'on passe à pied.
     if (any && this.roads) {
       const lines = this.roads(x0 + TILE / 2, z0 + TILE / 2, TILE);
@@ -364,6 +443,7 @@ export class HydroBlock {
             if (Number.isNaN(surf[i]!)) continue; // pas d'eau ici
             const x = x0 + a * RES;
             const z = z0 + b * RES;
+            if (bridges.some((br) => this.underBridge(br, x, z))) continue; // sous un pont : pas de gué
             let k = 0; // 1 sur le chemin, 0 à la fin de la marge
             for (const l of lines) {
               const d = distToSeg(l, x, z);
@@ -377,7 +457,7 @@ export class HydroBlock {
         }
       }
     }
-    return any ? { delta, surf } : null;
+    return any ? { delta, surf, bridges } : null;
   }
 }
 
@@ -455,6 +535,35 @@ export class Hydro {
     const d = t.delta;
     const i = b * RW + a;
     return (d[i]! * (1 - u) + d[i + 1]! * u) * (1 - v) + (d[i + RW]! * (1 - u) + d[i + RW + 1]! * u) * v; // interpolation entre les 4 cases
+  }
+
+  // Hauteur du tablier d'un pont en (x, z) (NaN = pas de pont ici).
+  deckAt(x: number, z: number): number {
+    const t = this.tile(Math.floor(x / TILE), Math.floor(z / TILE));
+    if (!t) return NaN;
+    for (const b of t.bridges) {
+      const d = bridgeDeckAt(b, x, z);
+      if (!Number.isNaN(d)) return d;
+    }
+    return NaN;
+  }
+
+  // Les ponts dont le centre est à moins de r de (x, z) (sans doublon).
+  bridgesNear(x: number, z: number, r: number): Bridge[] {
+    const out: Bridge[] = [];
+    const m = r + BRIDGE_MAX_L;
+    for (let tz = Math.floor((z - m) / TILE); tz <= Math.floor((z + m) / TILE); tz++) {
+      for (let tx = Math.floor((x - m) / TILE); tx <= Math.floor((x + m) / TILE); tx++) {
+        const t = this.tile(tx, tz);
+        if (!t) continue;
+        for (const b of t.bridges) {
+          if (Math.hypot(b.x - x, b.z - z) > r + b.len) continue;
+          if (out.some((o) => Math.hypot(o.x - b.x, o.z - b.z) < 0.5)) continue;
+          out.push(b);
+        }
+      }
+    }
+    return out;
   }
 
   // Hauteur de l'eau en (x, z) (NaN = pas d'eau ni de rive).

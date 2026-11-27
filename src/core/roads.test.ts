@@ -204,6 +204,13 @@ describe('gués', () => {
     expect(wetPlain).toBeGreaterThan(0); // il y a bien des traversées d'eau profonde à aménager
     expect(wetFord).toBe(0); // et plus aucune une fois les gués faits
   });
+  it('autour de Lannion les rivières sont petites : des gués, pas de pont', () => {
+    const l = idOf('Lannion', 'FR');
+    for (const j of sys.roads.neighbours(l)) {
+      const path = sys.roads.path(l, j)!;
+      for (let k = 0; k < path.length; k += 3) expect(withFords.bridgesNear(path[k]!.x, path[k]!.z, 60).length).toBe(0);
+    }
+  });
   it('loin des chemins, les rivières ne changent pas', () => {
     const r = withFords.coarseHeightAt(0, 0); // (appel quelconque pour amorcer)
     expect(Number.isFinite(r)).toBe(true);

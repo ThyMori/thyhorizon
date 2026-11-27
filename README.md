@@ -349,6 +349,13 @@ Sans objet : jeu local, sans compte ni serveur.
 - Le reste de la rivière ne change pas, et les villes dont les rues croisent l'eau ne sont pas concernées pour l'instant.
 - Pas de pont visible : un gué convient aux rivières de 3 à 28 m ; de vrais ponts (planches, pierre) viendront plus tard si tu en veux.
 
+## 1.36 — Ponts de bois sur les grandes rivières
+
+- Quand un chemin de terre croise une rivière **large d'au moins 9 m** (`BRIDGE_MIN_W`), un **pont de bois** l'enjambe : tablier de 4 m de large à 1,1 m au-dessus de l'eau, rampes qui rejoignent le sol, garde-corps avec poteaux, pieux dans l'eau (`core/bridgeMesh.ts`). Les rivières plus étroites gardent leur gué (1.35).
+- On marche sur le tablier (le terrain répond « tablier » à `heightAt`, « sol » à `bedHeightAt`) ; sous le pont, le lit reste profond (pas de gué).
+- Les ponts sont **rares** : les rivières de Bretagne sont petites, on en trouve surtout sur de plus grands cours d'eau. Exemple pour tester : route entre Spolète et Foligno (Italie, x ≈ 1 318 636, z ≈ 649 836 en `?debug`).
+- Limites : les rues de village n'ont pas de pont ; pas encore de pont de pierre ; les grands fleuves réels (Rhin, Loire…) ne sont pas dans le jeu (rivières plausibles, pas réelles).
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

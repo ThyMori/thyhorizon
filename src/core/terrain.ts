@@ -9,7 +9,7 @@ import { worldToLatLon } from './geo';
 import { clamp, smoothstep } from './math';
 import { Noise2D, fbm } from './noise';
 import { Biome, Climate, uniformClimate } from './climate';
-import { Hydro, RoadProvider } from './hydro';
+import { Bridge, Hydro, RoadProvider } from './hydro';
 import type { Relief } from './relief';
 
 // Niveau de la mer.
@@ -18,7 +18,9 @@ export const SEA_LEVEL = 0;
 // Un terrain : des fonctions qui répondent à « quelle altitude ici ? ».
 export interface Terrain {
   readonly seed: number; // graine utilisée
-  heightAt(x: number, z: number): number; // altitude du sol en (x, z), en mètres (lits des rivières creusés)
+  heightAt(x: number, z: number): number; // altitude où l'on marche en (x, z) : le sol (lits des rivières creusés), ou le tablier d'un pont
+  bedHeightAt(x: number, z: number): number; // altitude du SOL seul (sans tablier de pont) : sert au maillage du terrain
+  bridgesNear(x: number, z: number, r: number): Bridge[]; // les ponts de bois proches (centre à moins de r)
   coarseHeightAt(x: number, z: number): number; // altitude SANS les rivières : plus rapide, pour les calculs sur de grandes zones (chemins, carte, recalage des villes)
   waterSurfaceAt(x: number, z: number): number; // hauteur de l'eau d'une rivière ou d'un lac en (x, z) (NaN = ni eau ni rive)
   waterDepthAt(x: number, z: number): number; // profondeur de l'eau douce ici (0 = à sec)
@@ -103,11 +105,18 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
         return c.startsWith('B') ? 8 : c.startsWith('E') ? 2 : 1; // désert : 8 fois plus ; polaire : 2 fois plus
       })
     : null;
-  const heightAt = hydro ? (x: number, z: number): number => coarseHeightAt(x, z) + hydro.deltaAt(x, z) : coarseHeightAt;
+  const bedHeightAt = hydro ? (x: number, z: number): number => coarseHeightAt(x, z) + hydro.deltaAt(x, z) : coarseHeightAt;
+  const heightAt = hydro
+    ? (x: number, z: number): number => {
+        const bed = bedHeightAt(x, z);
+        const deck = hydro.deckAt(x, z); // le tablier d'un pont, s'il y en a un ici
+        return deck > bed ? deck : bed; // (NaN > x est faux : sans pont, on garde le sol)
+      }
+    : coarseHeightAt;
   const waterSurfaceAt = (x: number, z: number): number => (hydro ? hydro.surfaceAt(x, z) : NaN);
   const waterDepthAt = (x: number, z: number): number => {
     const s = waterSurfaceAt(x, z);
-    return Number.isNaN(s) ? 0 : Math.max(0, s - heightAt(x, z));
+    return Number.isNaN(s) ? 0 : Math.max(0, s - heightAt(x, z)); // sur un tablier, la profondeur est nulle
   };
 
   const colorNoise = (x: number, z: number): number =>
@@ -126,7 +135,7 @@ export function createTerrain(seed: number, relief: Relief, climate: Climate = u
   const forestNoise = (x: number, z: number): number => fbm(forestN, x / 380, z / 380, 3); // taches de quelques centaines de mètres
 
   return {
-    seed, heightAt, coarseHeightAt, waterSurfaceAt, waterDepthAt, realHeightAt, colorNoise, forestNoise, biomeAt, climateClassAt,
+    seed, heightAt, bedHeightAt, bridgesNear: (x, z, r) => (hydro ? hydro.bridgesNear(x, z, r) : []), coarseHeightAt, waterSurfaceAt, waterDepthAt, realHeightAt, colorNoise, forestNoise, biomeAt, climateClassAt,
     hasWaterNear: (x0, z0, size) => (hydro ? hydro.hasWater(x0, z0, size) : false),
     warmWater: (x, z, r) => (hydro ? hydro.warm(x, z, r) : false),
     setRoads: (roads) => hydro?.setRoads(roads),

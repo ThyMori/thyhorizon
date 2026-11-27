@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.36.0 — 2026-11-27
+
+Ponts de bois sur les grandes rivières
+
 ## 1.35.0 — 2026-11-26
 
 gués aménagés : un chemin qui traverse une rivière ou un lac passe sur un fond remonté (0,4 m d'eau au plus)

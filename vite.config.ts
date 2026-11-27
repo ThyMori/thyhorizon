@@ -17,5 +17,7 @@ export default defineConfig({
     environment: 'node',
     // Où chercher les fichiers de test.
     include: ['src/**/*.test.ts'],
+    // Les tests de terrain réel (rivières, chemins) sont lents sur les machines de GitHub : 30 s au lieu de 5 s.
+    testTimeout: 30000,
   },
 });

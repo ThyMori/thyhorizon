@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.43.1 — 2026-11-27
+
+Tests : limite de temps relevée (le test des gués échouait sur GitHub)
+
 ## 1.43.0 — 2026-11-27
 
 Voix des animaux : moutons, vaches, cerfs, lapins, rapaces, oiseaux et mouettes localisés

@@ -421,6 +421,10 @@ Sans objet : jeu local, sans compte ni serveur.
 - Tout est synthétisé (aucun fichier son). Essai hors ligne avec `?debug` : `__thy.audioTest({ voice: 'cow' })` (aussi `sheep`, `deer`, `rabbit`, `songbird`, `gull`, `raptor`) mesure le niveau sans haut-parleur.
 - Pas encore : pas de bruit de pas des animaux, pas de cris de papillons ni d'insectes (les grillons du fond existent depuis 1.22), les sons ne sont pas réverbérés selon la forêt.
 
+## 1.43.1 — Tests plus patients sur GitHub
+
+- Le test des gués (`roads.test.ts`) dépassait parfois 5 s sur les machines de GitHub et faisait échouer la publication. La limite passe à 30 s pour tous les tests (`testTimeout` dans `vite.config`). Aucun changement dans le jeu.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

@@ -5,9 +5,12 @@ import { SaveData, readSavedSeed, sanitizeSave } from './core/save';
 import { formatCount } from './core/format';
 import { hashSeed } from './core/noise';
 import { Settings, sanitizeSettings } from './core/settings';
-import { dayOfYearFromDate, realSolarClock, wrapDay } from './core/geo';
+import { worldClock } from './core/worldClock';
+import { buildSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from './core/saveFile';
+import { applyImport } from './storage/importSave';
+import { VERSION } from './version';
 import { Origin, snapOrigin, updateOrigin } from './core/origin';
-import { sunState, wrapHours } from './core/sun';
+import { sunState } from './core/sun';
 import { createRelief } from './core/relief';
 import { realClimate } from './world/climateData';
 import { CALM_SEA, SeaState, approachSea, seaName, seaStateFor } from './core/sea';
@@ -96,6 +99,7 @@ export class Game {
   private villageObjects!: VillageObjects; // le dessin des villages proches
   private villageClock = 0; // temps depuis le dernier rafraîchissement des villages (s)
   private savedWorldVersion = WORLD_VERSION; // version du monde lue dans la sauvegarde
+  private importing = false; // un import est en cours : on n'enregistre plus la position (elle écraserait celle du fichier)
   private editsReadOnly = false; // vrai si la sauvegarde vient d'un jeu plus récent : on ne touche à rien
   private editClock = 0; // temps depuis le dernier rafraîchissement du dessin (s)
   private avatar!: Avatar; // les bras, les mains, la boussole et le corps du joueur
@@ -164,10 +168,11 @@ export class Game {
     this.savedWorldVersion = readWorldVersion(rawSave); // version du monde de la sauvegarde lue
     this.cities = parseCities(citiesBytes); // les villes réelles du monde
     this.villages = new VillageSystem(this.cities, this.terrain); // leurs villages, calculés à la demande
-    const save = sanitizeSave(rawSave, this.terrain, this.seedText, dayOfYearFromDate(new Date())); // position valable, sinon départ sur la plage
-    this.hours = save.hours;
-    this.gameHours = save.day * 24 + save.hours;
-    this.day = save.day;
+    const save = sanitizeSave(rawSave, this.terrain, this.seedText); // position valable, sinon départ sur la plage
+    const startClock = worldClock.solar(worldToLatLon(save.x, save.z).lon); // le temps réel, là où l'on repart
+    this.hours = startClock.hours;
+    this.day = startClock.day;
+    this.gameHours = worldClock.hoursSinceEpoch();
     this.origin = snapOrigin(save.x, save.z); // le rendu démarre près du joueur
 
     this.gs = new GameScene(byId('stage'));
@@ -189,17 +194,12 @@ export class Game {
     this.settingsPanel = new SettingsPanel({
       getSettings: () => this.settings,
       setSettings: (next) => this.applySettings(next),
-      getHours: () => this.hours,
-      setHours: (h) => {
-        this.hours = wrapHours(h);
-      },
+      getClock: () => ({ hours: this.hours, day: this.day }), // lecture seule : c'est l'horloge du monde qui décide
+      exportSave: () => this.exportSave(),
+      importSave: (file) => void this.importSave(file),
       getMoonText: () => {
         const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
         return moonText(moonState(lat, lon, this.day, this.hours)); // phase de la vraie Lune ici et maintenant
-      },
-      getDay: () => this.day,
-      setDay: (d) => {
-        this.day = wrapDay(d);
       },
     });
     this.touchUi = new TouchUi(this.controls, () => this.pauseTouch(), () => this.toggleConstellations());
@@ -219,8 +219,7 @@ export class Game {
 
   // Calcule le temps visé au lieu du joueur et s'en approche doucement ; donne le vent au voilier et au ciel.
   private updateWeather(dt: number, seconds: number): void {
-    if (this.settings.realTime) this.gameHours = Date.now() / 3600000; // temps réel : la météo suit vraiment les jours qui passent
-    else if (this.controls.locked && this.settings.dayLengthMinutes > 0) this.gameHours += (dt * 24) / (this.settings.dayLengthMinutes * 60);
+    this.gameHours = worldClock.hoursSinceEpoch(); // temps réel : la météo suit vraiment les jours qui passent
     this.weatherTimer -= dt;
     if (this.weatherTimer <= 0) {
       this.weatherTimer = 0.5; // inutile de recalculer à chaque image
@@ -358,13 +357,13 @@ export class Game {
       return;
     }
     const key = cellKey(lat, lon);
-    if (this.realBusy || !needsRefresh(this.realState, key, Date.now())) return; // rien à faire
+    if (this.realBusy || !needsRefresh(this.realState, key, worldClock.now())) return; // rien à faire
     this.realBusy = true;
-    this.realState = { key, at: Date.now(), ok: true }; // on note la tentative tout de suite
-    void fetchRealConditions(lat, lon, Date.now()).then((r) => {
+    this.realState = { key, at: worldClock.now(), ok: true }; // on note la tentative tout de suite
+    void fetchRealConditions(lat, lon, worldClock.now()).then((r) => {
       this.realBusy = false;
       if (!this.settings.realWeather) return; // coupée pendant la requête
-      this.realState = { key, at: Date.now(), ok: r !== null };
+      this.realState = { key, at: worldClock.now(), ok: r !== null };
       if (r) {
         this.real = r; // données fraîches
         this.realKey = key;
@@ -383,15 +382,9 @@ export class Game {
     const dt = Math.min(0.1, Math.max(0, (now - this.last) / 1000)); // durée de l'image, bornée (retour d'onglet, etc.)
     this.last = now;
     this.elapsed += dt;
-    if (this.settings.realTime) {
-      const clock = realSolarClock(new Date(), worldToLatLon(this.controls.x, this.controls.z).lon); // vraie heure UTC → heure solaire là où tu te trouves (nuit à Paris, jour à Sydney)
-      this.hours = clock.hours;
-      this.day = clock.day;
-    } else if (this.controls.locked && this.settings.dayLengthMinutes > 0) {
-      const before = this.hours; // heure avant ce pas de temps
-      this.hours = wrapHours(this.hours + (dt * 24) / (this.settings.dayLengthMinutes * 60)); // le temps ne passe que quand on joue
-      if (this.settings.daysPass && this.hours < before) this.day = wrapDay(this.day + 1); // minuit passé : le calendrier avance d'un jour
-    }
+    const clock = worldClock.solar(worldToLatLon(this.controls.x, this.controls.z).lon); // vraie heure UTC → heure solaire là où tu te trouves (nuit à Paris, jour à Sydney)
+    this.hours = clock.hours;
+    this.day = clock.day;
     this.updateWeather(dt, now / 1000);
     const origin = updateOrigin(this.origin, this.controls.x, this.controls.z); // le joueur s'est-il trop éloigné de l'origine ?
     if (origin !== this.origin) {
@@ -480,7 +473,7 @@ export class Game {
       climate: realClimate,
       cities: this.cities,
       getPlayer: () => worldToLatLon(this.controls.x, this.controls.z),
-      getTime: () => (this.settings.realTime ? realSolarClock(new Date()) : { hours: this.hours, day: this.day }), // en temps réel, la carte reçoit l'heure de Lannion (référence de l'ombre de nuit)
+      getTime: () => worldClock.solar(), // la carte reçoit l'heure de Lannion (référence de l'ombre de nuit)
       groundAt: (lat, lon) => {
         const w = latLonToWorld(lat, lon);
         return this.terrain.coarseHeightAt(w.x, w.z); // le terrain du jeu (pas la grille floue), sans les rivières : la carte survole de grandes zones
@@ -595,7 +588,7 @@ export class Game {
     if (this.terrain.heightAt(px, pz) <= 0.3) return toast('Il faut poser le cairn sur la terre ferme.');
     if (this.villages.housesNear(px, pz, 3).some((h) => pointInHouse(h, px, pz, 0.8))) return toast('Pas dans une maison : pose le cairn dehors.');
     if (this.edits.nearest(px, pz, 0.8)) return toast('Il y a déjà un cairn ici.');
-    toast(this.edits.add('cairn', px, pz, yaw, Date.now()) ? 'Cairn posé. Maj+K pour le retirer.' : 'Trop de constructions : retires-en avant d\'en poser.', 'info');
+    toast(this.edits.add('cairn', px, pz, yaw, worldClock.now()) ? 'Cairn posé. Maj+K pour le retirer.' : 'Trop de constructions : retires-en avant d\'en poser.', 'info');
   }
 
 
@@ -910,9 +903,10 @@ export class Game {
     this.touchUi.setConstellations(next.constellations); // bouton ✦ à jour
   }
 
-  private saveNow(): void {
+  // La partie telle qu'on l'enregistre maintenant (aussi utilisée pour l'export).
+  private currentSave(): SaveData {
     const shore = this.boat.savedPose(); // à bord : on enregistre le point d'embarquement, pas la pleine mer
-    const data: SaveData = {
+    return {
       version: 2,
       seed: this.seedText,
       x: shore ? shore.x : this.controls.x,
@@ -920,13 +914,61 @@ export class Game {
       y: shore ? this.terrain.heightAt(shore.x, shore.z) + 1.7 : this.controls.y,
       yaw: shore ? shore.yaw : this.controls.yaw,
       pitch: this.controls.pitch,
-      hours: this.hours,
-      day: this.day,
+      savedAt: worldClock.now(), // quand on a quitté : servira au journal de bord au retour
       fly: shore ? false : this.controls.fly,
       worldVersion: this.savedWorldVersion, // le monde garde son numéro d'origine
     };
+  }
+
+  private saveNow(): void {
+    if (this.importing) return; // la partie importée vient d'être écrite : on ne la recouvre pas
+    const data = this.currentSave();
     if (this.editsReadOnly) return; // sauvegarde d'un jeu plus récent : on ne l'écrase pas
     saveJson(SAVE_KEY, data);
+  }
+
+  // Exporte la partie dans un fichier (téléchargement) : position + constructions, pour une copie à l'abri ou un autre ordinateur.
+  private exportSave(): void {
+    if (!this.editsDb) return toast('Un instant, le monde se charge…'); // les constructions ne sont pas encore relues : le fichier serait incomplet
+    const now = worldClock.now();
+    const text = serializeSaveFile(buildSaveFile(this.currentSave(), this.edits.all(), VERSION, now));
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' })); // le fichier, en mémoire
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = saveFileName(now); // nom daté
+    document.body.appendChild(link);
+    link.click(); // déclenche le téléchargement
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000); // libère la mémoire un peu plus tard
+    const n = this.edits.size;
+    toast(`Partie exportée (${n} construction${n > 1 ? 's' : ''}). Garde ce fichier précieusement.`, 'info');
+  }
+
+  // Remplace la partie par celle d'un fichier exporté. Tout est vérifié avant d'écrire quoi que ce soit.
+  private async importSave(file: File): Promise<void> {
+    if (!this.editsDb) return toast('Un instant, le monde se charge…');
+    if (this.editsReadOnly) return toast('Ta partie actuelle vient d\'une version plus récente du jeu : impossible de la remplacer ici.', 'error');
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      return toast('Impossible de lire ce fichier.', 'error');
+    }
+    const r = parseSaveFile(text, this.terrain, this.seedText);
+    if (!r.ok) return toast(r.error, 'error'); // la phrase dit quoi faire
+    const lines = [`Importer cette partie ?`, '', `${r.edits.length} construction${r.edits.length > 1 ? 's' : ''}, écrite par la version ${r.gameVersion}.`];
+    if (r.skipped > 0) lines.push(`${r.skipped} élément${r.skipped > 1 ? 's' : ''} illisible${r.skipped > 1 ? 's' : ''} ignoré${r.skipped > 1 ? 's' : ''}.`);
+    if (r.newerWorld) lines.push('Ce monde vient d\'une version plus récente du jeu : tu pourras le visiter, pas le modifier.');
+    lines.push('', 'Ta partie actuelle sera remplacée.');
+    if (!window.confirm(lines.join('\n'))) return; // on laisse tomber
+    this.importing = true; // plus aucun enregistrement automatique de la position pendant l'import
+    try {
+      await applyImport(this.editsDb, r.edits, r.save, (save) => saveJson(SAVE_KEY, save));
+    } catch (e) {
+      this.importing = false; // rien n'a été remplacé : on reprend normalement
+      return toast(`Import impossible : ${e instanceof Error ? e.message : 'erreur inconnue'}`, 'error');
+    }
+    location.reload(); // le jeu repart de la partie importée
   }
 
   // ---------- Outils de développement (adresse terminée par ?debug) ----------
@@ -942,12 +984,11 @@ export class Game {
         this.controls.fly = fly;
         this.controls.y = y ?? this.terrain.heightAt(x, z) + 1.7;
       },
-      setHours: (h) => {
-        this.hours = wrapHours(h);
-      },
-      setDay: (d) => {
-        this.day = wrapDay(d);
-      },
+      setHours: (h) => worldClock.setSolarHours(h, this.playerLon()), // essais : décale l'horloge du monde (pas de réglage dans le jeu normal)
+      setDay: (d) => worldClock.setDayOfYear(d, this.playerLon()),
+      advance: (ms) => worldClock.advance(ms), // essais : avance rapide
+      resetClock: () => worldClock.reset(), // essais : retour à l'heure réelle
+      clock: () => ({ now: worldClock.now(), offsetMs: worldClock.testOffsetMs, solar: worldClock.solar(this.playerLon()) }),
       moon: () => {
         // Où est la Lune ? (essais) : phase, hauteur, et le cap/inclinaison à donner à la caméra pour la viser.
         const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
@@ -1034,7 +1075,7 @@ export class Game {
         return { rms: Math.sqrt(sum / n), peak, bad, chords };
       },
       real: (c) => {
-        this.real = c ? { wind: c.wind ?? null, weather: c.weather ?? null, hs: c.hs ?? null, waveFrom: c.waveFrom ?? null, current: c.current ?? null, fetchedAt: Date.now() } : null; // impose des conditions réelles simulées (essais)
+        this.real = c ? { wind: c.wind ?? null, weather: c.weather ?? null, hs: c.hs ?? null, waveFrom: c.waveFrom ?? null, current: c.current ?? null, fetchedAt: worldClock.now() } : null; // impose des conditions réelles simulées (essais)
         this.realDebug = c !== null; // tant qu'elles sont imposées, la gestion réseau est suspendue
         this.weatherTimer = 0;
         return this.real ? 'conditions réelles imposées' : 'retour au simulé';

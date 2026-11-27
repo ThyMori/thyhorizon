@@ -7,6 +7,7 @@ export interface EditsPersistence {
   loadAll(): Promise<unknown[]>;
   put(edit: { id: string }): Promise<void>;
   delete(id: string): Promise<void>;
+  clear(): Promise<void>; // efface tout (avant d'importer une autre partie)
 }
 
 const STORE = 'edits';
@@ -19,6 +20,7 @@ export function memoryPersistence(): EditsPersistence {
     loadAll: async () => [...m.values()],
     put: async (e) => void m.set(e.id, e),
     delete: async (id) => void m.delete(id),
+    clear: async () => void m.clear(),
   };
 }
 
@@ -44,6 +46,7 @@ export async function openEditsDb(name = 'thyhorizon', factory: IDBFactory | nul
       loadAll: () => wrap(tx('readonly').getAll()),
       put: async (e) => void (await wrap(tx('readwrite').put(e))),
       delete: async (id) => void (await wrap(tx('readwrite').delete(id))),
+      clear: async () => void (await wrap(tx('readwrite').clear())),
     };
   } catch {
     return memoryPersistence(); // blocage, quota… : on continue sans sauvegarde durable

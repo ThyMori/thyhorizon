@@ -13,19 +13,17 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ viewDistance: 'beaucoup' })).toEqual(DEFAULT_SETTINGS);
   });
   it('borne les valeurs hors limites', () => {
-    const s = sanitizeSettings({ viewDistance: 9999, resolution: 0, mouseSensitivity: 50, dayLengthMinutes: 7, shadowSize: 99999 });
+    const s = sanitizeSettings({ viewDistance: 9999, resolution: 0, mouseSensitivity: 50, shadowSize: 99999 });
     expect(s.viewDistance).toBe(LIMITS.viewDistance.max);
     expect(s.resolution).toBe(LIMITS.resolution.min);
     expect(s.mouseSensitivity).toBe(LIMITS.mouseSensitivity.max);
-    expect(s.dayLengthMinutes).toBe(DEFAULT_SETTINGS.dayLengthMinutes); // 7 n'est pas un choix proposé
     expect(s.shadowSize).toBe(2048);
   });
   it('garde les valeurs valides', () => {
-    const s = sanitizeSettings({ viewDistance: 15, shadows: false, showFps: false, dayLengthMinutes: 0 });
+    const s = sanitizeSettings({ viewDistance: 15, shadows: false, showFps: false });
     expect(s.viewDistance).toBe(15);
     expect(s.shadows).toBe(false);
     expect(s.showFps).toBe(false);
-    expect(s.dayLengthMinutes).toBe(0);
   });
   it('garde le réglage des constellations hors des préréglages', () => {
     expect(DEFAULT_SETTINGS.constellations).toBe(false);
@@ -51,10 +49,11 @@ describe('sanitizeSettings', () => {
     expect(sanitizeSettings({ showInstruments: false }).showInstruments).toBe(false);
     expect(sanitizeSettings({ showInstruments: 'non' }).showInstruments).toBe(true);
   });
-  it('garde le temps réel désactivé par défaut et le valide', () => {
-    expect(DEFAULT_SETTINGS.realTime).toBe(false);
-    expect(sanitizeSettings({ realTime: true }).realTime).toBe(true);
-    expect(sanitizeSettings({ realTime: 1 }).realTime).toBe(false);
+  it('n\'a plus de réglage de temps : le jeu est toujours en temps réel (1.45)', () => {
+    expect(Object.keys(DEFAULT_SETTINGS)).not.toContain('realTime');
+    expect(Object.keys(DEFAULT_SETTINGS)).not.toContain('dayLengthMinutes');
+    expect(Object.keys(DEFAULT_SETTINGS)).not.toContain('daysPass');
+    expect(Object.keys(sanitizeSettings({ realTime: true, dayLengthMinutes: 10, daysPass: false }))).not.toContain('realTime'); // un vieux réglage est ignoré
   });
   it('ne plante pas sur NaN ni Infinity', () => {
     expect(sanitizeSettings({ viewDistance: NaN, resolution: Infinity }).viewDistance).toBe(DEFAULT_SETTINGS.viewDistance);
@@ -76,67 +75,58 @@ describe('préréglages', () => {
 
 describe('sauvegarde', () => {
   const terrain = createTerrain(hashSeed(DEFAULT_SEED), loadRealRelief());
-  const TODAY = 327; // 23 novembre
-  const base = defaultSave(terrain, DEFAULT_SEED, TODAY);
+  const base = defaultSave(terrain, DEFAULT_SEED);
 
   it('garde le numéro de version du monde de la sauvegarde (absent = 1)', () => {
-    expect(sanitizeSave({ ...base }, terrain, DEFAULT_SEED, TODAY).worldVersion).toBe(1);
-    expect(sanitizeSave({ ...base, worldVersion: 7 }, terrain, DEFAULT_SEED, TODAY).worldVersion).toBe(7);
-    expect(sanitizeSave({ ...base, worldVersion: 'x' }, terrain, DEFAULT_SEED, TODAY).worldVersion).toBe(1);
+    expect(sanitizeSave({ ...base }, terrain, DEFAULT_SEED).worldVersion).toBe(1);
+    expect(sanitizeSave({ ...base, worldVersion: 7 }, terrain, DEFAULT_SEED).worldVersion).toBe(7);
+    expect(sanitizeSave({ ...base, worldVersion: 'x' }, terrain, DEFAULT_SEED).worldVersion).toBe(1);
   });
   it('part d\'un départ valide sur la terre', () => {
-    expect(base.day).toBe(TODAY);
-    expect(base.hours).toBeCloseTo(15.3, 1); // une heure avant le coucher (≈ 16 h 18 solaire le 23 novembre à Lannion)
+    expect(base.savedAt).toBe(0); // jamais enregistrée
     expect(terrain.heightAt(base.x, base.z)).toBeGreaterThan(1);
   });
   it('reprend une sauvegarde valide telle quelle', () => {
-    const s = sanitizeSave({ ...base, x: base.x + 50, z: base.z + 20, hours: 9.5, yaw: 1 }, terrain, DEFAULT_SEED, TODAY);
+    const s = sanitizeSave({ ...base, x: base.x + 50, z: base.z + 20, savedAt: 1.7e12, yaw: 1 }, terrain, DEFAULT_SEED);
     expect(s.x).toBe(base.x + 50);
-    expect(s.hours).toBe(9.5);
+    expect(s.savedAt).toBe(1.7e12);
     expect(s.yaw).toBe(1);
   });
   it('revient au départ si la position est en eau profonde', () => {
-    const s = sanitizeSave({ ...base, x: 0, z: base.z - 6000 }, terrain, DEFAULT_SEED, TODAY);
+    const s = sanitizeSave({ ...base, x: 0, z: base.z - 6000 }, terrain, DEFAULT_SEED);
     expect(s.x).toBe(base.x);
     expect(s.z).toBe(base.z);
   });
   it('ignore une sauvegarde de l\'ancien monde inventé (version 1) : sa position n\'a plus de sens', () => {
-    const s = sanitizeSave({ ...base, version: 1, x: base.x + 500, z: base.z + 500 }, terrain, DEFAULT_SEED, TODAY);
+    const s = sanitizeSave({ ...base, version: 1, x: base.x + 500, z: base.z + 500 }, terrain, DEFAULT_SEED);
     expect(s.x).toBe(base.x);
     expect(s.z).toBe(base.z);
   });
   it('revient au départ si les données sont abîmées', () => {
-    expect(sanitizeSave(null, terrain, DEFAULT_SEED, TODAY).x).toBe(base.x);
-    expect(sanitizeSave({ x: 'a', z: NaN }, terrain, DEFAULT_SEED, TODAY).x).toBe(base.x);
-    expect(sanitizeSave({ ...base, x: 1e12 }, terrain, DEFAULT_SEED, TODAY).x).toBe(base.x);
+    expect(sanitizeSave(null, terrain, DEFAULT_SEED).x).toBe(base.x);
+    expect(sanitizeSave({ x: 'a', z: NaN }, terrain, DEFAULT_SEED).x).toBe(base.x);
+    expect(sanitizeSave({ ...base, x: 1e12 }, terrain, DEFAULT_SEED).x).toBe(base.x);
   });
   it('ignore une sauvegarde d\'un autre monde', () => {
-    expect(sanitizeSave({ ...base, seed: 'autre', x: base.x + 99 }, terrain, DEFAULT_SEED, TODAY).x).toBe(base.x);
+    expect(sanitizeSave({ ...base, seed: 'autre', x: base.x + 99 }, terrain, DEFAULT_SEED).x).toBe(base.x);
   });
   it('lit la graine ou retombe sur celle par défaut', () => {
     expect(readSavedSeed({ seed: 'abc' })).toBe('abc');
     expect(readSavedSeed({ seed: 12 })).toBe(DEFAULT_SEED);
     expect(readSavedSeed(undefined)).toBe(DEFAULT_SEED);
   });
-  it('normalise le jour de l\'année et reprend la date du jour pour une vieille sauvegarde', () => {
-    expect(sanitizeSave({ ...base, day: 400 }, terrain, DEFAULT_SEED, TODAY).day).toBe(35);
-    const { day: _day, ...old } = base; // sauvegarde de la version 1.1, sans date
-    expect(sanitizeSave(old, terrain, DEFAULT_SEED, 100).day).toBe(100);
+  it('lit la date d\'enregistrement et la borne ; une vieille sauvegarde sans date donne 0', () => {
+    expect(sanitizeSave({ ...base, savedAt: -5 }, terrain, DEFAULT_SEED).savedAt).toBe(0);
+    expect(sanitizeSave({ ...base, savedAt: 'x' }, terrain, DEFAULT_SEED).savedAt).toBe(0);
+    const { savedAt: _savedAt, ...old } = base; // sauvegarde d'avant 1.45
+    expect(sanitizeSave(old, terrain, DEFAULT_SEED).savedAt).toBe(0);
   });
-  it('normalise l\'heure et borne le regard', () => {
-    const s = sanitizeSave({ ...base, hours: 49, pitch: 9 }, terrain, DEFAULT_SEED, TODAY);
-    expect(s.hours).toBeCloseTo(1);
+  it('borne le regard', () => {
+    const s = sanitizeSave({ ...base, pitch: 9 }, terrain, DEFAULT_SEED);
     expect(s.pitch).toBe(1.5);
   });
 });
 
-describe('réglage « les jours passent »', () => {
-  it('est actif par défaut, respecte false et ignore une valeur invalide', () => {
-    expect(sanitizeSettings({}).daysPass).toBe(true);
-    expect(sanitizeSettings({ daysPass: false }).daysPass).toBe(false);
-    expect(sanitizeSettings({ daysPass: 'non' }).daysPass).toBe(true);
-  });
-});
 
 describe('bloom', () => {
   it('est coupé par défaut et seul le préréglage Beau l\'allume', () => {

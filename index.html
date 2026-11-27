@@ -147,24 +147,17 @@
         <p class="hint">Lieu : <output id="out-place"></output></p>
         <label class="check"><input id="set-realweather" type="checkbox" /> Météo et houle réelles du lieu (Internet)</label>
         <p class="hint">Envoie ta position arrondie à ≈ 55 km à Open-Meteo.com (données CC BY 4.0). Sans réseau, le jeu garde la météo simulée.</p>
-        <label class="check"><input id="set-realtime" type="checkbox" /> Temps réel (vraie heure UTC, journées de 24 h)</label>
-        <label>Date <output id="out-day"></output>
-          <input id="set-day" type="range" min="1" max="365" step="1" />
-        </label>
-        <label class="check"><input id="set-dayspass" type="checkbox" /> Les jours passent (les saisons avancent)</label>
-        <label>Heure solaire du jour <output id="out-hours"></output>
-          <input id="set-hours" type="range" min="0" max="23.99" step="0.05" />
-        </label>
+        <p class="hint">Le jeu suit la vraie horloge : <output id="out-clock"></output> (heure solaire du lieu). Le monde continue d'avancer quand tu fermes le jeu.</p>
         <p class="hint" id="out-moon"></p>
-        <label>Durée d'une journée
-          <select id="set-daylength">
-            <option value="0">Temps arrêté</option>
-            <option value="10">10 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="60">1 heure</option>
-            <option value="120">2 heures</option>
-          </select>
-        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Sauvegarde</legend>
+        <p class="hint">Ta position et ce que tu poses dans le monde restent dans ce navigateur. Exporte un fichier pour en garder une copie à l'abri, ou pour changer d'ordinateur.</p>
+        <button type="button" id="btn-export">Exporter ma partie</button>
+        <button type="button" id="btn-import">Importer une partie…</button>
+        <input type="file" id="file-import" accept=".json,application/json" hidden />
+        <p class="hint">Importer remplace la partie actuelle : ce qui n'est pas dans le fichier disparaît.</p>
       </fieldset>
 
       <fieldset>

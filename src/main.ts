@@ -16,6 +16,9 @@ declare global {
       moon(): { name: string; illumination: number; elevation: number; yaw: number; pitch: number }; // la Lune ici et maintenant (essais)
       setHours(hours: number): void;
       setDay(day: number): void; // change le jour de l'année (1 à 365)
+      advance(ms: number): void; // avance le monde de ms millisecondes (essais, avance rapide)
+      resetClock(): void; // revient à l'heure réelle (essais)
+      clock(): { now: number; offsetMs: number; solar: { hours: number; day: number } }; // l'horloge du monde (essais)
       origin(): { x: number; z: number; camera: number[] }; // origine flottante et position de la caméra (pour vérifier)
       pose(): { x: number; z: number; yaw: number; pitch: number; fly: boolean; playing: boolean }; // position et regard (pour vérifier)
       view(mode: 'first' | 'third'): string; // change de vue (essais)

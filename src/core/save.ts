@@ -1,10 +1,9 @@
-// La partie sauvegardée : où l'on était, quelle heure il était. Logique pure.
+// La partie sauvegardée : où l'on était. Logique pure. (Depuis 1.45 le jeu est en temps réel : l'heure et la date ne sont plus sauvegardées,
+// on note seulement QUAND on a quitté, pour le futur « journal de bord au retour ».)
 // Ce qui est lu depuis le stockage passe TOUJOURS par sanitizeSave : si la cible n'existe plus
 // (graine différente, position sous l'eau profonde, données abîmées), on retombe sur un départ valide.
 
-import { START_LAT, startHours, wrapDay } from './geo';
 import { clamp } from './math';
-import { wrapHours } from './sun';
 import { Terrain, findSpawn } from './terrain';
 import { isWalkable } from './movement';
 import { WORLD_VERSION, readWorldVersion } from './worldVersion';
@@ -20,8 +19,7 @@ export interface SaveData {
   y: number; // altitude des yeux (utile seulement en vol libre)
   yaw: number; // cap
   pitch: number; // inclinaison du regard
-  hours: number; // heure solaire locale du jeu
-  day: number; // jour de l'année du jeu (1 à 365)
+  savedAt: number; // instant de l'enregistrement (ms depuis 1970, horloge du monde) ; 0 = inconnu (ancienne sauvegarde)
   fly: boolean; // vol libre actif
   worldVersion: number; // version du monde (voir worldVersion.ts) sur laquelle cette partie a été jouée
 }
@@ -33,16 +31,14 @@ export function readSavedSeed(raw: unknown): string {
 }
 
 // Sauvegarde de départ pour un nouveau monde.
-// today = jour de l'année réel : le jeu commence à la date d'aujourd'hui, une heure avant le coucher du soleil.
-export function defaultSave(terrain: Terrain, seed: string, today: number): SaveData {
+export function defaultSave(terrain: Terrain, seed: string): SaveData {
   const s = findSpawn(terrain); // point de départ sur la plage
-  const day = wrapDay(today); // jour valide
-  return { version: 2, seed, x: s.x, z: s.z, y: terrain.heightAt(s.x, s.z) + 1.7, yaw: s.yaw, pitch: s.pitch, hours: startHours(START_LAT, day), day, fly: false, worldVersion: WORLD_VERSION };
+  return { version: 2, seed, x: s.x, z: s.z, y: terrain.heightAt(s.x, s.z) + 1.7, yaw: s.yaw, pitch: s.pitch, savedAt: 0, fly: false, worldVersion: WORLD_VERSION };
 }
 
 // Nettoie une sauvegarde brute pour ce terrain. La position redevient celle du départ si elle n'est plus valable.
-export function sanitizeSave(raw: unknown, terrain: Terrain, seed: string, today: number): SaveData {
-  const fallback = defaultSave(terrain, seed, today); // départ par défaut
+export function sanitizeSave(raw: unknown, terrain: Terrain, seed: string): SaveData {
+  const fallback = defaultSave(terrain, seed); // départ par défaut
   if (typeof raw !== 'object' || raw === null) return fallback; // rien de lisible
   const r = raw as Record<string, unknown>;
   if (readSavedSeed(raw) !== seed) return fallback; // la sauvegarde appartient à un autre monde
@@ -60,8 +56,7 @@ export function sanitizeSave(raw: unknown, terrain: Terrain, seed: string, today
     y: positionOk && fly ? clamp(num(r.y, ground + 1.7), ground + 1.7, ground + 3000) : (positionOk ? ground : terrain.heightAt(fallback.x, fallback.z)) + 1.7,
     yaw: positionOk ? num(r.yaw, fallback.yaw) : fallback.yaw,
     pitch: clamp(positionOk ? num(r.pitch, fallback.pitch) : fallback.pitch, -1.5, 1.5),
-    hours: wrapHours(num(r.hours, fallback.hours)), // ancienne sauvegarde sans heure : départ par défaut
-    day: wrapDay(num(r.day, fallback.day)), // ancienne sauvegarde sans date : aujourd'hui
+    savedAt: clamp(num(r.savedAt, 0), 0, 8.64e15), // ancienne sauvegarde sans date : inconnu
     fly: positionOk && fly,
     worldVersion: readWorldVersion(raw), // on garde le numéro de la sauvegarde (absent = 1)
   };

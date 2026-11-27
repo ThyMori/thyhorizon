@@ -1,9 +1,9 @@
 // Tests des modifications du monde : nettoyage, ajout, retrait, recherche du plus proche, plafond.
 import { describe, expect, it } from 'vitest';
-import { EditStore, MAX_EDITS, newEditId, sanitizeEdit } from './worldEdits';
+import { EditStore, MAX_EDITS, PLAYER_AUTHOR, newEditId, sanitizeEdit } from './worldEdits';
 import { WORLD_VERSION } from './worldVersion';
 
-const good = { id: 'a1', type: 'cairn', x: 10, z: -5, yaw: 1, t: 1000, worldVersion: 1 };
+const good = { id: 'a1', type: 'cairn', x: 10, z: -5, yaw: 1, t: 1000, author: 'moi', worldVersion: 1 };
 
 describe('nettoyage', () => {
   it('garde une entrée valide', () => expect(sanitizeEdit(good)).toEqual(good));
@@ -16,6 +16,16 @@ describe('nettoyage', () => {
     const e = sanitizeEdit({ id: 'a', type: 'cairn', x: 1, z: 2 })!;
     expect(e.yaw).toBe(0);
     expect(e.worldVersion).toBe(1);
+    expect(e.author).toBe(PLAYER_AUTHOR); // ancienne modification sans auteur : « moi »
+  });
+  it('garde l\'auteur, et en remplace un illisible ou trop long par « moi »', () => {
+    expect(sanitizeEdit({ ...good, author: 'Léa' })!.author).toBe('Léa');
+    for (const bad of ['', 42, null, 'x'.repeat(41)]) expect(sanitizeEdit({ ...good, author: bad })!.author).toBe(PLAYER_AUTHOR);
+  });
+  it('add() note l\'auteur (par défaut « moi »)', () => {
+    const s = new EditStore();
+    expect(s.add('cairn', 0, 0, 0, 5)!.author).toBe(PLAYER_AUTHOR);
+    expect(s.add('cairn', 3, 3, 0, 6, undefined, 'Léa')!.author).toBe('Léa');
   });
   it('les identifiants ne se répètent pas', () => {
     const ids = new Set(Array.from({ length: 500 }, (_, k) => newEditId(1700000000000 + (k % 3))));

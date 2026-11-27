@@ -4,9 +4,10 @@
 // y a donc ses vraies phases : en « temps réel », c'est celle du ciel d'aujourd'hui).
 
 import { DAYS_IN_YEAR, siderealAngleDeg, skyRotation } from './geo';
+import { worldClock } from './worldClock';
 
 const DEG = Math.PI / 180;
-export const CURRENT_YEAR = new Date().getUTCFullYear(); // année de référence du calendrier du jeu
+export const CURRENT_YEAR = worldClock.date().getUTCFullYear(); // année de référence du calendrier du jeu (lue sur l'horloge du monde)
 
 // Jour julien (jours depuis −4712) d'un instant : jour de l'année (1 = 1er janvier), heure UT (0 à 24).
 export function julianDay(year: number, day: number, utHours: number): number {

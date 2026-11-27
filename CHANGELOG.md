@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.45.0 — 2026-11-27
+
+Temps réel unique, horloge du monde, export et import de la sauvegarde, auteur des constructions
+
 ## 1.44.1 — 2026-11-27
 
 Feuille de route détaillée ajoutée au README, comparée à l'existant

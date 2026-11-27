@@ -21,9 +21,6 @@ export interface Settings {
   soundVolume: number; // volume du son, de 0 (coupé) à 1
   musicVolume: number; // volume de la musique d'ambiance, de 0 (coupée) à 1
   mouseSensitivity: number; // sensibilité de la souris, de 0.5 à 2
-  daysPass: boolean; // le calendrier avance-t-il (un jour de plus à chaque minuit du jeu) ?
-  realTime: boolean; // « Temps réel » : l'heure et la date du jeu suivent la vraie horloge (journées de 24 h)
-  dayLengthMinutes: number; // durée d'une journée du jeu en minutes réelles (0 = le temps est arrêté)
 }
 
 // Valeurs imposées par chaque préréglage.
@@ -45,13 +42,8 @@ export const DEFAULT_SETTINGS: Settings = {
   soundVolume: 0.6, // volume moyen par défaut
   musicVolume: 0.5, // la musique reste discrète par défaut
   mouseSensitivity: 1,
-  daysPass: true, // les saisons avancent lentement tant qu'on joue
-  realTime: false, // par défaut, les journées sont accélérées
-  dayLengthMinutes: 30,
 };
 
-// Durées de journée proposées dans le menu (en minutes ; 0 = arrêté).
-export const DAY_LENGTH_CHOICES = [0, 10, 30, 60, 120] as const;
 
 // Bornes des curseurs.
 export const LIMITS = {
@@ -91,7 +83,6 @@ export function sanitizeSettings(raw: unknown): Settings {
     shadows: bool(r.shadows, d.shadows),
     shadowSize: num(r.shadowSize, d.shadowSize) >= 2048 ? 2048 : 1024, // seules deux tailles existent
     bloom: bool(r.bloom, d.bloom),
-    realTime: bool(r.realTime, d.realTime),
     constellations: bool(r.constellations, d.constellations),
     resolution: clamp(num(r.resolution, d.resolution), LIMITS.resolution.min, LIMITS.resolution.max),
     showFps: bool(r.showFps, d.showFps),
@@ -101,10 +92,6 @@ export function sanitizeSettings(raw: unknown): Settings {
     soundVolume: clamp(num(r.soundVolume, d.soundVolume), LIMITS.soundVolume.min, LIMITS.soundVolume.max),
     musicVolume: clamp(num(r.musicVolume, d.musicVolume), LIMITS.musicVolume.min, LIMITS.musicVolume.max),
     mouseSensitivity: clamp(num(r.mouseSensitivity, d.mouseSensitivity), LIMITS.mouseSensitivity.min, LIMITS.mouseSensitivity.max),
-    daysPass: bool(r.daysPass, d.daysPass),
-    dayLengthMinutes: DAY_LENGTH_CHOICES.includes(num(r.dayLengthMinutes, d.dayLengthMinutes) as (typeof DAY_LENGTH_CHOICES)[number])
-      ? num(r.dayLengthMinutes, d.dayLengthMinutes)
-      : d.dayLengthMinutes,
   };
   return out;
 }

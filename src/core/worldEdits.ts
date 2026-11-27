@@ -7,6 +7,7 @@ import { WORLD_VERSION } from './worldVersion';
 
 export type EditType = 'cairn';
 export const EDIT_TYPES: readonly EditType[] = ['cairn'];
+export const PLAYER_AUTHOR = 'moi'; // auteur par défaut : le joueur de cet ordinateur (le partage avec d'autres joueurs viendra plus tard)
 export const MAX_EDITS = 20000; // plafond : un navigateur n'a pas un stockage infini
 
 export interface WorldEdit {
@@ -15,7 +16,8 @@ export interface WorldEdit {
   x: number; // position dans le monde (m)
   z: number;
   yaw: number; // orientation (rad)
-  t: number; // date de création (ms)
+  t: number; // date de création (ms, horloge du monde)
+  author: string; // qui l'a posé (`PLAYER_AUTHOR` ici ; ancienne modification sans auteur = « moi »)
   worldVersion: number; // version du monde sur laquelle c'est posé
 }
 
@@ -40,6 +42,7 @@ export function sanitizeEdit(raw: unknown): WorldEdit | null {
     z,
     yaw: num(r.yaw) ?? 0,
     t: clamp(num(r.t) ?? 0, 0, 8.64e15),
+    author: typeof r.author === 'string' && r.author.length > 0 && r.author.length <= 40 ? r.author : PLAYER_AUTHOR,
     worldVersion: wv !== null && Number.isInteger(wv) && wv >= 1 ? wv : 1,
   };
 }
@@ -63,9 +66,9 @@ export class EditStore {
   }
 
   // Ajoute une modification ; renvoie false si le plafond est atteint.
-  add(type: EditType, x: number, z: number, yaw: number, nowMs: number, rnd?: () => number): WorldEdit | null {
+  add(type: EditType, x: number, z: number, yaw: number, nowMs: number, rnd?: () => number, author: string = PLAYER_AUTHOR): WorldEdit | null {
     if (this.items.size >= MAX_EDITS) return null;
-    const e: WorldEdit = { id: newEditId(nowMs, rnd), type, x, z, yaw, t: nowMs, worldVersion: WORLD_VERSION };
+    const e: WorldEdit = { id: newEditId(nowMs, rnd), type, x, z, yaw, t: nowMs, author, worldVersion: WORLD_VERSION };
     this.items.set(e.id, e);
     for (const l of this.listeners) l({ added: e });
     return e;

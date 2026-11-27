@@ -3,7 +3,7 @@
 
 import { CHUNK_SIZE } from '../core/chunk';
 import { formatCoords, formatDistance, formatHours } from '../core/format';
-import { DAYS_IN_YEAR, START_LAT, START_LON, START_PLACE, formatDay } from '../core/geo';
+import { START_LAT, START_LON, START_PLACE, formatDay } from '../core/geo';
 import { Quality, Settings, applyPreset, detectQuality } from '../core/settings';
 import { byId } from './dom';
 
@@ -11,10 +11,9 @@ import { byId } from './dom';
 export interface SettingsBridge {
   getSettings(): Settings; // réglages actuels
   setSettings(next: Settings): void; // applique et enregistre de nouveaux réglages
-  getHours(): number; // heure du jeu
-  setHours(hours: number): void; // change l'heure du jeu
-  getDay(): number; // jour de l'année du jeu
-  setDay(day: number): void; // change le jour de l'année
+  getClock(): { hours: number; day: number }; // heure solaire et jour de l'année, lus sur l'horloge du monde (lecture seule)
+  exportSave(): void; // télécharge un fichier de sauvegarde
+  importSave(file: File): void; // remplace la partie par celle d'un fichier
   getMoonText(): string; // phase de la Lune à la date et au lieu courants
 }
 
@@ -30,11 +29,9 @@ export class SettingsPanel {
   private readonly instruments = byId<HTMLInputElement>('set-instruments');
   private readonly hands = byId<HTMLInputElement>('set-hands'); // mains et boussole
   private readonly realWeather = byId<HTMLInputElement>('set-realweather'); // météo réelle
-  private readonly hours = byId<HTMLInputElement>('set-hours');
-  private readonly day = byId<HTMLInputElement>('set-day');
-  private readonly realTime = byId<HTMLInputElement>('set-realtime');
-  private readonly daysPass = byId<HTMLInputElement>('set-dayspass');
-  private readonly dayLength = byId<HTMLSelectElement>('set-daylength');
+  private readonly exportBtn = byId<HTMLButtonElement>('btn-export'); // « Exporter ma partie »
+  private readonly importBtn = byId<HTMLButtonElement>('btn-import'); // « Importer une partie »
+  private readonly importFile = byId<HTMLInputElement>('file-import'); // le sélecteur de fichier (caché)
   private readonly sensitivity = byId<HTMLInputElement>('set-sensitivity');
   private readonly volume = byId<HTMLInputElement>('set-volume'); // volume du son
   private readonly music = byId<HTMLInputElement>('set-music'); // volume de la musique
@@ -56,19 +53,12 @@ export class SettingsPanel {
     this.sensitivity.addEventListener('input', () => this.apply({ ...bridge.getSettings(), mouseSensitivity: Number(this.sensitivity.value) / 100 }));
     this.volume.addEventListener('input', () => this.apply({ ...bridge.getSettings(), soundVolume: Number(this.volume.value) / 100 }));
     this.music.addEventListener('input', () => this.apply({ ...bridge.getSettings(), musicVolume: Number(this.music.value) / 100 }));
-    this.dayLength.addEventListener('change', () => this.apply({ ...bridge.getSettings(), dayLengthMinutes: Number(this.dayLength.value) }));
-    this.day.addEventListener('input', () => {
-      bridge.setDay(Number(this.day.value)); // la date change tout de suite (saison, hauteur du soleil)
-      this.sync();
-    });
-    this.realTime.addEventListener('change', () => {
-      this.apply({ ...bridge.getSettings(), realTime: this.realTime.checked }); // le jeu se cale tout de suite sur l'horloge
-      this.sync();
-    });
-    this.daysPass.addEventListener('change', () => this.apply({ ...bridge.getSettings(), daysPass: this.daysPass.checked }));
-    this.hours.addEventListener('input', () => {
-      bridge.setHours(Number(this.hours.value)); // l'heure change tout de suite
-      this.sync();
+    this.exportBtn.addEventListener('click', () => bridge.exportSave());
+    this.importBtn.addEventListener('click', () => this.importFile.click()); // ouvre le sélecteur de fichier
+    this.importFile.addEventListener('change', () => {
+      const file = this.importFile.files?.[0]; // le fichier choisi
+      this.importFile.value = ''; // permet de choisir deux fois le même fichier
+      if (file) bridge.importSave(file);
     });
   }
 
@@ -89,23 +79,15 @@ export class SettingsPanel {
     this.instruments.checked = s.showInstruments;
     this.hands.checked = s.showHands;
     this.realWeather.checked = s.realWeather;
-    this.dayLength.value = String(s.dayLengthMinutes);
     this.volume.value = String(Math.round(s.soundVolume * 100));
     byId('out-volume').textContent = s.soundVolume === 0 ? 'coupé' : `${Math.round(s.soundVolume * 100)} %`;
     this.music.value = String(Math.round(s.musicVolume * 100));
     byId('out-music').textContent = s.musicVolume === 0 ? 'coupée' : `${Math.round(s.musicVolume * 100)} %`;
     this.sensitivity.value = String(Math.round(s.mouseSensitivity * 100));
     byId('out-sensitivity').textContent = `${Math.round(s.mouseSensitivity * 100)} %`;
-    const h = this.bridge.getHours();
-    this.hours.value = String(h);
-    this.day.max = String(DAYS_IN_YEAR); // le curseur couvre l'année entière
-    this.day.value = String(this.bridge.getDay());
-    byId('out-day').textContent = formatDay(this.bridge.getDay());
-    this.daysPass.checked = s.daysPass;
-    this.realTime.checked = s.realTime;
-    for (const el of [this.hours, this.day, this.daysPass, this.dayLength]) el.disabled = s.realTime; // l'horloge réelle décide : ces réglages ne servent plus
+    const clock = this.bridge.getClock(); // la vraie heure solaire du lieu
     byId('out-place').textContent = `${START_PLACE} — ${formatCoords(START_LAT, START_LON)}`; // le lieu du monde
-    byId('out-hours').textContent = formatHours(h);
+    byId('out-clock').textContent = `${formatDay(clock.day)}, ${formatHours(clock.hours)}`;
     byId('out-moon').textContent = `Lune : ${this.bridge.getMoonText()}`; // la vraie phase de la Lune à cette date
   }
 

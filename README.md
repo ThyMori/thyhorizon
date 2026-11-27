@@ -434,6 +434,17 @@ Sans objet : jeu local, sans compte ni serveur.
 - Pas de nouveau réglage : si ça ralentit, dis-le-moi et j'ajoute un interrupteur.
 - Limites : un tronc et un rocher ont la même texture de paroi (le shader ne sait pas les distinguer) ; je n'ai pas vu le rendu sur un vrai GPU ni sur téléphone.
 
+## 1.45 — Temps réel, horloge unique, export et import (étape 1 de la feuille de route)
+
+- **Le jeu est toujours en temps réel.** Les réglages « Temps réel », « Les jours passent », date, heure et « Durée d'une journée » n'existent plus : l'heure solaire et la date sont celles de la vraie horloge, au lieu où tu te trouves (nuit à Lannion pendant qu'il fait jour à Sydney). Les réglages restent lisibles dans Réglages → Temps (heure et date en lecture seule).
+- **Une seule horloge** : `core/worldClock.ts` (`worldClock.now()`, `.solar(lon)`). Plus aucun autre fichier ne lit l'heure de l'ordinateur ; le test `noRawClock.test.ts` casse si quelqu'un écrit `Date.now()` ou `new Date()` ailleurs (seule exception : `pwa/install.ts`, rappel d'installation). Les chronomètres d'image (`performance.now()`) ne sont pas une heure : permis.
+- **Avance rapide pour les tests** : seulement avec `?debug` (`__thy.setHours(h)`, `setDay(d)`, `advance(ms)`, `resetClock()`, `clock()`). Elle décale l'horloge du monde ; rien dans le jeu normal n'y touche.
+- **La sauvegarde ne contient plus l'heure ni la date de jeu** (inutiles en temps réel) mais `savedAt` : l'instant où tu as quitté, pour le futur « journal de bord au retour ». Les anciennes sauvegardes se lisent toujours (la position est gardée).
+- **Chaque construction a un auteur** (`author`, « moi » ici ; les anciennes constructions reçoivent « moi »). Prépare le partage avec les enfants (étape 9).
+- **Exporter / importer** (Réglages → Sauvegarde) : « Exporter ma partie » télécharge `thyhorizon-AAAA-MM-JJ.json` (position + constructions + versions). « Importer une partie… » vérifie tout le fichier (format, graine du monde, entrées abîmées ignorées et comptées), demande confirmation, **remplace** la partie actuelle puis recharge. Un fichier d'un monde plus récent s'ouvre en lecture seule ; un fichier d'une autre graine ou d'un format plus récent est refusé avec une phrase qui dit quoi faire.
+- Vérifié : 703 tests dont l'aller-retour complet « cairn posé, exporté, navigateur vide, importé, retrouvé » ; en navigateur de test, export réel puis import réel dans un navigateur vierge (la construction revient, affichée) ; fenêtre Réglages à 360 px sans débordement.
+- Pas vérifié : sur téléphone (le téléchargement de fichier y passe par un dialogue du navigateur) ; en vrai avec ton horloge sur plusieurs jours.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
@@ -522,7 +533,7 @@ La route se calcule au retour, à partir de la météo de la période écoulée.
 ### Étapes (une à la fois, testée avant la suivante)
 | N° | Étape | Terminé quand |
 |---|---|---|
-| 1 | Horloge unique et sauvegarde des modifications | Une marque posée dans le monde est retrouvée après fermeture, export et import compris |
+| 1 ✅ | Horloge unique et sauvegarde des modifications | Une marque posée dans le monde est retrouvée après fermeture, export et import compris |
 | 2 | Planter et cultiver | La taille correspond au temps écoulé, vérifié avec l'avance rapide de test |
 | 3 | Couper, obtenir du bois, poser un mur | Le mur et le stock de bois sont retrouvés le lendemain |
 | 4 | Bâtir une maison en chantier | Le chantier avance en mon absence ; la maison devient un refuge |
@@ -539,12 +550,12 @@ Une petite amélioration à la fois (comportement à la voile, houle, courant, v
 ### État du dépôt face à cette feuille (comparé en 1.44.0)
 | Point de la feuille | Dans le dépôt | Écart |
 |---|---|---|
-| Temps réel, toujours | Le réglage `realTime` existe mais est **désactivé par défaut** ; sinon les journées durent `dayLengthMinutes` (30 min) et le temps ne passe que pendant le jeu | **Contradiction** : à trancher à l'étape 1 |
-| Une seule horloge du monde | `Date.now`, `new Date()` et `performance.now` sont lus à plusieurs endroits (`game.ts`, `boatDriver.ts`…) ; la sauvegarde garde `hours` et `day` de jeu | À unifier (étape 1) |
+| Temps réel, toujours | ✅ 1.45 : plus aucun réglage de durée de journée ; heure et date = vraie horloge au lieu du joueur | — |
+| Une seule horloge du monde | ✅ 1.45 : `core/worldClock.ts`, garde-fou `noRawClock.test.ts` | — |
 | Météo et mer réelles, repli simulé | ✅ Open-Meteo (1.19), repli simulé sans exception ; mais option **OFF par défaut** | Pas de « retour progressif au réel » vérifié |
 | Le monde avance en mon absence | Faune et météo sont des fonctions du temps (bon socle) ; en mode accéléré rien n'avance hors jeu ; rien pour le bateau ni les chantiers | À construire (étapes 4 à 7) |
-| Sauvegarde des modifications, versionnée | ✅ `EditStore` + IndexedDB (1.29), `WORLD_VERSION`, lecture seule si la sauvegarde vient d'un jeu plus récent | Manque : champ **auteur**, **export/import** en fichier, un seul type (`cairn`) |
-| Marque posée retrouvée (étape 1) | ✅ le cairn (touche K) survit à la fermeture | Étape 1 à moitié faite |
+| Sauvegarde des modifications, versionnée | ✅ `EditStore` + IndexedDB (1.29), `WORLD_VERSION`, lecture seule si la sauvegarde vient d'un jeu plus récent ; ✅ 1.45 : champ **auteur**, **export/import** en fichier | Un seul type de construction (`cairn`) |
+| Marque posée retrouvée (étape 1) | ✅ 1.45 : retrouvée après fermeture, export et import (test automatique) | Étape 1 terminée |
 | Planter, couper, mur, maison, chantiers | Rien (flore non interactive, ni stock de bois, ni inventaire) | Étapes 2 à 4 entières |
 | Survie, difficulté, mort, sommeil, refuge | Rien. **Vocabulaire** : `CLAUDE.md` dit « Refuge = l'ambiance visée » ; la feuille dit « Refuge = dernier abri où j'ai dormi » | Renommer l'un des deux avant l'étape 5 |
 | Journal de bord au retour | Rien | Étape 6 |

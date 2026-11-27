@@ -14,7 +14,7 @@ TypeScript + Vite + Vitest + Three.js. Tout est local (localStorage, IndexedDB p
 - Tout nouveau fichier de logique = un test.
 
 ## Repères du monde
-+x = est, −x = ouest, +z = sud (donc le NORD est vers −z), y = haut, niveau de la mer y = 0. Yaw 0 = nord. Soleil : vrai soleil astronomique (`src/core/geo.ts`) pour la latitude du lieu et le jour de l'année ; l'heure du jeu est l'heure SOLAIRE locale (midi = plein sud).
++x = est, −x = ouest, +z = sud (donc le NORD est vers −z), y = haut, niveau de la mer y = 0. Yaw 0 = nord. Soleil : vrai soleil astronomique (`src/core/geo.ts`) pour la latitude du lieu et le jour de l'année ; l'heure du jeu est l'heure SOLAIRE locale (midi = plein sud), TOUJOURS en temps réel (1.45).
 Lieu de départ : Lannion, 48,73° N, 3,46° O. Ambition : une planète « cousine de la Terre » (relief et biomes guidés par la vraie Terre, détail inventé) — voir la feuille de route du README.
 
 ## Données
@@ -119,3 +119,8 @@ La surface de l'eau douce n'est plus dans le maillage du terrain : `ChunkData.wa
 
 ## Feuille de route décidée (27 novembre 2026)
 Elle est dans le README, section « Feuille de route détaillée », avec l'état du dépôt comparé. Règles à garder en tête : temps réel toujours (ni accélération), une seule horloge du monde, l'état d'une chose se calcule à partir de ses dates, ce que fait le joueur reste, pas d'XP. Une étape à la fois, testée avant la suivante. Conflit de vocabulaire à résoudre avant la survie : « Refuge » (ambiance, ci-dessus) contre « refuge = dernier abri où j'ai dormi ».
+
+## Horloge unique, export et import (1.45)
+`core/worldClock.ts` (pur, testé) : `worldClock.now()` (ms), `.solar(lon)` (heure solaire + jour), `.hoursSinceEpoch()` (météo). C'est le SEUL endroit qui lit `Date.now()` ; `core/noRawClock.test.ts` échoue si un autre fichier de `src/` utilise `Date.now(` ou `new Date()` sans argument (exception listée : `pwa/install.ts`). `new Date(valeur)` et `performance.now()` restent permis. Plus de réglages `realTime`, `dayLengthMinutes`, `daysPass` ; la sauvegarde n'a plus `hours`/`day` mais `savedAt`. Avance rapide d'essai : `?debug` seulement (`__thy.setHours/setDay/advance/resetClock/clock`) via `testOffsetMs`. Toute date enregistrée (construction, sauvegarde) vient de `worldClock.now()`.
+`WorldEdit.author` (`PLAYER_AUTHOR` = « moi »). Export/import : `core/saveFile.ts` (pur : `buildSaveFile`, `parseSaveFile` qui nettoie tout avec `sanitizeSave`/`sanitizeEdit`, refuse autre graine / format plus récent / trop gros), `storage/importSave.ts` (`applyImport` : vide le tiroir, écrit les constructions, la POSITION EN DERNIER ; refuse sans IndexedDB durable), `Game.exportSave/importSave` (confirmation, drapeau `importing` qui coupe `saveNow` sinon la position courante recouvre celle du fichier, puis rechargement). Changer la structure du fichier = monter `SAVE_FILE_VERSION`.
+

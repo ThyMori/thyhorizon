@@ -30,6 +30,8 @@ declare global {
       audioTest(over?: Record<string, unknown>, life?: Record<string, unknown>, boat?: Record<string, unknown>): Promise<{ rms: number; peak: number; bad: number }>; // rend du son hors ligne et le mesure (essais)
       real(c: { wind?: { speed: number; from: number } | null; weather?: { front: number; cloud: number; rain: number; fog: number; pressure: number } | null; hs?: number | null; waveFrom?: number | null; current?: { x: number; z: number } | null } | null): string; // impose des conditions « réelles » (essais)
       weather(w: { cloud?: number; rain?: number; fog?: number; windScale?: number } | null): string; // impose le temps (essais)
+      temperature(t: number | null): string; // impose la température en °C (null = calculée) ; sous 0 °C la pluie devient neige (essais)
+      snow(cover?: number): { temp: number; fall: number; cover: number }; // (cover : impose la neige au sol) température, part de neige dans la précipitation, neige au sol (essais)
       play(on: boolean): void; // fait « jouer » sans capture de souris (essais automatiques)
       ready(): boolean;
       pending(): number;

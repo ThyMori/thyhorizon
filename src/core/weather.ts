@@ -147,16 +147,17 @@ export function applyWeatherToSky(s: SunState, w: WeatherState): SunState {
 export const fogFactor = (w: WeatherState): number => 1 + 12 * w.fog * w.fog + 1.8 * w.rain + 0.6 * smoothstep(0.6, 1, w.cloud);
 
 // Description courte du temps, en français.
-export function weatherText(w: WeatherState): string {
+export function weatherText(w: WeatherState, snow = 0): string {
   const parts: string[] = [];
   if (w.cloud < 0.2) parts.push('ciel dégagé');
   else if (w.cloud < 0.45) parts.push('quelques nuages');
   else if (w.cloud < 0.7) parts.push('nuageux');
   else if (w.cloud < 0.9) parts.push('très nuageux');
   else parts.push('ciel couvert');
-  if (w.rain > 0.7) parts.push('forte pluie');
-  else if (w.rain > 0.35) parts.push('pluie');
-  else if (w.rain > 0.08) parts.push('bruine');
+  const snowy = snow > 0.5; // la précipitation est de la neige
+  if (w.rain > 0.7) parts.push(snowy ? 'forte neige' : 'forte pluie');
+  else if (w.rain > 0.35) parts.push(snowy ? 'neige' : 'pluie');
+  else if (w.rain > 0.08) parts.push(snowy ? 'flocons' : 'bruine');
   if (w.fog > 0.6) parts.push('brouillard');
   else if (w.fog > 0.25) parts.push('brume');
   return parts.join(' · ');

@@ -377,6 +377,15 @@ Sans objet : jeu local, sans compte ni serveur.
 - Aucun maillage n'est refait quand la saison change : chaque sommet porte une « classe de saison » et le shader du terrain cache ou colore (`render/seasonShader.ts`).
 - Pas encore : le sol (l'herbe du terrain reste verte), la neige, les climats secs ou à saison des pluies (seule la latitude compte), les arbres qui fleurissent.
 
+## 1.40 — La neige
+
+- Le jeu a maintenant une **température de l'air** (`core/temperature.ts`, pur et testé) : elle dépend de la latitude, de la saison (inversée au sud), de l'heure (fraîche la nuit, surtout par ciel dégagé), de l'**altitude** (−6,5 °C par 1 000 m) et du temps (une perturbation refroidit un peu). Elle s'affiche dans le bandeau météo du bateau.
+- Quand il **tombe de l'eau et qu'il gèle** (autour de 0 °C), la pluie devient **neige** : de vrais flocons qui se balancent et dérivent avec le vent (`render/snow.ts`), plus de traînées de pluie, plus de gouttes sur l'écran, plus de bruit de pluie.
+- Le **sol blanchit** par plaques puis entièrement : les faces tournées vers le ciel (sol, dessus des branches de conifères, buissons, herbe) deviennent blanches, les pentes raides gardent leur couleur. Le shader du terrain fait tout (`SNOW_BODY` dans `render/scene.ts`), sans refaire de maillage.
+- La neige **fond** quand il fait plus doux (plus vite à 6 °C qu'à 2 °C), tient par grand froid, et disparaît d'un coup si tu te téléportes dans un lieu chaud (au-dessus de ~10 °C elle ne peut pas exister).
+- À Lannion, la neige est rare (hiver doux), comme dans la vraie Bretagne ; elle est fréquente en montagne et vers les pôles. Pour essayer vite avec `?debug` : `__thy.weather({cloud:0.9, rain:0.8})`, `__thy.temperature(-4)`, `__thy.snow(1)` (impose la neige au sol), `__thy.temperature(null)` rend la température calculée.
+- Pas encore : la neige est la même partout autour de toi (une seule épaisseur « locale », pas une carte), les arbres n'ont pas de neige qui glisse, pas de lacs gelés, pas de bruit de pas dans la neige, le froid n'a pas encore d'effet sur le joueur.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

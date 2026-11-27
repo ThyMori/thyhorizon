@@ -96,3 +96,12 @@ describe('météo', () => {
     expect(weatherText({ ...CLEAR_WEATHER, cloud: 0.3, fog: 0.8 })).toContain('brouillard');
   });
 });
+
+describe('texte de la neige (1.40)', () => {
+  it('la précipitation devient neige quand il gèle', () => {
+    expect(weatherText({ ...CLEAR_WEATHER, cloud: 0.95, rain: 0.5 }, 1)).toBe('ciel couvert · neige');
+    expect(weatherText({ ...CLEAR_WEATHER, cloud: 0.95, rain: 0.9 }, 1)).toContain('forte neige');
+    expect(weatherText({ ...CLEAR_WEATHER, cloud: 0.95, rain: 0.15 }, 1)).toContain('flocons');
+    expect(weatherText({ ...CLEAR_WEATHER, cloud: 0.95, rain: 0.5 }, 0.2)).toBe('ciel couvert · pluie');
+  });
+});

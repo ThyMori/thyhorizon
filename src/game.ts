@@ -58,6 +58,7 @@ import { musicMood, newMusicState, stepMusic } from './core/music';
 import { mulberry32 } from './core/noise';
 import { shoreProximity, soundMix } from './core/soundMix';
 import { seasonState } from './core/season';
+import { airTemperature, snowFraction, stepSnowCover, temperatureText } from './core/temperature';
 import { waterAround, waterMix } from './core/waterSound';
 import { LifeInput, lifeMix } from './core/wildlife';
 import { SettingsPanel } from './ui/settingsPanel';
@@ -71,6 +72,12 @@ export class Game {
   private hours: number; // heure solaire locale du jeu
   private gameHours = 0; // temps de jeu continu (heures) : fait évoluer la météo sans saut à minuit ni au changement d'année
   private weather: WeatherState = CLEAR_WEATHER; // temps actuel au lieu du joueur (adouci)
+  private temperature = 12; // température de l'air au lieu du joueur (°C, adoucie)
+  private tempInit = false; // la première température est prise telle quelle (pas de glissement depuis 12 °C)
+  private tempForced: number | null = null; // pour les essais (?debug)
+  private snowFall = 0; // part des précipitations qui tombe en neige (0 à 1)
+  private snowCover = 0; // neige au sol (0 à 1)
+  private wetRain = 0; // pluie liquide (sans la neige) : pour le son et les gouttes sur l'écran
   private weatherTarget: WeatherState = CLEAR_WEATHER; // temps visé (recalculé deux fois par seconde)
   private readonly lens: LensDrops; // gouttes de pluie sur l'écran
   private readonly audio = new AudioSystem(); // ambiance sonore (démarre au premier geste)
@@ -214,11 +221,19 @@ export class Game {
       let target = weatherAt(lat, lon, realClimate.classAt(lat, lon), this.day, this.gameHours, this.hours);
       this.manageReal(lat, lon); // demande la météo réelle si l'option est active et qu'il est temps
       if (this.real?.weather) target = { ...target, ...this.real.weather, windScale: this.real.wind ? 1 : target.windScale }; // le temps réel remplace le simulé
-      if (this.boat.aboard) this.boatHud.setWeather(`${weatherText(this.weather)} · ${beaufortName(beaufort(this.boat.wind.speed))} · ${seaName(this.sea.hs)}${this.boat.current.x || this.boat.current.z ? ` · courant ${(Math.round(msToKnots(Math.hypot(this.boat.current.x, this.boat.current.z)) * 10) / 10).toString().replace('.', ',')} nd` : ''}${this.real ? ' · météo réelle' : ''}`);
+      if (this.boat.aboard) this.boatHud.setWeather(`${weatherText(this.weather, this.snowFall)} · ${temperatureText(this.temperature)} · ${beaufortName(beaufort(this.boat.wind.speed))} · ${seaName(this.sea.hs)}${this.boat.current.x || this.boat.current.z ? ` · courant ${(Math.round(msToKnots(Math.hypot(this.boat.current.x, this.boat.current.z)) * 10) / 10).toString().replace('.', ',')} nd` : ''}${this.real ? ' · météo réelle' : ''}`);
       this.weatherTarget = this.weatherForced ? { ...target, ...this.weatherForced } : target;
     }
     this.weather = blendWeather(this.weather, this.weatherTarget, 1 - Math.exp(-dt / 4)); // le temps change en quelques secondes si on change de lieu
     this.boat.weather = this.weather;
+    // Température, puis neige : sous zéro la pluie devient neige, le sol blanchit puis fond (core/temperature.ts).
+    const rawTemp = this.tempForced ?? airTemperature(this.playerLat(), this.day, this.hours, Math.max(0, this.controls.y - 1.7), this.weather);
+    this.temperature = this.tempInit ? this.temperature + (rawTemp - this.temperature) * (1 - Math.exp(-dt / 4)) : rawTemp;
+    this.tempInit = true;
+    this.snowFall = snowFraction(this.temperature);
+    this.wetRain = this.weather.rain * (1 - this.snowFall);
+    this.snowCover = stepSnowCover(this.snowCover, dt, this.weather.rain * this.snowFall, this.temperature);
+    this.gs.setSnow(this.snowFall, this.snowCover);
     // Vent réel : on s'en approche doucement (≈ 20 s) ; sans vent réel, le vent simulé s'applique.
     if (this.real?.wind) this.realWind = this.realWind ? approachWind(this.realWind, this.real.wind, 1 - Math.exp(-dt / 20)) : this.real.wind;
     else this.realWind = null;
@@ -273,9 +288,9 @@ export class Game {
       forest: biome.forest,
       conifer: biome.conifer,
       land: !aboard && ground > 0, // à bord, on est sur l'eau
-      snowy: ground > biome.snowLine,
+      snowy: ground > biome.snowLine || this.snowCover > 0.5,
       shore: this.shore,
-      rain: this.weather.rain,
+      rain: this.wetRain,
       wind: windFelt,
     });
     this.audio.setMood(
@@ -284,7 +299,7 @@ export class Game {
         hours: this.hours,
         day: this.day,
         cloud: this.weather.cloud,
-        rain: this.weather.rain,
+        rain: this.wetRain,
         fog: this.weather.fog,
         wind: windFelt,
         onWater: aboard,
@@ -295,7 +310,7 @@ export class Game {
     this.audio.setMix(
       soundMix({
         windSpeed: windFelt, // à bord on entend le vent apparent
-        rain: this.weather.rain,
+        rain: this.wetRain,
         seaHs: this.sea.hs,
         onWater: aboard,
         shore: this.shore,
@@ -316,7 +331,7 @@ export class Game {
               heelRate: bs.heelRate,
               boatSpeed: r ? r.speed : 0,
               seaHs: this.sea.hs,
-              rain: this.weather.rain,
+              rain: this.wetRain,
             })
           : undefined,
         life,
@@ -395,7 +410,7 @@ export class Game {
     this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day, this.playerLon()), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
     const sky = sunState(this.hours, this.playerLat(), this.day, this.playerLon());
     this.updateSound(dt);
-    this.lens.update(dt, this.weather.rain, sky.daylight, this.controls.locked); // gouttes sur l'écran quand il pleut et qu'on joue
+    this.lens.update(dt, this.wetRain, sky.daylight, this.controls.locked); // gouttes sur l'écran quand il pleut et qu'on joue
     this.gs.render();
     this.updateFps(dt);
     this.updateLoading();
@@ -941,8 +956,14 @@ export class Game {
         this.weatherForced = w; // impose (ou rend) le temps pour les essais
         this.weatherTimer = 0;
         if (w) this.weather = { ...this.weather, ...w };
-        return weatherText(this.weather);
+        return weatherText(this.weather, this.snowFall);
       },
+      temperature: (t) => {
+        this.tempForced = t; // impose (ou rend) la température pour les essais
+        if (t !== null) { this.temperature = t; this.tempInit = true; }
+        return t === null ? 'calculée' : temperatureText(t);
+      },
+      snow: (cover) => { if (cover !== undefined) this.snowCover = cover; return { temp: this.temperature, fall: this.snowFall, cover: this.snowCover }; },
       audioTest: async (over, life, boat) => {
         // Rend 2 s de son hors ligne (sans haut-parleur) et mesure : niveau moyen, crête, valeurs invalides. Pour vérifier le moteur sans l'écouter.
         const ctx = new OfflineAudioContext(1, 44100 * 2, 44100);

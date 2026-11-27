@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.40.0 — 2026-11-27
+
+Neige : température, flocons, sol blanc qui fond
+
 ## 1.39.0 — 2026-11-27
 
 Saisons : feuillus, fleurs, herbe, fougères

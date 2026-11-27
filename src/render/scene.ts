@@ -19,6 +19,7 @@ import type { SeasonState } from '../core/season';
 import { applySeason, createSeasonDepthMaterial, createSeasonUniforms, patchSeasonShader } from './seasonShader';
 import { Ocean } from './ocean';
 import { Rain } from './rain';
+import { Snow } from './snow';
 import { SkyDome, toColor } from './sky';
 
 const SHADOW_EXTENT = 90; // demi-largeur de la zone ombrée autour du joueur, en mètres
@@ -60,6 +61,26 @@ float groundGrain(vec3 wp, float dist) { // facteur de luminosité du sol (autou
 }
 `;
 
+
+// Neige au sol (1.40) : les faces tournées vers le ciel blanchissent par plaques puis tout à fait ; les pentes raides gardent leur couleur.
+// Appliquée après le calcul de la normale (on a besoin de savoir si la face regarde vers le haut). Rien n'est fait sans neige (uSnow = 0).
+const SNOW = /* glsl */ `
+uniform float uSnow; // épaisseur de neige au sol, 0 à 1
+`;
+const SNOW_BODY = /* glsl */ `
+if (uSnow > 0.001 && vGroundPos.y > 0.4) {
+  vec3 upView = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz); // le haut du monde, vu depuis la caméra
+  float upness = dot(normalize(normal), upView); // 1 = face horizontale tournée vers le ciel
+  float breakup = gNoise(vGroundPos.xz * 0.35 + uShiftB) * 0.6 + gNoise(vGroundPos.xz * 0.07 + uShiftA) * 0.4; // plaques
+  float amount = smoothstep(0.0, 0.3, uSnow * 1.25 - breakup * 0.5); // peu de neige : des plaques ; beaucoup : tout est blanc
+  float facing = smoothstep(mix(0.95, 0.35, uSnow), mix(1.1, 0.6, uSnow), upness); // plus il y a de neige, plus les pentes en gardent
+  float plant = vSCls > 1.5 ? 0.6 : (vSCls > 0.5 ? 0.85 : 1.0); // fleurs, herbe, fougères : un peu moins couverts que le sol
+  float snowAmt = amount * facing * plant;
+  float shade = 0.92 + 0.08 * gNoise(vGroundPos.xz * 2.5 + uShiftC); // léger grain dans le blanc
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.8, 0.84, 0.9) * shade, snowAmt);
+}
+`;
+
 // Rivage : sous l'eau, le fond s'assombrit et prend la teinte de la mer avec la profondeur (on voit le sable clair dans les petits fonds,
 // du bleu sombre plus loin) ; au bord, l'écume de la houle monte et redescend en bandes.
 const SHORE = /* glsl */ `
@@ -91,6 +112,9 @@ export class GameScene {
   private readonly ocean = new Ocean();
   readonly freshWater = new FreshWater(); // matériau animé des rivières et des lacs
   private readonly rain = new Rain(); // pluie autour de la caméra
+  private readonly snow = new Snow(); // flocons autour de la caméra
+  private snowFall = 0; // part des précipitations qui tombe en neige (0 pluie, 1 neige)
+  private readonly snowUniform = new THREE.Uniform(0); // épaisseur de neige au sol (0 à 1), lue par le shader du terrain
   private readonly seasonUniforms = createSeasonUniforms(); // l'état des saisons (feuilles, fleurs, herbe), partagé par le terrain et ses ombres
   private readonly surfTime = new THREE.Uniform(0); // temps de l'écume de rivage
   private readonly surfStrength = new THREE.Uniform(0.4); // force de l'écume de rivage (dépend de l'état de mer)
@@ -120,7 +144,7 @@ export class GameScene {
     container.appendChild(this.renderer.domElement); // le canvas entre dans la page
 
     this.scene.fog = this.fog;
-    this.scene.add(this.sky.dome, this.sky.stars, this.sky.lines, this.ocean.mesh, this.rain.mesh);
+    this.scene.add(this.sky.dome, this.sky.stars, this.sky.lines, this.ocean.mesh, this.rain.mesh, this.snow.mesh);
     this.scene.add(this.hemi, this.moon, this.moon.target, this.sun, this.sun.target);
 
     this.sun.castShadow = true; // le soleil ombre le terrain proche
@@ -144,15 +168,23 @@ export class GameScene {
       shader.uniforms.uShiftC = this.grainUniforms[2]!;
       shader.uniforms.uSurfTime = this.surfTime;
       shader.uniforms.uSurf = this.surfStrength;
+      shader.uniforms.uSnow = this.snowUniform; // neige au sol
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vGroundPos;') // position monde transmise au fragment
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\nvarying vec3 vGroundPos;\nuniform float uSurfTime;\nuniform float uSurf;\n${GROUND_NOISE}`)
-        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= groundGrain(vGroundPos, length(vViewPosition));\n' + SHORE);
+        .replace('#include <common>', `#include <common>\nvarying vec3 vGroundPos;\nuniform float uSurfTime;\nuniform float uSurf;\n${GROUND_NOISE}${SNOW}`)
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= groundGrain(vGroundPos, length(vViewPosition));\n' + SHORE)
+        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SNOW_BODY); // la neige a besoin de la normale
       patchSeasonShader(shader, this.seasonUniforms); // saisons : feuilles qui tombent, fleurs, herbe sèche
     };
     this.terrainMaterial.userData.seasonDepth = createSeasonDepthMaterial(this.seasonUniforms); // même chose pour les ombres
+  }
+
+  // La neige (1.40) : part des précipitations qui tombe en neige, et épaisseur de neige au sol (0 à 1).
+  setSnow(fall: number, cover: number): void {
+    this.snowFall = fall;
+    this.snowUniform.value = cover;
   }
 
   // Applique l'état des saisons (cheap : quelques nombres envoyés au shader).
@@ -296,7 +328,8 @@ export class GameScene {
     this.sky.setClouds(this.weather.cloud, this.cloudX, this.cloudZ);
     this.fog.density = (FOG_DENSITY_FACTOR / this.radiusMeters) * fogFactor(this.weather); // brume et pluie réduisent la visibilité
     toColor(state.skyHorizon, this.tmpColor);
-    this.rain.update(this.camera, timeSeconds, this.weather.rain, state.daylight, this.tmpColor, this.windX, this.windZ);
+    this.rain.update(this.camera, timeSeconds, this.weather.rain * (1 - this.snowFall), state.daylight, this.tmpColor, this.windX, this.windZ); // la pluie devient neige quand il gèle
+    this.snow.update(this.camera, timeSeconds, this.weather.rain * this.snowFall, state.daylight, this.tmpColor, this.windX, this.windZ, this.renderer.domElement.height);
     this.sky.update(state, this.camera, timeSeconds);
     this.ocean.update(timeSeconds, state, this.camera);
     this.freshWater.update(timeSeconds, state); // rides et reflets des rivières et des lacs

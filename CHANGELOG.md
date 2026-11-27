@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.42.0 — 2026-11-27
+
+Faune visible : oiseaux, papillons, libellules, lapins, cerfs, moutons, vaches
+
 ## 1.41.0 — 2026-11-27
 
 Arbres variés : hauteurs, pins, jeunes, morts, souches, troncs tombés

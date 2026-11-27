@@ -405,6 +405,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - Tout reste déterministe (même graine, mêmes arbres). Champ `Tree.form` (`core/trees.ts`) ; tests dans `treeVariety.test.ts`.
 - Pas encore : les arbres ne grandissent ni ne meurent avec le temps (ce sera le rôle de la simulation du monde vivant), pas de troncs creux, pas de champignons ni de lierre.
 
+## 1.42 — La faune visible (monde peuplé, étape 2)
+
+- **Oiseaux chanteurs** (surtout en forêt, le jour, pas sous la pluie), **mouettes** (près de la côte et des grands plans d'eau), **rapaces** qui planent très haut, **papillons** (prairies, journées douces), **libellules** (près de l'eau, l'été), **lapins** (prairies, surtout à l'aube et au crépuscule, ils s'écartent quand tu approches), **cerfs** (forêts, aube et crépuscule, ils se tiennent à une quarantaine de mètres), **moutons** et **vaches** (pâturages autour des villages, plus calmes la nuit).
+- **Aucun état à simuler** : chaque bête est une fonction du lieu et de l'heure (`core/fauna.ts`, pur et testé). Même endroit + même heure = mêmes bêtes ; le monde « vit » donc sans calcul pendant ton absence. Les bêtes sortent selon l'heure, la température (pas de papillons sous 12 °C), la pluie et la neige.
+- Dessin en **instances** (une seule demande à la carte graphique par espèce, `render/fauna.ts`), modèles simples (boîtes et ailes) ; les battements d'ailes sont calculés dans le shader. Rien n'est envoyé en grande coordonnée (origine flottante).
+- Pas encore : pas de bruit d'animaux (chants, bêlements), pas d'animaux marins, les bêtes ne se mangent ni ne se reproduisent pas, pas de pattes animées (elles glissent en sautillant), pas d'option pour les désactiver (à ajouter si la fluidité en souffre sur ton téléphone).
+- Debug (`?debug`) : `__thy.fauna()` donne le nombre de bêtes par espèce et les 40 plus proches.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

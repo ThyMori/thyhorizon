@@ -23,6 +23,9 @@ import { PlayerControls } from './player/controls';
 import { Avatar } from './render/avatar';
 import { EditObjects } from './render/editObjects';
 import { VillageObjects } from './render/villageObjects';
+import { Critter, Fauna, FaunaEnv, FaunaWorld } from './core/fauna';
+import { lushness } from './core/flora';
+import { FaunaView } from './render/fauna';
 import { Cities, parseCities } from './core/cities';
 import { VillageSystem } from './core/villageSystem';
 import { pointInHouse } from './core/village';
@@ -86,6 +89,9 @@ export class Game {
   private readonly edits = new EditStore(); // les modifications du monde faites par le joueur (cairns…)
   private editsDb: EditsPersistence | null = null; // leur enregistrement durable (null tant que la base n'est pas ouverte)
   private editObjects!: EditObjects; // leur dessin
+  private fauna!: Fauna; // la vie sauvage et le bétail autour du joueur (calculés à partir du lieu et de l'heure)
+  private faunaNear: Critter[] = []; // les bêtes de cette image, des plus proches aux plus lointaines
+  private faunaView!: FaunaView; // leur dessin (instances)
   private villageObjects!: VillageObjects; // le dessin des villages proches
   private villageClock = 0; // temps depuis le dernier rafraîchissement des villages (s)
   private savedWorldVersion = WORLD_VERSION; // version du monde lue dans la sauvegarde
@@ -399,6 +405,9 @@ export class Game {
       this.villageClock = 0;
       this.villageObjects.update(this.controls.x, this.controls.z, this.origin.x, this.origin.z, (x, z) => this.terrain.heightAt(x, z)); // maisons et panneaux proches
     }
+    const faunaEnv: FaunaEnv = { hours: this.hours, tempC: this.temperature, rain: this.wetRain, snow: this.snowCover };
+    this.faunaNear = this.fauna.around(this.controls.x, this.controls.z, faunaEnv, now / 1000).sort((a, b) => Math.hypot(a.x - this.controls.x, a.z - this.controls.z) - Math.hypot(b.x - this.controls.x, b.z - this.controls.z)); // plus proches d'abord (pour les essais)
+    this.faunaView.update(this.faunaNear, this.origin.x, this.origin.z); // la faune bouge à chaque image (fonction du temps)
     this.editClock += dt;
     if (this.editClock > 0.5) {
       this.editClock = 0;
@@ -528,6 +537,21 @@ export class Game {
     this.avatar = new Avatar(this.gs.scene);
     this.editObjects = new EditObjects(this.gs.scene, this.edits);
     this.villageObjects = new VillageObjects(this.gs.scene, this.villages, this.gs.renderer);
+    const faunaWorld: FaunaWorld = {
+      groundAt: (x, z) => this.terrain.heightAt(x, z),
+      waterDepthAt: (x, z) => this.terrain.waterDepthAt(x, z),
+      biomeAt: (x, z) => {
+        const b = this.terrain.biomeAt(x, z);
+        return { forest: b.forest, lush: lushness(b) };
+      },
+      nearSea: (x, z) => [[0, 250], [180, 180], [250, 0], [180, -180], [0, -250], [-180, -180], [-250, 0], [-180, 180]].some(([dx, dz]) => this.terrain.coarseHeightAt(x + dx!, z + dz!) < 0), // la mer à moins de 250 m (relief sans rivières : calcul rapide)
+      farmNear: (x, z) => {
+        const v = this.villages.near(x, z, 450)[0];
+        return v ? { x: v.x, z: v.z, r: v.radius } : null;
+      },
+    };
+    this.fauna = new Fauna(faunaWorld);
+    this.faunaView = new FaunaView(this.gs.scene);
     this.villages.setReserved((x, z, r) => this.edits.nearest(x, z, r) !== null); // pas de maison sur un cairn
     this.controls.onEditKey = (remove) => this.editAction(remove);
     this.edits.onChange((c) => {
@@ -963,6 +987,7 @@ export class Game {
         if (t !== null) { this.temperature = t; this.tempInit = true; }
         return t === null ? 'calculée' : temperatureText(t);
       },
+      fauna: () => ({ ...this.faunaView.counts(), near: this.faunaNear.slice(0, 40).map((c) => ({ sp: c.species, x: Math.round(c.x), y: Math.round(c.y), z: Math.round(c.z), d: Math.round(Math.hypot(c.x - this.controls.x, c.z - this.controls.z)) })) }),
       snow: (cover) => { if (cover !== undefined) this.snowCover = cover; return { temp: this.temperature, fall: this.snowFall, cover: this.snowCover }; },
       audioTest: async (over, life, boat) => {
         // Rend 2 s de son hors ligne (sans haut-parleur) et mesure : niveau moyen, crête, valeurs invalides. Pour vérifier le moteur sans l'écouter.

@@ -31,6 +31,7 @@ declare global {
       real(c: { wind?: { speed: number; from: number } | null; weather?: { front: number; cloud: number; rain: number; fog: number; pressure: number } | null; hs?: number | null; waveFrom?: number | null; current?: { x: number; z: number } | null } | null): string; // impose des conditions « réelles » (essais)
       weather(w: { cloud?: number; rain?: number; fog?: number; windScale?: number } | null): string; // impose le temps (essais)
       temperature(t: number | null): string; // impose la température en °C (null = calculée) ; sous 0 °C la pluie devient neige (essais)
+      fauna(): Record<string, unknown>; // nombre de bêtes dessinées par espèce, et les 40 plus proches (essais)
       snow(cover?: number): { temp: number; fall: number; cover: number }; // (cover : impose la neige au sol) température, part de neige dans la précipitation, neige au sol (essais)
       play(on: boolean): void; // fait « jouer » sans capture de souris (essais automatiques)
       ready(): boolean;

@@ -35,7 +35,7 @@ const ROCK: Rgb = [0.5, 0.48, 0.45]; // gris de la roche
 const REED: Rgb = [0.5, 0.55, 0.27]; // vert-jaune des roseaux
 
 // À quel point l'herbe est verte ici (0 = désert ou glace, 1 = prairie) d'après la couleur du sol du climat.
-const lushness = (b: Biome): number => smoothstep(0.04, 0.15, b.grassLight[1] - (b.grassLight[0] + b.grassLight[2]) / 2);
+export const lushness = (b: Biome): number => smoothstep(0.04, 0.15, b.grassLight[1] - (b.grassLight[0] + b.grassLight[2]) / 2);
 
 // Les plantes d'une tuile. Rien dans les villages et sur les chemins (`blocked`), rien sur la plage ni dans l'eau (sauf des roseaux sur la rive).
 export function floraForChunk(terrain: Terrain, cx: number, cz: number, lod: number, chunkSize: number, blocked: ((x: number, z: number) => boolean) | null = null, hasWater = false): Plant[] {

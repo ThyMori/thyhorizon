@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.44.0 — 2026-11-27
+
+Textures procédurales : sol moucheté, cailloux, écorce, strates de roche
+
 ## 1.43.1 — 2026-11-27
 
 Tests : limite de temps relevée (le test des gués échouait sur GitHub)

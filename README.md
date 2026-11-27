@@ -425,6 +425,15 @@ Sans objet : jeu local, sans compte ni serveur.
 
 - Le test des gués (`roads.test.ts`) dépassait parfois 5 s sur les machines de GitHub et faisait échouer la publication. La limite passe à 30 s pour tous les tests (`testTimeout` dans `vite.config`). Aucun changement dans le jeu.
 
+## 1.44 — Textures procédurales
+
+- Le sol, les troncs, les rochers et les falaises ont maintenant du **grain** (`core/surfaceTexture.ts` pour les réglages, `render/surfaceTexture.ts` pour le shader) : aucune image à charger, tout est calculé.
+- **Sol** : plaques de teinte chaude ou froide, moucheture, et petits cailloux sombres et clairs visibles seulement de près.
+- **Parois** (troncs, rochers, falaises) : sillons d'écorce verticaux et strates horizontales de roche. De loin, le détail s'efface pour ne pas scintiller.
+- Les plantes (feuillage, herbe, fleurs, fougères) gardent leur couleur : leur texture reste celle des saisons.
+- Pas de nouveau réglage : si ça ralentit, dis-le-moi et j'ajoute un interrupteur.
+- Limites : un tronc et un rocher ont la même texture de paroi (le shader ne sait pas les distinguer) ; je n'ai pas vu le rendu sur un vrai GPU ni sur téléphone.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { CHUNK_SIZE } from '../core/chunk';
 import { lerpRgb } from '../core/math';
+import { SURFACE_TEXTURE } from './surfaceTexture';
 import { GRAIN_FREQUENCIES, GRAIN_PERIOD, Origin, grainShift } from '../core/origin';
 import type { Settings } from '../core/settings';
 import type { SunState } from '../core/sun';
@@ -173,8 +174,8 @@ export class GameScene {
         .replace('#include <common>', '#include <common>\nvarying vec3 vGroundPos;') // position monde transmise au fragment
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\nvarying vec3 vGroundPos;\nuniform float uSurfTime;\nuniform float uSurf;\n${GROUND_NOISE}${SNOW}`)
-        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= groundGrain(vGroundPos, length(vViewPosition));\n' + SHORE)
+        .replace('#include <common>', `#include <common>\nvarying vec3 vGroundPos;\nuniform float uSurfTime;\nuniform float uSurf;\n${GROUND_NOISE}${SURFACE_TEXTURE}${SNOW}`)
+        .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= groundGrain(vGroundPos, length(vViewPosition)) * surfaceTexture(vGroundPos, length(vViewPosition), vSCls);\n' + SHORE)
         .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n' + SNOW_BODY); // la neige a besoin de la normale
       patchSeasonShader(shader, this.seasonUniforms); // saisons : feuilles qui tombent, fleurs, herbe sèche
     };

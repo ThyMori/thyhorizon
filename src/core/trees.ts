@@ -8,6 +8,8 @@ import { slopeAt } from './terrain';
 import type { Terrain } from './terrain';
 
 export type TreeKind = 'conifer' | 'broadleaf' | 'acacia';
+// État d'un arbre (1.41) : absent = vivant ; mort sur pied (sans feuilles), souche, ou tronc tombé au sol.
+export type TreeForm = 'dead' | 'stump' | 'fallen';
 
 // Un arbre placé dans le monde.
 export interface Tree {
@@ -17,6 +19,7 @@ export interface Tree {
   kind: TreeKind;
   size: number; // facteur de taille (1 = arbre moyen)
   seed: number; // nombre pseudo-aléatoire propre à l'arbre (0 à 1)
+  form?: TreeForm; // arbre mort, souche ou tronc tombé (absent = vivant)
 }
 
 export const TREE_GROWTH = 1.35; // facteur de taille général des arbres (1.40.1 : ils étaient un peu bas) ; le tronc suit, donc la collision aussi
@@ -63,8 +66,12 @@ export function treesForChunk(terrain: Terrain, cx: number, cz: number, lod: num
       const k = hash01(gi, gj, 4); // choix de l'espèce
       const kind: TreeKind = k < biome.acacia ? 'acacia' : hash01(gi, gj, 5) < biome.conifer ? 'conifer' : 'broadleaf';
       const cold = smoothstep(2000, 300, biome.snowLine); // arbres plus petits près des pôles et en altitude
-      const size = (0.75 + 0.6 * hash01(gi, gj, 6)) * lerp(1, 0.65, cold) * sizeBoost * TREE_GROWTH;
-      trees.push({ x, z, y, kind, size, seed: hash01(gi, gj, 7) });
+      const age = hash01(gi, gj, 10); // l'âge : quelques jeunes pousses, quelques très vieux arbres
+      const ageFactor = age < 0.12 ? 0.45 + 0.8 * age : age > 0.92 ? 1.25 : 1; // jeunes plus petits (0,45 à 0,55), vieux plus grands
+      const size = (0.75 + 0.6 * hash01(gi, gj, 6)) * lerp(1, 0.65, cold) * sizeBoost * TREE_GROWTH * ageFactor;
+      const fate = hash01(gi, gj, 9); // le sort de l'arbre : la forêt vit, meurt et se renouvelle
+      const form: TreeForm | undefined = age < 0.12 ? undefined : fate < 0.035 ? 'dead' : fate < 0.055 ? 'stump' : fate < 0.07 ? 'fallen' : undefined; // pas de jeunes pousses mortes
+      trees.push(form ? { x, z, y, kind, size, seed: hash01(gi, gj, 7), form } : { x, z, y, kind, size, seed: hash01(gi, gj, 7) });
     }
   }
   return trees;
@@ -94,7 +101,8 @@ const linear = (c: Rgb, k: number): Rgb => [lin(clamp(c[0] * k, 0, 1)), lin(clam
 
 // Rayon du pied du tronc (m) selon l'espèce, pour une taille de 1 : sert à la fois au dessin et à la collision (on ne traverse pas un tronc).
 export const TRUNK_BASE: Record<TreeKind, number> = { conifer: 0.34, broadleaf: 0.5, acacia: 0.36 };
-export const trunkRadius = (t: { kind: TreeKind; size: number }): number => TRUNK_BASE[t.kind] * t.size * 0.9;
+// Un tronc tombé n'a pas de pied debout (rayon 0) : il est bas, on l'enjambe.
+export const trunkRadius = (t: { kind: TreeKind; size: number; form?: TreeForm }): number => (t.form === 'fallen' ? 0 : TRUNK_BASE[t.kind] * t.size * 0.9);
 
 // Ajoute un sommet et renvoie son numéro.
 function vertex(b: MeshBuilder, p: [number, number, number], nrm: [number, number, number], c: Rgb): number {
@@ -256,28 +264,38 @@ const tinted = (c: Rgb, k: number): Rgb => [clamp(c[0] * k, 0, 1), clamp(c[1] * 
 const around = (seed: number, i: number, n: number): number => seed * Math.PI * 2 + (i / n) * Math.PI * 2 + (hash01(Math.floor(seed * 1e6), i, 51) - 0.5) * 0.9;
 
 // Ajoute un arbre au maillage. (lx, lz) = position relative au coin de la tuile. detail 0 = arbre complet (près), 1 = simplifié (loin).
+const DEAD_WOOD: Rgb = [0.46, 0.43, 0.39]; // bois mort : gris, sec
 export function addTree(b: MeshBuilder, t: Tree, lx: number, lz: number, detail = 0): void {
-  const s = t.size;
-  const tone = 0.85 + 0.3 * t.seed; // chaque arbre a sa nuance
+  const sd = Math.floor(t.seed * 1e6);
+  const r = (k: number): number => hash01(sd, k, 90); // petits hasards propres à l'arbre
   const birch = t.kind === 'broadleaf' && t.seed > 0.82; // quelques feuillus ont l'écorce claire du bouleau
+  const tall = (0.8 + 0.5 * r(1)) * (birch ? 1.15 : 1); // hauteur du tronc (0,8 à 1,3) : les arbres ne sont pas tous aussi hauts
+  const fat = (0.82 + 0.38 * r(2)) * (birch ? 0.8 : 1); // largeur de la cime : houppiers étroits ou larges ; le bouleau est élancé
+  const s = t.size * fat; // taille de la cime (le tronc, lui, suit `t.size` : la collision reste d'accord)
+  const tone = 0.85 + 0.3 * t.seed; // chaque arbre a sa nuance
+  if (t.form) {
+    addDeadWood(b, t, lx, lz, detail, tall, r);
+    return;
+  }
   const bark = birch ? BIRCH : TRUNK;
   const foliage: Rgb = birch ? [0.3, 0.46, 0.14] : FOLIAGE[t.kind];
   const sides = detail === 0 ? 8 : 6;
   const y = t.y;
   const barkTone = birch ? 1 : tone;
   if (t.kind === 'conifer') {
-    const pts = bentTrunk(b, lx, y, lz, TRUNK_BASE.conifer * s, 0.15 * s, 2.6 * s, detail === 0 ? 2 : 1, 0.2 * s, tinted(bark, barkTone), t.seed, sides);
+    const pine = r(3) < 0.3; // un résineux sur trois est un pin : long tronc nu, petite cime en haut
+    const pts = bentTrunk(b, lx, y, lz, TRUNK_BASE.conifer * t.size, 0.15 * s, (pine ? 5.6 : 2.6) * s * tall, detail === 0 ? 2 : 1, 0.2 * s, tinted(bark, barkTone), t.seed, sides);
     void pts;
-    const tiers = detail === 0 ? 6 : 4;
+    const tiers = pine ? (detail === 0 ? 3 : 2) : detail === 0 ? 6 : 4;
     for (let i = 0; i < tiers; i++) {
       const f = i / (tiers - 1); // 0 = étage du bas, 1 = pointe
       const lean = (hash01(Math.floor(t.seed * 1e6), i, 61) - 0.5) * 0.5 * s; // chaque étage un peu décalé : le sapin n'est pas un cône parfait
       const leanZ = (hash01(Math.floor(t.seed * 1e6), i, 62) - 0.5) * 0.5 * s;
-      skirt(b, lx + lean, y + (1.3 + f * (detail === 0 ? 8 : 7.4)) * s, lz + leanZ, lerp(2.6, 0.7, f) * s, lerp(2.7, 2.0, f) * s, foliage, tone * (i % 2 === 0 ? 1 : 0.9), detail === 0 ? 8 : 6, t.seed + i * 0.07, detail === 0);
+      skirt(b, lx + lean, y + (pine ? 5.0 * tall + f * 3.2 : 1.3 + f * (detail === 0 ? 8 : 7.4)) * s * tall, lz + leanZ, lerp(pine ? 1.9 : 2.6, 0.7, f) * s, lerp(2.7, 2.0, f) * s, foliage, tone * (i % 2 === 0 ? 1 : 0.9), detail === 0 ? 8 : 6, t.seed + i * 0.07, detail === 0);
     }
   } else if (t.kind === 'broadleaf') {
-    const H = 3.6 * s;
-    const pts = bentTrunk(b, lx, y, lz, TRUNK_BASE.broadleaf * s, 0.26 * s, H, detail === 0 ? 3 : 1, 0.5 * s, tinted(bark, barkTone), t.seed, sides);
+    const H = 3.6 * s * tall; // tronc plus ou moins haut
+    const pts = bentTrunk(b, lx, y, lz, TRUNK_BASE.broadleaf * t.size, 0.26 * s, H, detail === 0 ? 3 : 1, 0.5 * s, tinted(bark, barkTone), t.seed, sides);
     const top = pts[pts.length - 1]!.p;
     if (detail === 0) {
       const nb = 3; // trois grosses branches partent du haut du tronc
@@ -311,8 +329,8 @@ export function addTree(b: MeshBuilder, t: Tree, lx: number, lz: number, detail 
     }
     b.season = 0; // le reste ne change pas avec les saisons
   } else {
-    const H = 3.8 * s;
-    const pts = bentTrunk(b, lx, y, lz, TRUNK_BASE.acacia * s, 0.2 * s, H, detail === 0 ? 2 : 1, 0.9 * s, tinted(bark, barkTone), t.seed, sides);
+    const H = 3.8 * s * tall;
+    const pts = bentTrunk(b, lx, y, lz, TRUNK_BASE.acacia * t.size, 0.2 * s, H, detail === 0 ? 2 : 1, 0.9 * s, tinted(bark, barkTone), t.seed, sides);
     const top = pts[pts.length - 1]!.p;
     if (detail === 0) {
       const nb = 3; // l'acacia se divise en fourche, branches ouvertes vers l'extérieur
@@ -326,6 +344,53 @@ export function addTree(b: MeshBuilder, t: Tree, lx: number, lz: number, detail 
       fineBlob(b, top[0], top[1] + 1.2 * s, top[2], 2.7 * s, 0.85 * s, 2.7 * s, foliage, t.seed + 0.6);
     } else {
       blob(b, top[0], top[1] + 1.0 * s, top[2], 3.6 * s, 0.95 * s, 3.6 * s, foliage, t.seed);
+    }
+  }
+}
+
+// Arbre mort sur pied (tronc et branches nues), souche, ou tronc tombé au sol : la forêt n'est pas un décor figé.
+function addDeadWood(b: MeshBuilder, t: Tree, lx: number, lz: number, detail: number, tall: number, r: (k: number) => number): void {
+  const s = t.size;
+  const y = t.y;
+  const sides = detail === 0 ? 8 : 6;
+  const base = TRUNK_BASE[t.kind] * s;
+  const wood = tinted(DEAD_WOOD, 0.85 + 0.3 * t.seed);
+  if (t.form === 'stump') {
+    // Souche : un tronc coupé, court (30 à 60 cm), au sommet un peu plus clair (bois frais).
+    const h = (0.3 + 0.3 * r(4)) * Math.max(0.8, s);
+    bentTrunk(b, lx, y, lz, base, base * 0.88, h, 1, 0.05 * s, tinted(TRUNK, 0.75), t.seed, sides);
+    limb(b, [lx, y + h - 0.02, lz], [lx, y + h + 0.01, lz], base * 0.88, base * 0.8, sides, linear(TRUNK, 1.25), linear(TRUNK, 1.3), t.seed); // dessus clair
+  } else if (t.form === 'fallen') {
+    // Tronc tombé : couché dans une direction au hasard, moitié enfoncé dans le sol, avec un ou deux moignons de branches.
+    const a = r(5) * Math.PI * 2;
+    const len = (3.2 + 2.2 * r(6)) * Math.max(0.8, s) * (t.kind === 'conifer' ? 1.3 : 1);
+    const rr = base * 0.75;
+    const ex = Math.cos(a);
+    const ez = Math.sin(a);
+    const p0: P3 = [lx - ex * len * 0.5, y + rr * 0.55, lz - ez * len * 0.5];
+    const p1: P3 = [lx + ex * len * 0.5, y + rr * 0.55, lz + ez * len * 0.5];
+    limb(b, p0, p1, rr, rr * 0.55, sides, linear(TRUNK, 0.7), linear(TRUNK, 0.8), t.seed);
+    if (detail === 0) {
+      for (let i = 0; i < 2; i++) {
+        const k = 0.25 + 0.4 * r(7 + i);
+        const from: P3 = [lerp(p0[0], p1[0], k), p0[1] + rr * 0.6, lerp(p0[2], p1[2], k)];
+        const up = a + (i === 0 ? 1.1 : -1.1);
+        limb(b, from, [from[0] + Math.cos(up) * 0.9 * s, from[1] + 0.5 * s, from[2] + Math.sin(up) * 0.9 * s], rr * 0.3, rr * 0.1, 5, linear(wood, 1), linear(wood, 1.05), t.seed + i);
+      }
+    }
+  } else {
+    // Mort sur pied : tronc gris, quelques branches nues cassées. Les conifères gardent leur long tronc.
+    const H = (t.kind === 'conifer' ? 6.5 : t.kind === 'broadleaf' ? 4.4 : 3.6) * s * tall;
+    const pts = bentTrunk(b, lx, y, lz, base, base * 0.3, H, detail === 0 ? 3 : 1, 0.5 * s, wood, t.seed, sides);
+    if (detail === 0) {
+      const nb = t.kind === 'conifer' ? 5 : 3;
+      for (let i = 0; i < nb; i++) {
+        const from = pts[Math.min(pts.length - 1, 1 + (i % (pts.length - 1)))]!;
+        const a = around(t.seed, i, nb);
+        const len = (t.kind === 'conifer' ? 0.9 : 1.6) * (0.6 + 0.8 * r(11 + i)) * s;
+        const end: P3 = [from.p[0] + Math.cos(a) * len, from.p[1] + (0.5 + 0.8 * r(16 + i)) * s, from.p[2] + Math.sin(a) * len];
+        limb(b, from.p, end, from.r * 0.5, from.r * 0.12, 5, linear(wood, 0.95), linear(wood, 1.05), t.seed + i * 0.3);
+      }
     }
   }
 }

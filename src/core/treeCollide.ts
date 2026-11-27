@@ -16,6 +16,7 @@ export function pushOutOfTrees(trees: readonly Tree[], x: number, z: number, rad
     // plusieurs passages : deux troncs voisins peuvent se repousser mutuellement
     let moved = false;
     for (const t of trees) {
+      if (t.form === 'fallen') continue; // un tronc tombé est bas : on l'enjambe
       const dx = x - t.x;
       const dz = z - t.z;
       const min = trunkRadius(t) + radius; // distance minimale entre les centres

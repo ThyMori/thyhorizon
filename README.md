@@ -396,6 +396,15 @@ Sans objet : jeu local, sans compte ni serveur.
 - Un rocher de moins de **40 cm** de haut (taille < 0,77) s'enjambe ; les plus hauts bloquent toujours (`ROCK_STEP_SIZE` dans `core/rockCollide.ts`).
 - Garde-fou testé : même avec les arbres plus grands, la caméra reste à plus de 0,3 m de l'écorce (`trunkClearance.test.ts`).
 
+## 1.41.0 — Des arbres tous différents
+
+- Chaque arbre a sa **hauteur** (0,8 à 1,3 ×) et la **largeur de sa cime** (0,82 à 1,2 ×) : plus de forêt de clones. Le bouleau est plus élancé.
+- Un résineux sur trois est un **pin** (long tronc nu, petite cime en haut), les autres des épicéas étagés.
+- **Âges** : environ 12 % de jeunes pousses (moitié moins grandes), quelques très vieux arbres (+25 %).
+- **La forêt vit et meurt** : environ 3,5 % d'arbres **morts sur pied** (tronc gris, branches nues cassées), 2 % de **souches**, 1,5 % de **troncs tombés** au sol (on les enjambe, on ne les traverse pas : ils ne bloquent pas ; souches et arbres morts bloquent comme un tronc).
+- Tout reste déterministe (même graine, mêmes arbres). Champ `Tree.form` (`core/trees.ts`) ; tests dans `treeVariety.test.ts`.
+- Pas encore : les arbres ne grandissent ni ne meurent avec le temps (ce sera le rôle de la simulation du monde vivant), pas de troncs creux, pas de champignons ni de lierre.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

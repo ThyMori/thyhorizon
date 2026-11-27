@@ -6,6 +6,7 @@ import { clamp } from '../core/math';
 import { CROUCH_EYE_HEIGHT, EYE_HEIGHT, MoveInput, flyDelta, keyLookDelta, smoothTo, stepWalk } from '../core/movement';
 import type { SaveData } from '../core/save';
 import type { Terrain } from '../core/terrain';
+import { RockObstacles } from '../core/rockCollide';
 import { PLAYER_RADIUS, TreeObstacles } from '../core/treeCollide';
 import type { VillageSystem } from '../core/villageSystem';
 
@@ -38,6 +39,7 @@ export class PlayerControls {
   touchUp = 0; // vol au doigt : +1 monte, -1 descend, 0 stable
   private readonly keys = new Set<string>(); // touches physiques actuellement enfoncées
   private readonly trees: TreeObstacles; // les troncs d'arbres autour de nous (on ne les traverse pas)
+  private readonly rocks: RockObstacles; // les rochers autour de nous (on ne les traverse pas non plus)
   crouching = false; // accroupi (touche C tenue, à pied) ?
   private blockedCooldown = 0; // évite d'afficher le message d'eau à chaque image
 
@@ -54,6 +56,7 @@ export class PlayerControls {
     this.pitch = save.pitch;
     this.fly = save.fly;
     this.trees = new TreeObstacles(terrain, villages ? (cx, cz, size) => villages.blockerForChunk(cx, cz, size) : null);
+    this.rocks = new RockObstacles(terrain, villages ? (cx, cz, size) => villages.blockerForChunk(cx, cz, size) : null);
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear()); // si la fenêtre perd le focus, on lâche toutes les touches
@@ -131,7 +134,8 @@ export class PlayerControls {
         this.y = clamp(this.y, this.terrain.heightAt(this.x, this.z) + 1, 3000); // pas sous le sol, pas dans l'espace
       } else {
         const r = stepWalk(this.terrain, this.x, this.z, this.yaw, input, dt);
-        const p = this.trees.resolve(r.x, r.z); // pas de passage à travers les troncs : on glisse autour
+        const t = this.trees.resolve(r.x, r.z); // pas de passage à travers les troncs : on glisse autour
+        const p = this.rocks.resolve(t.x, t.z); // ni à travers les rochers
         const q = this.villages ? this.villages.resolve(p.x, p.z, PLAYER_RADIUS) : p; // ni à travers les murs des maisons
         this.x = q.x;
         this.z = q.z;

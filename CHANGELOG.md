@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.40.1 — 2026-11-27
+
+Rochers infranchissables, arbres plus hauts
+
 ## 1.40.0 — 2026-11-27
 
 Neige : température, flocons, sol blanc qui fond

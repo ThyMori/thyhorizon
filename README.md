@@ -386,6 +386,11 @@ Sans objet : jeu local, sans compte ni serveur.
 - À Lannion, la neige est rare (hiver doux), comme dans la vraie Bretagne ; elle est fréquente en montagne et vers les pôles. Pour essayer vite avec `?debug` : `__thy.weather({cloud:0.9, rain:0.8})`, `__thy.temperature(-4)`, `__thy.snow(1)` (impose la neige au sol), `__thy.temperature(null)` rend la température calculée.
 - Pas encore : la neige est la même partout autour de toi (une seule épaisseur « locale », pas une carte), les arbres n'ont pas de neige qui glisse, pas de lacs gelés, pas de bruit de pas dans la neige, le froid n'a pas encore d'effet sur le joueur.
 
+## 1.40.1 — Rochers infranchissables, arbres plus hauts
+
+- Les **rochers** arrêtent le joueur comme les troncs : on glisse autour (`core/rockCollide.ts`, même placement que le dessin).
+- Les **arbres** sont 35 % plus grands (`TREE_GROWTH` dans `core/trees.ts`) ; le tronc grossit avec, donc la collision suit.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

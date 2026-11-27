@@ -19,6 +19,7 @@ export interface Tree {
   seed: number; // nombre pseudo-aléatoire propre à l'arbre (0 à 1)
 }
 
+export const TREE_GROWTH = 1.35; // facteur de taille général des arbres (1.40.1 : ils étaient un peu bas) ; le tronc suit, donc la collision aussi
 export const TREE_VERTEX_BUDGET = 40000; // sommets d'arbres maximum par tuile
 
 // Taille d'une case de placement selon le niveau de détail de la tuile (un arbre au plus par case) ; 0 = pas d'arbres.
@@ -62,7 +63,7 @@ export function treesForChunk(terrain: Terrain, cx: number, cz: number, lod: num
       const k = hash01(gi, gj, 4); // choix de l'espèce
       const kind: TreeKind = k < biome.acacia ? 'acacia' : hash01(gi, gj, 5) < biome.conifer ? 'conifer' : 'broadleaf';
       const cold = smoothstep(2000, 300, biome.snowLine); // arbres plus petits près des pôles et en altitude
-      const size = (0.75 + 0.6 * hash01(gi, gj, 6)) * lerp(1, 0.65, cold) * sizeBoost;
+      const size = (0.75 + 0.6 * hash01(gi, gj, 6)) * lerp(1, 0.65, cold) * sizeBoost * TREE_GROWTH;
       trees.push({ x, z, y, kind, size, seed: hash01(gi, gj, 7) });
     }
   }

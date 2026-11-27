@@ -57,6 +57,7 @@ import { boatSoundMix } from './core/boatSound';
 import { musicMood, newMusicState, stepMusic } from './core/music';
 import { mulberry32 } from './core/noise';
 import { shoreProximity, soundMix } from './core/soundMix';
+import { seasonState } from './core/season';
 import { waterAround, waterMix } from './core/waterSound';
 import { LifeInput, lifeMix } from './core/wildlife';
 import { SettingsPanel } from './ui/settingsPanel';
@@ -390,6 +391,7 @@ export class Game {
     }
     if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
+    this.gs.setSeason(seasonState(this.day, this.playerLat())); // saisons : feuilles, fleurs, herbe selon le jour et la latitude
     this.gs.updateEnvironment(applyWeatherToSky(sunState(this.hours, this.playerLat(), this.day, this.playerLon()), this.weather), now / 1000); // le soleil dépend de la latitude du joueur
     const sky = sunState(this.hours, this.playerLat(), this.day, this.playerLon());
     this.updateSound(dt);

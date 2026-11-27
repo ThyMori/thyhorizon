@@ -15,6 +15,8 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { WeatherState, CLEAR_WEATHER, fogFactor } from '../core/weather';
 import type { SeaState } from '../core/sea';
 import { FreshWater } from './freshWater';
+import type { SeasonState } from '../core/season';
+import { applySeason, createSeasonDepthMaterial, createSeasonUniforms, patchSeasonShader } from './seasonShader';
 import { Ocean } from './ocean';
 import { Rain } from './rain';
 import { SkyDome, toColor } from './sky';
@@ -89,6 +91,7 @@ export class GameScene {
   private readonly ocean = new Ocean();
   readonly freshWater = new FreshWater(); // matériau animé des rivières et des lacs
   private readonly rain = new Rain(); // pluie autour de la caméra
+  private readonly seasonUniforms = createSeasonUniforms(); // l'état des saisons (feuilles, fleurs, herbe), partagé par le terrain et ses ombres
   private readonly surfTime = new THREE.Uniform(0); // temps de l'écume de rivage
   private readonly surfStrength = new THREE.Uniform(0.4); // force de l'écume de rivage (dépend de l'état de mer)
   private weather: WeatherState = CLEAR_WEATHER; // temps actuel (nuages, pluie, brume)
@@ -147,7 +150,14 @@ export class GameScene {
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\nvarying vec3 vGroundPos;\nuniform float uSurfTime;\nuniform float uSurf;\n${GROUND_NOISE}`)
         .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= groundGrain(vGroundPos, length(vViewPosition));\n' + SHORE);
+      patchSeasonShader(shader, this.seasonUniforms); // saisons : feuilles qui tombent, fleurs, herbe sèche
     };
+    this.terrainMaterial.userData.seasonDepth = createSeasonDepthMaterial(this.seasonUniforms); // même chose pour les ombres
+  }
+
+  // Applique l'état des saisons (cheap : quelques nombres envoyés au shader).
+  setSeason(state: SeasonState): void {
+    applySeason(this.seasonUniforms, state);
   }
 
   // Applique les réglages de qualité.

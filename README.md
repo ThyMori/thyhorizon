@@ -369,6 +369,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - Les plantes ne gênent pas la marche (on passe au travers). De loin, elles disparaissent (comme les détails des arbres). Pas encore de saisons.
 - Coût : environ +25 % de triangles autour de toi ; non mesuré sur une vraie carte graphique.
 
+## 1.39 — Les saisons
+
+- Les **arbres feuillus** (chênes, bouleaux…) ont des feuilles vert vif au printemps, bien vertes l'été, puis **roussies** (jaune, orange, rouge, selon la touffe) à l'automne ; elles **tombent touffe par touffe** en octobre-novembre et les branches restent **nues** l'hiver. Les **conifères** et les acacias gardent leurs feuilles toute l'année.
+- Les **fleurs** éclosent d'avril à septembre et disparaissent l'hiver ; l'**herbe** et la bruyère jaunissent l'été puis brunissent ; les **fougères** rousissent et se couchent l'hiver ; les **roseaux** dorent puis sèchent ; les buissons perdent leurs feuilles comme les feuillus. Les ombres suivent : plus d'ombre de feuillage en hiver.
+- Les saisons dépendent du **jour de l'année** et de la **latitude** : inversées dans l'hémisphère sud, presque absentes sous les tropiques (`core/season.ts`, pur et testé). Pour essayer vite : `__thy.setDay(jour)` avec `?debug` (20 = hiver, 115 = printemps, 200 = été, 290 = automne).
+- Aucun maillage n'est refait quand la saison change : chaque sommet porte une « classe de saison » et le shader du terrain cache ou colore (`render/seasonShader.ts`).
+- Pas encore : le sol (l'herbe du terrain reste verte), la neige, les climats secs ou à saison des pluies (seule la latitude compte), les arbres qui fleurissent.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

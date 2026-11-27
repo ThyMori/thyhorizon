@@ -202,6 +202,7 @@ export class ChunkManager {
     g.setAttribute('position', new THREE.BufferAttribute(d.positions, 3)); // positions locales
     g.setAttribute('normal', new THREE.BufferAttribute(d.normals, 3)); // normales
     g.setAttribute('color', new THREE.BufferAttribute(d.colors, 3)); // couleurs
+    g.setAttribute('aSeason', new THREE.BufferAttribute(d.seasons, 1)); // saison de chaque sommet (feuilles, fleurs, herbe)
     g.setIndex(new THREE.BufferAttribute(d.indices, 1)); // triangles
     const half = CHUNK_SIZE / 2; // demi-côté
     const hy = (d.maxY - d.minY) / 2; // demi-hauteur
@@ -210,6 +211,8 @@ export class ChunkManager {
     this.placeMesh(mesh, d.cx, d.cz); // placée dans le monde (relativement à l'origine flottante)
     mesh.matrixAutoUpdate = false; // la tuile ne bouge jamais seule
     mesh.castShadow = d.lod <= 1; // seules les tuiles proches projettent des ombres
+    const depthMat = this.material.userData.seasonDepth as THREE.Material | undefined; // matériau d'ombre qui suit les saisons (feuilles tombées = plus d'ombre)
+    if (depthMat) mesh.customDepthMaterial = depthMat;
     mesh.receiveShadow = true; // toutes en reçoivent
     return mesh;
   }

@@ -6,6 +6,7 @@ import type { Biome } from './climate';
 import { Rgb, clamp, lerpRgb, smoothstep, srgbToLinear } from './math';
 import { slopeAt } from './terrain';
 import type { Terrain } from './terrain';
+import { SEASON_FERN, SEASON_FLOWER, SEASON_GRASS, SEASON_LEAF, SEASON_REED, seasonCode } from './season';
 import { MeshBuilder, hash01 } from './trees';
 
 export type FloraKind = 'tuft' | 'flower' | 'fern' | 'heather' | 'bush' | 'rock' | 'reed';
@@ -129,6 +130,7 @@ function vert(b: MeshBuilder, p: P3, n: P3, c: Rgb): void {
   b.positions.push(p[0], p[1], p[2]);
   b.normals.push(n[0], n[1], n[2]);
   b.colors.push(c[0], c[1], c[2]);
+  if (b.seasons) b.seasons.push(b.season ?? 0); // la saison de ce sommet
 }
 
 // Un triangle visible des deux côtés, éclairé comme s'il regardait vers le haut (l'herbe se fond dans le sol).
@@ -220,6 +222,8 @@ export function addPlant(b: MeshBuilder, p: Plant, lx: number, lz: number): void
   const s = p.size;
   const ang = p.seed * Math.PI * 2; // orientation de la plante
   const sd = Math.floor(p.seed * 1e6); // graine entière pour les tirages
+  const cls = { tuft: SEASON_GRASS, heather: SEASON_GRASS, flower: SEASON_FLOWER, fern: SEASON_FERN, bush: SEASON_LEAF, rock: 0, reed: SEASON_REED }[p.kind]; // comment cette plante suit les saisons
+  b.season = cls === 0 ? 0 : seasonCode(cls, hash01(sd, 7, 46)); // chaque plante a son tirage : toutes ne fleurissent ni ne jaunissent le même jour
   if (p.kind === 'tuft') {
     for (let i = 0; i < 5; i++) { // cinq lames qui partent en éventail
       const a = ang + i * 1.3;
@@ -259,6 +263,7 @@ export function addPlant(b: MeshBuilder, p: Plant, lx: number, lz: number): void
       blade(b, lx + Math.cos(a) * 0.06, y, lz + Math.sin(a) * 0.06, a, 0.12 * s, (1.1 + 0.6 * hash01(sd, i, 45)) * s, 0.07, p.color);
     }
   }
+  b.season = 0; // ce qu'on ajoute ensuite ne change pas avec les saisons
 }
 
 // Ajoute toute la flore d'une tuile dans `b` ; renvoie le nombre de plantes dessinées et la hauteur maximale atteinte au-dessus du sol.

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.39.0 — 2026-11-27
+
+Saisons : feuillus, fleurs, herbe, fougères
+
 ## 1.38.0 — 2026-11-27
 
 Flore au sol : herbes, fleurs, fougères, buissons, rochers, roseaux

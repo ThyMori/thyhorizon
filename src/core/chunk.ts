@@ -35,6 +35,7 @@ export interface ChunkData {
   positions: Float32Array; // x,y,z de chaque sommet, RELATIFS au coin de la tuile (précision)
   normals: Float32Array; // normale de chaque sommet
   colors: Float32Array; // couleur (linéaire) de chaque sommet
+  seasons: Float32Array; // code de saison de chaque sommet (0 = ne change pas ; voir core/season.ts)
   indices: Uint16Array; // triangles
   minY: number; // altitude minimale (jupes comprises)
   maxY: number; // altitude maximale
@@ -236,17 +237,18 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
   }
 
   // 6) Arbres : ajoutés à la suite du terrain, dans les mêmes tableaux (une seule tuile, un seul objet 3D).
-  const trees: MeshBuilder = { positions: [], normals: [], colors: [], indices: [] };
+  const trees: MeshBuilder = { positions: [], normals: [], colors: [], indices: [], seasons: [] };
   const water = terrain.hasWaterNear(x0, z0, CHUNK_SIZE) ? buildWater(terrain, heights, ew, w, n, cell, x0, z0) ?? undefined : undefined; // l'eau douce : maillage à part
   let bridgeTop = -Infinity; // point le plus haut des ponts de cette tuile
   if (water && lod <= 2) {
     for (const br of terrain.bridgesNear(x0 + CHUNK_SIZE / 2, z0 + CHUNK_SIZE / 2, CHUNK_SIZE)) bridgeTop = Math.max(bridgeTop, addBridge(trees, br, x0, z0, CHUNK_SIZE, terrain.bedHeightAt)); // les ponts de bois (planches, garde-corps, pieux)
   }
+  while (trees.seasons!.length < trees.positions.length / 3) trees.seasons!.push(0); // les ponts ne changent pas avec les saisons
   const added = addTreesForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE, blocked);
   let floraTop = -Infinity; // point le plus haut de la flore
   const floraRoom = MESH_VERTEX_LIMIT - vertexCount - trees.positions.length / 3; // sommets encore disponibles dans cette tuile
   if (lod === 0 && floraRoom > 400) floraTop = addFloraForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE, blocked, water !== undefined, floraRoom - 200).topY; // herbes, fleurs, buissons, rochers, roseaux
-  if (trees.positions.length === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY: water ? Math.max(maxY, water.maxY, bridgeTop) : maxY, water };
+  if (trees.positions.length === 0) return { cx, cz, lod, positions, normals, colors, indices, seasons: new Float32Array(positions.length / 3), minY, maxY: water ? Math.max(maxY, water.maxY, bridgeTop) : maxY, water };
   const base = positions.length / 3; // numéro du premier sommet d'arbre
   const allPositions = new Float32Array(positions.length + trees.positions.length);
   allPositions.set(positions);
@@ -260,5 +262,7 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
   const allIndices = new Uint16Array(indices.length + trees.indices.length);
   allIndices.set(indices);
   for (let k = 0; k < trees.indices.length; k++) allIndices[indices.length + k] = trees.indices[k]! + base;
-  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY, floraTop, bridgeTop, water ? water.maxY : -Infinity), water };
+  const allSeasons = new Float32Array(positions.length / 3 + trees.seasons!.length); // le terrain ne change pas avec les saisons (0), puis le code de chaque sommet d'arbre ou de plante
+  allSeasons.set(trees.seasons!, positions.length / 3);
+  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, seasons: allSeasons, minY, maxY: Math.max(maxY, added.topY, floraTop, bridgeTop, water ? water.maxY : -Infinity), water };
 }

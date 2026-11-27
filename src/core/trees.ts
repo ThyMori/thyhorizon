@@ -3,6 +3,7 @@
 // Même graine → mêmes arbres, toujours aux mêmes endroits.
 
 import { Rgb, clamp, lerp, smoothstep } from './math';
+import { SEASON_LEAF, seasonCode } from './season';
 import { slopeAt } from './terrain';
 import type { Terrain } from './terrain';
 
@@ -76,6 +77,8 @@ export interface MeshBuilder {
   normals: number[];
   colors: number[];
   indices: number[];
+  seasons?: number[]; // code de saison de chaque sommet (voir core/season.ts) ; absent = pas de saisons pour ce maillage
+  season?: number; // le code appliqué aux sommets ajoutés maintenant (0 = ne change pas)
 }
 
 const TRUNK: Rgb = [0.5, 0.38, 0.26]; // brun d'écorce (assez clair : l'ombre des feuilles le fonce déjà)
@@ -98,6 +101,7 @@ function vertex(b: MeshBuilder, p: [number, number, number], nrm: [number, numbe
   b.positions.push(p[0], p[1], p[2]);
   b.normals.push(nrm[0] / len, nrm[1] / len, nrm[2] / len);
   b.colors.push(c[0], c[1], c[2]);
+  if (b.seasons) b.seasons.push(b.season ?? 0); // la saison de ce sommet
   return b.positions.length / 3 - 1;
 }
 
@@ -283,15 +287,28 @@ export function addTree(b: MeshBuilder, t: Tree, lx: number, lz: number, detail 
         const end: P3 = [from.p[0] + Math.cos(a) * len, from.p[1] + (0.9 + 0.5 * hash01(Math.floor(t.seed * 1e6), i, 72)) * s * 1.3, from.p[2] + Math.sin(a) * len];
         limb(b, from.p, end, from.r * 0.55, from.r * 0.2, 5, linear(bark, barkTone * 0.95), linear(bark, barkTone), t.seed + i * 0.3);
         const bs = (1.9 + 0.7 * hash01(Math.floor(t.seed * 1e6), i, 73)) * s; // touffe au bout de la branche
+        b.season = seasonCode(SEASON_LEAF, hash01(Math.floor(t.seed * 1e6), 10 + i, 56)); // chaque touffe de feuilles tombe à son heure
         fineBlob(b, end[0], end[1] + 0.7 * s, end[2], bs, bs * 0.8, bs, foliage, t.seed + i * 0.137);
+        b.season = 0; // le reste de l'arbre ne change pas
       }
+      b.season = seasonCode(SEASON_LEAF, hash01(Math.floor(t.seed * 1e6), 1, 56)); // chaque touffe de feuilles tombe à son heure
       fineBlob(b, top[0], top[1] + 1.7 * s, top[2], 2.8 * s, 2.3 * s, 2.8 * s, foliage, t.seed + 0.5); // grosse touffe centrale
+      b.season = 0; // le reste de l'arbre ne change pas
+      b.season = seasonCode(SEASON_LEAF, hash01(Math.floor(t.seed * 1e6), 2, 56)); // chaque touffe de feuilles tombe à son heure
       fineBlob(b, top[0] + Math.cos(t.seed * 9) * 1.6 * s, top[1] + 0.7 * s, top[2] + Math.sin(t.seed * 9) * 1.6 * s, 2.1 * s, 1.6 * s, 2.1 * s, foliage, t.seed + 0.77); // touffe basse : le feuillage descend vers le tronc
+      b.season = 0; // le reste de l'arbre ne change pas
+      b.season = seasonCode(SEASON_LEAF, hash01(Math.floor(t.seed * 1e6), 3, 56)); // chaque touffe de feuilles tombe à son heure
       fineBlob(b, top[0] + Math.cos(t.seed * 9 + 3.4) * 1.7 * s, top[1] + 2.4 * s, top[2] + Math.sin(t.seed * 9 + 3.4) * 1.7 * s, 1.7 * s, 1.4 * s, 1.7 * s, foliage, t.seed + 0.91); // touffe haute décalée : cime irrégulière
+      b.season = 0; // le reste de l'arbre ne change pas
     } else {
+      b.season = seasonCode(SEASON_LEAF, hash01(Math.floor(t.seed * 1e6), 4, 56)); // chaque touffe de feuilles tombe à son heure
       blob(b, top[0], top[1] + 1.8 * s, top[2], 3.1 * s, 2.7 * s, 3.1 * s, foliage, t.seed);
+      b.season = 0; // le reste de l'arbre ne change pas
+      b.season = seasonCode(SEASON_LEAF, hash01(Math.floor(t.seed * 1e6), 5, 56)); // chaque touffe de feuilles tombe à son heure
       blob(b, top[0] + 1.2 * s, top[1] + 0.9 * s, top[2] - 0.8 * s, 1.9 * s, 1.6 * s, 1.9 * s, foliage, t.seed + 0.37);
+      b.season = 0; // le reste de l'arbre ne change pas
     }
+    b.season = 0; // le reste ne change pas avec les saisons
   } else {
     const H = 3.8 * s;
     const pts = bentTrunk(b, lx, y, lz, TRUNK_BASE.acacia * s, 0.2 * s, H, detail === 0 ? 2 : 1, 0.9 * s, tinted(bark, barkTone), t.seed, sides);

@@ -362,6 +362,13 @@ Sans objet : jeu local, sans compte ni serveur.
 - Tout est synthétisé (aucun fichier son), comme le reste (`core/waterSound.ts`, pur et testé ; `audio/ambient.ts` joue les couches). Le réglage de volume général s'applique.
 - Rien de nouveau dans les Réglages. Non testé à l'oreille (mesuré hors ligne : niveaux raisonnables, aucune valeur invalide).
 
+## 1.38 — Flore au sol (monde peuplé, étape 1)
+
+- De près (à moins de 160 m), le sol se couvre de **plantes** : touffes d'herbe (en plaques hautes ou rases), fleurs (blanches, jaunes, violettes, rouges, bleues : une couleur par prairie), fougères sous les arbres, bruyère sur les landes, buissons en lisière, rochers (plus nombreux en altitude), et **roseaux** sur les rives des rivières et lacs.
+- Elles suivent le climat : presque rien dans le désert (des rochers), rien sur la plage ni dans la neige, ni dans les villages et sur les chemins. Même graine → mêmes plantes (`core/flora.ts`, pur et testé).
+- Les plantes ne gênent pas la marche (on passe au travers). De loin, elles disparaissent (comme les détails des arbres). Pas encore de saisons.
+- Coût : environ +25 % de triangles autour de toi ; non mesuré sur une vraie carte graphique.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
@@ -371,6 +378,8 @@ Sans objet : jeu local, sans compte ni serveur.
 5. ✅ Carte du monde et voyage (1.10.0) ; reste : saisie de coordonnées, noms de lieux
 
 **Simulation maritime** : 1. ✅ voilier jouable, vent simulé, instruments (1.13.0) ; 2. ✅ beau modèle de bateau (1.13.1) → marcher sur le pont → cabine (refuge) → ✅ météo et mer cohérentes (1.17–1.18) → ✅ ambiance sonore (1.22–1.25 : vent, mer, vie sauvage, musique ; 1.26 : bruits du bateau) → sillage ; 3. ✅ météo et houle réelles Open-Meteo avec repli (1.19.0) ; 4. navigation (bateau et route sur la carte, mouillage, polaires) ; puis cabine habitable, autres bateaux, sauvegarde du bateau.
+
+**Monde peuplé** (vision à long terme, une étape à la fois) : 1. ✅ flore au sol (1.38) ; 2. faune visible (oiseaux, papillons, poissons, lapins, cerfs, moutons et vaches près des villages) ; 3. villageois qui vivent leur journée (jour/nuit, chemins) ; 4. familles, âges, métiers ; 5. naissances, décès et mémoire des rencontres. Principe : simulation à plusieurs niveaux (statistique au loin, individus près du joueur, seules les personnes rencontrées sont enregistrées dans une liste à part posée sur le monde déterministe, avec « rattrapage » du temps écoulé au retour). Idée plus lointaine : une « bulle temporelle » (jouer dans une autre époque, ex. 1589) avec un calque de données par époque.
 
 **Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 

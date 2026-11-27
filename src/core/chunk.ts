@@ -6,6 +6,7 @@ import { lerpRgb, clamp, smoothstep } from './math';
 import { dirtColor, terrainColor } from './palette';
 import { DirtSeg, distToSeg } from './roads';
 import { addBridge } from './bridgeMesh';
+import { MESH_VERTEX_LIMIT, addFloraForChunk } from './flora';
 import { MeshBuilder, addTreesForChunk } from './trees';
 import type { Terrain } from './terrain';
 
@@ -242,6 +243,9 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
     for (const br of terrain.bridgesNear(x0 + CHUNK_SIZE / 2, z0 + CHUNK_SIZE / 2, CHUNK_SIZE)) bridgeTop = Math.max(bridgeTop, addBridge(trees, br, x0, z0, CHUNK_SIZE, terrain.bedHeightAt)); // les ponts de bois (planches, garde-corps, pieux)
   }
   const added = addTreesForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE, blocked);
+  let floraTop = -Infinity; // point le plus haut de la flore
+  const floraRoom = MESH_VERTEX_LIMIT - vertexCount - trees.positions.length / 3; // sommets encore disponibles dans cette tuile
+  if (lod === 0 && floraRoom > 400) floraTop = addFloraForChunk(trees, terrain, cx, cz, lod, CHUNK_SIZE, blocked, water !== undefined, floraRoom - 200).topY; // herbes, fleurs, buissons, rochers, roseaux
   if (trees.positions.length === 0) return { cx, cz, lod, positions, normals, colors, indices, minY, maxY: water ? Math.max(maxY, water.maxY, bridgeTop) : maxY, water };
   const base = positions.length / 3; // numéro du premier sommet d'arbre
   const allPositions = new Float32Array(positions.length + trees.positions.length);
@@ -256,5 +260,5 @@ export function buildChunk(terrain: Terrain, cx: number, cz: number, lod: number
   const allIndices = new Uint16Array(indices.length + trees.indices.length);
   allIndices.set(indices);
   for (let k = 0; k < trees.indices.length; k++) allIndices[indices.length + k] = trees.indices[k]! + base;
-  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY, bridgeTop, water ? water.maxY : -Infinity), water };
+  return { cx, cz, lod, positions: allPositions, normals: allNormals, colors: allColors, indices: allIndices, minY, maxY: Math.max(maxY, added.topY, floraTop, bridgeTop, water ? water.maxY : -Infinity), water };
 }

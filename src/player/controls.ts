@@ -28,6 +28,9 @@ export class PlayerControls {
   onFlyChange: ((on: boolean) => void) | null = null; // appelé quand on active/désactive le vol
   onViewKey: (() => void) | null = null; // appelé quand on appuie sur T (première / troisième personne)
   onEditKey: ((remove: boolean) => void) | null = null; // appelé quand on appuie sur K (pose un cairn) ou Maj+K (retire le plus proche)
+  onPlantKey: ((remove: boolean) => void) | null = null; // P : planter ; Maj+P : arracher la plante la plus proche
+  onObserveKey: (() => void) | null = null; // O : observer la plante la plus proche
+  onSpeciesKey: ((choice: number | 'next' | 'previous') => void) | null = null; // touches 1 à 4 (0 à 3) ou molette : choisir l'espèce à planter
   onConstellationsKey: (() => void) | null = null; // appelé quand on appuie sur L (constellations)
   onMapKey: (() => void) | null = null; // appelé quand on appuie sur M (carte du monde)
   onBoatKey: (() => void) | null = null; // appelé quand on appuie sur B (monter à bord / débarquer)
@@ -58,6 +61,10 @@ export class PlayerControls {
     this.trees = new TreeObstacles(terrain, villages ? (cx, cz, size) => villages.blockerForChunk(cx, cz, size) : null);
     this.rocks = new RockObstacles(terrain, villages ? (cx, cz, size) => villages.blockerForChunk(cx, cz, size) : null);
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
+    window.addEventListener('wheel', (e) => {
+      if (!this.locked || this.aboard || e.deltaY === 0) return; // seulement à pied, souris capturée
+      this.onSpeciesKey?.(e.deltaY > 0 ? 'next' : 'previous'); // la molette change la plante choisie
+    });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('blur', () => this.keys.clear()); // si la fenêtre perd le focus, on lâche toutes les touches
     document.addEventListener('mousemove', (e) => this.onMouseMove(e));
@@ -154,6 +161,13 @@ export class PlayerControls {
     camera.rotation.set(this.pitch + this.pitchBias, this.yaw, this.roll, 'YXZ'); // d'abord le cap, puis l'inclinaison, puis le roulis (gîte du bateau)
   }
 
+  // Un tronc ou un rocher occupe-t-il ce point ? (sert à ne pas planter dans un arbre)
+  blockedAt(x: number, z: number): boolean {
+    const t = this.trees.resolve(x, z);
+    const p = this.rocks.resolve(t.x, t.z);
+    return t.x !== x || t.z !== z || p.x !== t.x || p.z !== t.z; // le point a été poussé : il était dans un obstacle
+  }
+
   // Une touche physique est-elle enfoncée en ce moment ? (utilisé par le bateau pour la barre et l'écoute)
   down(code: string): boolean {
     return this.keys.has(code);
@@ -179,6 +193,9 @@ export class PlayerControls {
     if (e.code === 'KeyI') this.onInstrumentsKey?.(); // I : montre ou cache les instruments du voilier
     if (e.code === 'KeyT') this.onViewKey?.(); // T : changer de vue (première / troisième personne)
     if (e.code === 'KeyK') this.onEditKey?.(e.shiftKey); // K : poser un cairn ; Maj+K : retirer le plus proche
+    if (e.code === 'KeyP') this.onPlantKey?.(e.shiftKey); // P : planter ; Maj+P : arracher
+    if (e.code === 'KeyO') this.onObserveKey?.(); // O : observer une plante
+    if (/^Digit[1-4]$/.test(e.code)) this.onSpeciesKey?.(Number(e.code.slice(5)) - 1); // 1 à 4 : choisir la plante
     if (e.code === 'KeyL') this.onConstellationsKey?.(); // L : traits des constellations
     if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault(); // pas de défilement de page
   }

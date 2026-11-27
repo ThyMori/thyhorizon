@@ -445,6 +445,16 @@ Sans objet : jeu local, sans compte ni serveur.
 - Vérifié : 703 tests dont l'aller-retour complet « cairn posé, exporté, navigateur vide, importé, retrouvé » ; en navigateur de test, export réel puis import réel dans un navigateur vierge (la construction revient, affichée) ; fenêtre Réglages à 360 px sans débordement.
 - Pas vérifié : sur téléphone (le téléchargement de fichier y passe par un dialogue du navigateur) ; en vrai avec ton horloge sur plusieurs jours.
 
+## 1.46 — Planter et cultiver (étape 2 de la feuille de route)
+
+- **Quatre plantes** : carotte (adulte en 4 jours), tournesol (14 jours), noisetier (60 jours), chêne (365 jours). Durées « plus rapides » que la vraie vie, choisies par toi.
+- **Gestes** : <kbd>P</kbd> plante devant toi (1,6 m), <kbd>1</kbd> à <kbd>4</kbd> ou la molette changent d'espèce, <kbd>O</kbd> observe la plus proche (âge, stade, taille), <kbd>Maj</kbd>+<kbd>P</kbd> arrache la plus proche (à moins de 3 m).
+- **La taille se calcule à partir de la date de plantation** (`core/plants.ts`, `growth`, `plantHeight`) : rien n'est stocké de la taille. Les plantes poussent donc même quand le jeu est fermé, avec la seule horloge du monde.
+- **Où planter** : à pied, sur la terre ferme (pas dans l'eau, pas dans une maison, pas sur un arbre ou un rocher), avec un écart entre plants selon l'espèce (de 0,4 m à 3 m). Maximum 5 000 plantes. Les plantes sont des constructions : elles sont sauvegardées, exportées et importées avec le reste, et réservent leur place dans les villages comme un cairn.
+- Pas de `WORLD_VERSION` : les plantes sont posées par-dessus le monde, elles ne le déplacent pas.
+- Vérifié : tests (`plants.test.ts`, `worldEdits.test.ts`) ; en navigateur de test avec l'avance rapide, le texte et la taille suivent le temps (2 jours : carotte 50 %, 30 jours : tournesol et carotte adultes, 400 jours : chêne de 8 m) ; doublon refusé ; un arbre à la place refuse le noisetier avec un message ; aucune erreur dans la console.
+- Pas encore : récolte et inventaire (étape 3), saisons sur ces plantes, collision sur les plantes, geste tactile. Pas vérifié : sur téléphone, ni la fluidité avec des milliers de plantes.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)
@@ -534,7 +544,7 @@ La route se calcule au retour, à partir de la météo de la période écoulée.
 | N° | Étape | Terminé quand |
 |---|---|---|
 | 1 ✅ | Horloge unique et sauvegarde des modifications | Une marque posée dans le monde est retrouvée après fermeture, export et import compris |
-| 2 | Planter et cultiver | La taille correspond au temps écoulé, vérifié avec l'avance rapide de test |
+| 2 ✅ | Planter et cultiver | La taille correspond au temps écoulé, vérifié avec l'avance rapide de test |
 | 3 | Couper, obtenir du bois, poser un mur | Le mur et le stock de bois sont retrouvés le lendemain |
 | 4 | Bâtir une maison en chantier | Le chantier avance en mon absence ; la maison devient un refuge |
 | 5 | Survie et réglage de difficulté | Manger, dormir, avoir froid, mourir et revenir au refuge ; aucun effet sur le personnage pendant l'absence |
@@ -556,7 +566,7 @@ Une petite amélioration à la fois (comportement à la voile, houle, courant, v
 | Le monde avance en mon absence | Faune et météo sont des fonctions du temps (bon socle) ; en mode accéléré rien n'avance hors jeu ; rien pour le bateau ni les chantiers | À construire (étapes 4 à 7) |
 | Sauvegarde des modifications, versionnée | ✅ `EditStore` + IndexedDB (1.29), `WORLD_VERSION`, lecture seule si la sauvegarde vient d'un jeu plus récent ; ✅ 1.45 : champ **auteur**, **export/import** en fichier | Un seul type de construction (`cairn`) |
 | Marque posée retrouvée (étape 1) | ✅ 1.45 : retrouvée après fermeture, export et import (test automatique) | Étape 1 terminée |
-| Planter, couper, mur, maison, chantiers | Rien (flore non interactive, ni stock de bois, ni inventaire) | Étapes 2 à 4 entières |
+| Planter, couper, mur, maison, chantiers | Planter fait (1.46) ; rien pour couper, bois, inventaire, mur, maison | Étapes 3 et 4 entières |
 | Survie, difficulté, mort, sommeil, refuge | Rien. **Vocabulaire** : `CLAUDE.md` dit « Refuge = l'ambiance visée » ; la feuille dit « Refuge = dernier abri où j'ai dormi » | Renommer l'un des deux avant l'étape 5 |
 | Journal de bord au retour | Rien | Étape 6 |
 | Faune puis habitants | ✅ faune visible et sonore (1.42, 1.43) ; villages = maisons, panneaux, rues, **sans habitants** | Habitants : étape 7 |

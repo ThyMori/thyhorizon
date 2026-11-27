@@ -1,8 +1,10 @@
-// L'affichage des modifications du monde posées par le joueur (pour l'instant : des cairns, petits tas de pierres).
+// L'affichage des modifications du monde posées par le joueur : des cairns (petits tas de pierres) et des plantes qui grandissent avec le temps.
 // On ne dessine que celles qui sont près du joueur. Positions en repère du rendu (monde − origine flottante) : jamais de coordonnée du monde pour la carte graphique.
 
 import * as THREE from 'three';
+import { growth, plantHeight } from '../core/plants';
 import type { EditStore, WorldEdit } from '../core/worldEdits';
+import { buildPlant } from './plantModel';
 
 const SHOW_RADIUS = 250; // on dessine ce qui est à moins de 250 m
 const STONE_GEO = new THREE.IcosahedronGeometry(1, 1); // une pierre arrondie, partagée par toutes
@@ -40,20 +42,22 @@ export class EditObjects {
   constructor(private readonly scene: THREE.Scene, private readonly store: EditStore) {}
 
   // Remet l'affichage à jour : ajoute ce qui entre dans le rayon, retire ce qui en sort, replace tout par rapport à l'origine.
-  update(px: number, pz: number, ox: number, oz: number, heightAt: (x: number, z: number) => number): void {
+  // nowMs = l'instant du monde : une plante a la taille qu'elle doit avoir à cet instant.
+  update(px: number, pz: number, ox: number, oz: number, heightAt: (x: number, z: number) => number, nowMs: number): void {
     const near = this.store.near(px, pz, SHOW_RADIUS);
     const keep = new Set<string>();
     for (const e of near) {
       keep.add(e.id);
       let g = this.shown.get(e.id);
       if (!g) {
-        g = buildCairn(e); // (un seul type pour l'instant)
+        g = e.type === 'plant' && e.species ? buildPlant(e.species, e.id) : buildCairn(e); // une plante ou un cairn
         g.rotation.y = e.yaw;
         this.scene.add(g);
         this.shown.set(e.id, g);
         this.baseY.set(e.id, heightAt(e.x, e.z)); // le sol sous le cairn
       }
       g.position.set(e.x - ox, this.baseY.get(e.id) ?? 0, e.z - oz); // repère du rendu
+      if (e.type === 'plant' && e.species) g.scale.setScalar(plantHeight(e.species, growth(e.species, e.t, nowMs))); // la plante grandit avec le temps écoulé depuis sa plantation
     }
     for (const [id, g] of this.shown) {
       if (keep.has(id)) continue;

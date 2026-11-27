@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.46.0 — 2026-11-27
+
+Planter et cultiver : 4 plantes qui poussent en temps réel (P, 1-4, O, Maj+P)
+
 ## 1.45.0 — 2026-11-27
 
 Temps réel unique, horloge du monde, export et import de la sauvegarde, auteur des constructions

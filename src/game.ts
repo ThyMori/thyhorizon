@@ -6,6 +6,7 @@ import { formatCount } from './core/format';
 import { hashSeed } from './core/noise';
 import { Settings, sanitizeSettings } from './core/settings';
 import { worldClock } from './core/worldClock';
+import { PLANTS, PLANT_INSPECT, PLANT_REACH, PLANT_SPECIES, PlantSpecies, formatSpan, plantBlockedBy, plantInfo } from './core/plants';
 import { buildSaveFile, parseSaveFile, saveFileName, serializeSaveFile } from './core/saveFile';
 import { applyImport } from './storage/importSave';
 import { VERSION } from './version';
@@ -99,6 +100,7 @@ export class Game {
   private villageObjects!: VillageObjects; // le dessin des villages proches
   private villageClock = 0; // temps depuis le dernier rafraîchissement des villages (s)
   private savedWorldVersion = WORLD_VERSION; // version du monde lue dans la sauvegarde
+  private plantIndex = 0; // l'espèce choisie pour planter (position dans PLANT_SPECIES)
   private importing = false; // un import est en cours : on n'enregistre plus la position (elle écraserait celle du fichier)
   private editsReadOnly = false; // vrai si la sauvegarde vient d'un jeu plus récent : on ne touche à rien
   private editClock = 0; // temps depuis le dernier rafraîchissement du dessin (s)
@@ -406,7 +408,7 @@ export class Game {
     this.editClock += dt;
     if (this.editClock > 0.5) {
       this.editClock = 0;
-      this.editObjects.update(this.controls.x, this.controls.z, this.origin.x, this.origin.z, (x, z) => this.terrain.heightAt(x, z)); // dessin des cairns proches
+      this.editObjects.update(this.controls.x, this.controls.z, this.origin.x, this.origin.z, (x, z) => this.terrain.heightAt(x, z), worldClock.now()); // dessin des cairns et des plantes proches
     }
     if (this.boat.aboard && this.boat.state) this.boatHud.update(this.boat.getReadout(), this.boat.state.boom, this.boat.state.rudder, now);
     this.chunks.update(this.controls.x, this.controls.z, this.settings.viewDistance);
@@ -549,9 +551,12 @@ export class Game {
     this.faunaView = new FaunaView(this.gs.scene);
     this.villages.setReserved((x, z, r) => this.edits.nearest(x, z, r) !== null); // pas de maison sur un cairn
     this.controls.onEditKey = (remove) => this.editAction(remove);
+    this.controls.onPlantKey = (remove) => this.plantAction(remove);
+    this.controls.onObserveKey = () => this.observePlant();
+    this.controls.onSpeciesKey = (choice) => this.chooseSpecies(choice);
     this.edits.onChange((c) => {
       this.editClock = 99; // le dessin se met à jour tout de suite
-      if (c.added) void this.editsDb?.put(c.added).catch(() => toast('Impossible d\'enregistrer ce cairn sur cet appareil.', 'error'));
+      if (c.added) void this.editsDb?.put(c.added).catch(() => toast('Impossible d\'enregistrer cette construction sur cet appareil.', 'error'));
       if (c.removed) void this.editsDb?.delete(c.removed.id).catch(() => undefined);
     });
     void this.loadEdits(); // lecture de l'enregistrement, sans bloquer le démarrage
@@ -591,6 +596,59 @@ export class Game {
     toast(this.edits.add('cairn', px, pz, yaw, worldClock.now()) ? 'Cairn posé. Maj+K pour le retirer.' : 'Trop de constructions : retires-en avant d\'en poser.', 'info');
   }
 
+
+  // Les plantes se plantent à pied, sur la terre ferme (même règle que les cairns pour le reste).
+  private plantCheck(): boolean {
+    if (this.boat.aboard || this.controls.fly) {
+      toast('Les plantes se plantent à pied, sur la terre ferme.');
+      return false;
+    }
+    if (!this.editsDb) {
+      toast('Un instant, le monde se charge…');
+      return false;
+    }
+    if (this.editsReadOnly) {
+      toast('Ce monde vient d\'une version plus récente du jeu : impossible de le modifier.', 'error');
+      return false;
+    }
+    return true;
+  }
+
+  // P : plante l'espèce choisie 1,6 m devant soi ; Maj+P : arrache la plante la plus proche (à 3 m).
+  private plantAction(remove: boolean): void {
+    if (!this.plantCheck()) return;
+    const { x, z, yaw } = this.controls;
+    if (remove) {
+      const e = this.edits.nearest(x, z, PLANT_INSPECT, 'plant');
+      if (!e || !e.species || !this.edits.remove(e.id)) return toast('Aucune plante à moins de 3 m.');
+      return toast(`${PLANTS[e.species].name} ${PLANTS[e.species].fem ? 'arrachée' : 'arraché'}.`);
+    }
+    const species = PLANT_SPECIES[this.plantIndex]!;
+    const px = x - Math.sin(yaw) * PLANT_REACH; // devant = direction (−sin, −cos)
+    const pz = z - Math.cos(yaw) * PLANT_REACH;
+    if (this.terrain.heightAt(px, pz) <= 0.3 || this.terrain.waterDepthAt(px, pz) > 0.02) return toast('Il faut planter sur la terre ferme, hors de l\'eau.');
+    if (this.villages.housesNear(px, pz, 3).some((h) => pointInHouse(h, px, pz, 0.8))) return toast('Pas dans une maison : plante dehors.');
+    if (this.controls.blockedAt(px, pz)) return toast('Un arbre ou un rocher occupe la place.');
+    const reason = plantBlockedBy(this.edits.near(px, pz, 4), px, pz, species);
+    if (reason) return toast(reason);
+    const e = this.edits.add('plant', px, pz, yaw + this.plantIndex * 1.3, worldClock.now(), undefined, undefined, species);
+    const def = PLANTS[species];
+    toast(e ? `${def.name} ${def.fem ? 'plantée' : 'planté'} : adulte dans ${formatSpan(def.growMs)}, même si tu fermes le jeu. O pour l'observer, Maj+P pour l'arracher.` : 'Trop de constructions : retires-en avant d\'en poser.', 'info');
+  }
+
+  // O : dit où en est la plante la plus proche (à 3 m).
+  private observePlant(): void {
+    const e = this.edits.nearest(this.controls.x, this.controls.z, PLANT_INSPECT, 'plant');
+    toast(e?.species ? plantInfo(e.species, e.t, worldClock.now()) : 'Aucune plante à moins de 3 m.');
+  }
+
+  // Touches 1 à 4 ou molette : change l'espèce à planter.
+  private chooseSpecies(choice: number | 'next' | 'previous'): void {
+    const n = PLANT_SPECIES.length;
+    this.plantIndex = typeof choice === 'number' ? Math.min(n - 1, Math.max(0, choice)) : (this.plantIndex + (choice === 'next' ? 1 : n - 1)) % n;
+    const def = PLANTS[PLANT_SPECIES[this.plantIndex]!];
+    toast(`À planter : ${def.name} (adulte en ${formatSpan(def.growMs)}). P pour planter.`);
+  }
 
   // Longitude actuelle du joueur (sert à la Lune : l'heure UT en dépend).
   private playerLon(): number {
@@ -1008,6 +1066,11 @@ export class Game {
       },
       water: () => ({ ground: this.terrain.heightAt(this.controls.x, this.controls.z), surface: this.terrain.waterSurfaceAt(this.controls.x, this.controls.z), depth: this.terrain.waterDepthAt(this.controls.x, this.controls.z) }), // eau douce sous le joueur (essais)
       villages: () => ({ shown: this.villageObjects.count, names: this.villageObjects.names(), near: this.villages.near(this.controls.x, this.controls.z, 3000).map((v) => ({ name: v.name, x: Math.round(v.x), z: Math.round(v.z), r: Math.round(v.radius), houses: v.houses.length, style: v.style.id, signs: v.signs.map((s) => ({ x: Math.round(s.x), z: Math.round(s.z), boards: s.boards.length })) })) }),
+      plant: (species) => {
+        if (PLANT_SPECIES.includes(species as PlantSpecies)) this.plantIndex = PLANT_SPECIES.indexOf(species as PlantSpecies); // essais : plante sans capturer la souris
+        this.plantAction(false);
+      },
+      plants: () => this.edits.all().filter((e) => e.type === 'plant').map((e) => ({ id: e.id, species: e.species ?? '', x: e.x, z: e.z, plantedAt: e.t, text: e.species ? plantInfo(e.species, e.t, worldClock.now()) : '' })),
       edits: () => ({ count: this.edits.size, shown: this.editObjects.count, persistent: this.editsDb?.persistent ?? null, worldVersion: WORLD_VERSION, list: this.edits.all().slice(0, 20).map((e) => ({ id: e.id, x: e.x, z: e.z })) }),
       compass: () => (this.compass ? { card: this.compass.card, text: compassText(bearingFromYaw(this.controls.yaw)) } : null),
       ready: () => this.chunks.isReadyAround(this.controls.x, this.controls.z, 2),

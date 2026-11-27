@@ -24,6 +24,8 @@ declare global {
       view(mode: 'first' | 'third'): string; // change de vue (essais)
       water(): { ground: number; surface: number; depth: number }; // eau douce sous le joueur (essais)
       villages(): { shown: number; names: string[]; near: { name: string; x: number; z: number; r: number; houses: number; style: string; signs: { x: number; z: number; boards: number }[] }[] }; // villages dessinés (essais)
+      plant(species: string): void; // plante devant soi, sans capturer la souris (essais)
+      plants(): { id: string; species: string; x: number; z: number; plantedAt: number; text: string }[]; // les plantes (essais)
       edits(): { count: number; shown: number; persistent: boolean | null; worldVersion: number; list: { id: string; x: number; z: number }[] }; // constructions du joueur (essais)
       compass(): { card: number; text: string } | null; // état de la boussole (essais)
       hideUi(): void;

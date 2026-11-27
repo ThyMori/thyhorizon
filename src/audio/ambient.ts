@@ -38,6 +38,7 @@ export class Ambient {
     this.buildRain();
     this.buildSea();
     this.buildHull();
+    this.buildFreshWater();
     this.air = this.buildAir();
     this.buildLife();
   }
@@ -213,6 +214,33 @@ export class Ambient {
     this.lfo(suG.gain, 0.083, 0, 'surfLfo2');
   }
 
+  // Eau douce : gargouillis (bruit moyen-aigu dont le niveau bouillonne), grondement grave, clapotis lent.
+  private buildFreshWater(): void {
+    const bb = this.ctx.createBiquadFilter();
+    bb.type = 'bandpass';
+    bb.frequency.value = 1200;
+    bb.Q.value = 1.2;
+    this.param.babbleFreq = bb.frequency;
+    const bbG = this.layer('babble', bb);
+    this.lfo(bb.frequency, 3.1, 350); // la note du gargouillis tremble
+    this.lfo(bb.frequency, 5.3, 250);
+    this.lfo(bbG.gain, 7.3, 0, 'babbleLfo'); // le niveau bouillonne (la profondeur suit le niveau)
+    this.lfo(bbG.gain, 11.1, 0, 'babbleLfo2');
+    const ru = this.ctx.createBiquadFilter();
+    ru.type = 'lowpass';
+    ru.frequency.value = 340;
+    ru.Q.value = 0.6;
+    const ruG = this.layer('rush', ru);
+    this.lfo(ruG.gain, 0.35, 0, 'rushLfo'); // le grondement respire doucement
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'bandpass';
+    lp.frequency.value = 700;
+    lp.Q.value = 0.8;
+    const lpG = this.layer('lap', lp);
+    this.lfo(lpG.gain, 0.45, 0, 'lapLfo'); // petit clapotis lent
+    this.lfo(lpG.gain, 0.71, 0, 'lapLfo2');
+  }
+
   // Eau qui file le long de la coque.
   private buildHull(): void {
     const f = this.ctx.createBiquadFilter();
@@ -251,6 +279,16 @@ export class Ambient {
     this.set('surf', su.gain * (1 - su.depth * 0.5));
     this.set('surfLfo', su.gain * su.depth * 0.5);
     this.set('surfLfo2', su.gain * su.depth * 0.3);
+    const wt = mix.water;
+    this.set('babble', wt.babble.gain * 0.7); // le niveau de base laisse la place à l'oscillation
+    this.set('babbleFreq', wt.babble.freq);
+    this.set('babbleLfo', wt.babble.gain * 0.3);
+    this.set('babbleLfo2', wt.babble.gain * 0.2);
+    this.set('rush', wt.rush * 0.85);
+    this.set('rushLfo', wt.rush * 0.15);
+    this.set('lap', wt.lap * 0.6);
+    this.set('lapLfo', wt.lap * 0.3);
+    this.set('lapLfo2', wt.lap * 0.2);
     this.set('hull', mix.hull.gain);
     this.set('hullFreq', mix.hull.freq);
     this.plipRate = mix.rain.plips;

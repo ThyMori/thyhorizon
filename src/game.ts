@@ -57,6 +57,7 @@ import { boatSoundMix } from './core/boatSound';
 import { musicMood, newMusicState, stepMusic } from './core/music';
 import { mulberry32 } from './core/noise';
 import { shoreProximity, soundMix } from './core/soundMix';
+import { waterAround, waterMix } from './core/waterSound';
 import { LifeInput, lifeMix } from './core/wildlife';
 import { SettingsPanel } from './ui/settingsPanel';
 import { toast } from './ui/toast';
@@ -253,6 +254,7 @@ export class Game {
     this.soundTimer = 0.25;
     const aboard = this.boat.aboard;
     this.shore = shoreProximity((x, z) => this.terrain.heightAt(x, z), this.controls.x, this.controls.z); // loin du rivage = 0
+    const water = waterMix(waterAround((x, z) => this.terrain.waterDepthAt(x, z), (x, z) => this.terrain.waterSurfaceAt(x, z), this.controls.x, this.controls.z), this.weather.rain); // eau douce proche (ruisseau, rivière, lac)
     const r = aboard ? this.boat.getReadout() : null; // instruments : vent apparent et vitesse
     const wind = this.boat.wind;
     const { lat, lon } = worldToLatLon(this.controls.x, this.controls.z);
@@ -317,6 +319,7 @@ export class Game {
             })
           : undefined,
         life,
+        water,
       }),
     );
   }

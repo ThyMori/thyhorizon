@@ -356,6 +356,12 @@ Sans objet : jeu local, sans compte ni serveur.
 - Les ponts sont **rares** : les rivières de Bretagne sont petites, on en trouve surtout sur de plus grands cours d'eau. Exemple pour tester : route entre Spolète et Foligno (Italie, x ≈ 1 318 636, z ≈ 649 836 en `?debug`).
 - Limites : les rues de village n'ont pas de pont ; pas encore de pont de pierre ; les grands fleuves réels (Rhin, Loire…) ne sont pas dans le jeu (rivières plausibles, pas réelles).
 
+## 1.37 — Bruits de l'eau douce
+
+- Près d'une rivière, d'un ruisseau ou d'un lac, tu **entends** l'eau : un **gargouillis** aigu pour l'eau vive (plus aigu quand la pente est forte), un **grondement** grave pour les grosses rivières, un **clapotis** lent pour les lacs et l'eau calme. Le son baisse avec la distance (audible à 45 m au plus) et la pluie le couvre un peu.
+- Tout est synthétisé (aucun fichier son), comme le reste (`core/waterSound.ts`, pur et testé ; `audio/ambient.ts` joue les couches). Le réglage de volume général s'applique.
+- Rien de nouveau dans les Réglages. Non testé à l'oreille (mesuré hors ligne : niveaux raisonnables, aucune valeur invalide).
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

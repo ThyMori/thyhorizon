@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.37.0 — 2026-11-27
+
+Bruits de l'eau douce
+
 ## 1.36.0 — 2026-11-27
 
 Ponts de bois sur les grandes rivières

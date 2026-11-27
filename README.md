@@ -448,4 +448,112 @@ Sans objet : jeu local, sans compte ni serveur.
 
 **Ensuite** : Construction de maison · Couche JDR solo (journal, oracle, dés) · Sauvegardes IndexedDB (modifications du monde) · Son.
 
+## Feuille de route détaillée (décidée le 27 novembre 2026)
+Elle **complète** la feuille de route ci-dessus et la remplace là où elles se contredisent (temps réel, ordre des étapes). Texte repris tel que décidé ; l'état réel du dépôt est comparé plus bas.
+
+### La vision
+Une planète vivante en temps réel, où l'on navigue, se promène et laisse son empreinte, sans courir après l'XP.
+Le plaisir de Sailaway et Flight Simulator (planète, météo, temps réels), avec ce qu'on fait dans Wurm et Minecraft.
+Un « petit labo de patience » et un monde refuge.
+
+### Avant de coder (à faire par Claude)
+1. Lire le CLAUDE.md, le README et le code du dépôt ThyMori/ThyHorizon.
+2. Dire ce qui existe déjà dans cette feuille de route, et ce qui la contredit.
+3. Proposer uniquement la première étape, puis attendre l'accord.
+
+### Règles décidées
+- Temps réel, toujours : ni accélération ni ellipse dans le jeu.
+- Météo et mer réelles. Hors ligne : simulées, cohérentes avec le lieu, la date et la saison, puis retour progressif au réel.
+- En mon absence, le monde avance du temps écoulé.
+- Pas d'XP à accumuler avant de pouvoir faire quelque chose.
+- Ce que je fais dans le monde reste.
+- Bateau réaliste (référence : Sailaway).
+- Jeu seul d'abord ; le partage avec mes enfants est un plus, pour plus tard.
+- Ordinateur d'abord.
+
+### Survie, terre, habitants
+- Vraie survie pour moi : faim, froid, sommeil, naufrage mortel.
+- Difficulté réglable par joueur (sans danger, légère ou vraie), pour mes enfants.
+- Mort : retour au refuge. Le monde et mes constructions restent. Hypothèse : je perds ce que je portais.
+- Naufrage : si le bateau coule, je me réveille à mon port d'attache, choisi par moi, où je le retrouve abîmé ou à remettre en état. Pas de perte définitive.
+- Gestes (hypothèse à confirmer avant l'étape 3) : petits gestes en quelques secondes ; gros ouvrages en chantier qui avance même en mon absence.
+- À terre, d'abord : planter et cultiver, bâtir une maison.
+- Habitants : les observer d'abord ; plus tard échanger, puis faire partie du village.
+
+### Refuge
+Le refuge est le dernier abri sûr où j'ai dormi (dormir quelque part suffit, sans menu).
+
+| Situation | Où je me réveille après une mort |
+|---|---|
+| Au début | La cabine du bateau |
+| J'ai dormi à bord, puis je meurs à terre | La cabine, là où se trouve le bateau |
+| J'ai une maison et j'y ai dormi | Ma maison |
+| Naufrage | Mon port d'attache |
+| Abri inutilisable (bateau échoué ou perdu) | Mon port d'attache |
+
+- Port d'attache au début : Lannion, modifiable ensuite.
+- Dormir à bord ne me tue pas en soi, mais le bateau reste exposé s'il n'est ni à l'ancre ni au port.
+
+### Navigation, voyage, chantiers
+- Sans personne à la barre : je choisis en partant entre garder un cap ou un angle au vent.
+- Téléportation (carte M) : réservée aux tests et à la difficulté « sans danger ».
+- Un chantier ne démarre qu'avec tous les matériaux réunis.
+
+### En mon absence
+Mon personnage est protégé (ni faim, ni froid, ni mort). Le bateau, lui, reste exposé : il peut s'échouer ou s'abîmer.
+
+| Situation au départ | Le bateau |
+|---|---|
+| Voiles établies | Continue sa route avec la météo réelle, au cap ou à l'angle au vent choisi |
+| Voiles affalées, sans ancre mouillée | Dérive |
+| Voiles affalées, ancre mouillée | Reste au mouillage (hypothèse sur « sauf s'il a une ancre ») |
+
+La route se calcule au retour, à partir de la météo de la période écoulée. À vérifier avant de coder : quelles données météo passées sont disponibles, et que faire sans elles.
+
+### Principes techniques
+- Une seule horloge du monde : rien d'autre ne lit l'heure de l'ordinateur.
+- Avance rapide réservée aux tests, invisible dans le jeu.
+- L'état d'une chose se calcule à partir de ses dates (planté le, commencé le), pas image par image.
+- Sauvegarde : le monde généré reste identique, on n'enregistre que les modifications (position, type, date, auteur).
+- Sauvegarde versionnée, avec le numéro de version du monde ; une mise à jour ne doit rien effacer.
+- Export et import de la sauvegarde dans un fichier (le stockage du navigateur peut être vidé).
+- Calculs (croissance, chantiers, météo simulée) dans des fonctions pures, testées.
+
+### Étapes (une à la fois, testée avant la suivante)
+| N° | Étape | Terminé quand |
+|---|---|---|
+| 1 | Horloge unique et sauvegarde des modifications | Une marque posée dans le monde est retrouvée après fermeture, export et import compris |
+| 2 | Planter et cultiver | La taille correspond au temps écoulé, vérifié avec l'avance rapide de test |
+| 3 | Couper, obtenir du bois, poser un mur | Le mur et le stock de bois sont retrouvés le lendemain |
+| 4 | Bâtir une maison en chantier | Le chantier avance en mon absence ; la maison devient un refuge |
+| 5 | Survie et réglage de difficulté | Manger, dormir, avoir froid, mourir et revenir au refuge ; aucun effet sur le personnage pendant l'absence |
+| 6 | Journal de bord au retour | Il dit ce qui a changé depuis la dernière visite |
+| 7 | Vie : faune puis habitants à observer | Ils naissent, vivent, meurent près de moi ; au loin, calcul résumé |
+| 8 | Façonner le terrain et sentiers | Le terrain modifié reste ; les passages répétés marquent le sol |
+| 9 | Partage avec les enfants (empreintes) | Chacun voit les constructions des autres ; droits validés en tableau avant de coder |
+| Plus tard | Échanger avec les habitants, puis faire partie du village | |
+
+### En parallèle : le bateau
+Une petite amélioration à la fois (comportement à la voile, houle, courant, vie à bord, cabine refuge), à planifier après l'inventaire du code. L'ancre et la navigation en mon absence en font partie.
+
+### État du dépôt face à cette feuille (comparé en 1.44.0)
+| Point de la feuille | Dans le dépôt | Écart |
+|---|---|---|
+| Temps réel, toujours | Le réglage `realTime` existe mais est **désactivé par défaut** ; sinon les journées durent `dayLengthMinutes` (30 min) et le temps ne passe que pendant le jeu | **Contradiction** : à trancher à l'étape 1 |
+| Une seule horloge du monde | `Date.now`, `new Date()` et `performance.now` sont lus à plusieurs endroits (`game.ts`, `boatDriver.ts`…) ; la sauvegarde garde `hours` et `day` de jeu | À unifier (étape 1) |
+| Météo et mer réelles, repli simulé | ✅ Open-Meteo (1.19), repli simulé sans exception ; mais option **OFF par défaut** | Pas de « retour progressif au réel » vérifié |
+| Le monde avance en mon absence | Faune et météo sont des fonctions du temps (bon socle) ; en mode accéléré rien n'avance hors jeu ; rien pour le bateau ni les chantiers | À construire (étapes 4 à 7) |
+| Sauvegarde des modifications, versionnée | ✅ `EditStore` + IndexedDB (1.29), `WORLD_VERSION`, lecture seule si la sauvegarde vient d'un jeu plus récent | Manque : champ **auteur**, **export/import** en fichier, un seul type (`cairn`) |
+| Marque posée retrouvée (étape 1) | ✅ le cairn (touche K) survit à la fermeture | Étape 1 à moitié faite |
+| Planter, couper, mur, maison, chantiers | Rien (flore non interactive, ni stock de bois, ni inventaire) | Étapes 2 à 4 entières |
+| Survie, difficulté, mort, sommeil, refuge | Rien. **Vocabulaire** : `CLAUDE.md` dit « Refuge = l'ambiance visée » ; la feuille dit « Refuge = dernier abri où j'ai dormi » | Renommer l'un des deux avant l'étape 5 |
+| Journal de bord au retour | Rien | Étape 6 |
+| Faune puis habitants | ✅ faune visible et sonore (1.42, 1.43) ; villages = maisons, panneaux, rues, **sans habitants** | Habitants : étape 7 |
+| Sentiers marqués par les passages | Chemins de terre fixes entre villes voisines (1.32), pas d'usure | Étape 8 (monter `WORLD_VERSION` à ce moment) |
+| Téléportation réservée aux tests / « sans danger » | La carte (M) voyage partout, toujours | À restreindre avec la difficulté (étape 5) |
+| Bateau | ✅ voilier, pilote automatique, pont marchable, échouage ; ancre = **décor seulement** (proue) ; ni mouillage, ni naufrage, ni cabine refuge, ni dérive en absence | Chantier « en parallèle » |
+| Partage avec les enfants | Rien (tout est local) | Étape 9, droits en tableau avant de coder |
+
+À confirmer avant l'étape concernée (déjà notés dans la feuille) : perte de ce que je porte à la mort ; gestes courts et gros chantiers (avant l'étape 3) ; ancre et bateau en absence ; données météo passées disponibles.
+
 En ligne : https://horizon.thierry-morin.com (depuis 1.0.2).

@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.44.1 — 2026-11-27
+
+Feuille de route détaillée ajoutée au README, comparée à l'existant
+
 ## 1.44.0 — 2026-11-27
 
 Textures procédurales : sol moucheté, cailloux, écorce, strates de roche

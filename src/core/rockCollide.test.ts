@@ -4,7 +4,7 @@ import { realClimate } from '../world/climateData';
 import { CHUNK_SIZE } from './chunk';
 import { Plant, floraForChunk } from './flora';
 import { loadRealRelief } from './relief.testutil';
-import { RockObstacles, pushOutOfRocks, rockRadius } from './rockCollide';
+import { ROCK_STEP_SIZE, RockObstacles, blocksPlayer, pushOutOfRocks, rockRadius } from './rockCollide';
 import { createTerrain, findSpawn } from './terrain';
 import { hashSeed } from './noise';
 import { PLAYER_RADIUS } from './treeCollide';
@@ -41,10 +41,22 @@ describe('rochers du monde', () => {
     const rocks: Plant[] = [];
     for (let k = 0; k < 100; k++) rocks.push(...floraForChunk(terrain, cx + (k % 10), cz + Math.floor(k / 10), 0, CHUNK_SIZE, null, false).filter((q) => q.kind === 'rock')); // les rochers dessinés dans 100 tuiles
     expect(rocks.length).toBeGreaterThan(0);
+    expect(rocks.some((q) => q.size < ROCK_STEP_SIZE)).toBe(true); // il y a aussi des petits rochers
+    const small = rocks.find((q) => q.size < ROCK_STEP_SIZE)!;
+    expect(new RockObstacles(terrain).resolve(small.x + 0.05, small.z).hit).toBe(false); // un petit rocher s'enjambe
     const obs = new RockObstacles(terrain);
-    const r = rocks[0]!;
+    const r = rocks.find((q) => blocksPlayer(q))!; // un rocher assez haut pour bloquer
     const out = obs.resolve(r.x + 0.1, r.z); // on se met presque au centre du rocher
     expect(out.hit).toBe(true);
     expect(Math.hypot(out.x - r.x, out.z - r.z)).toBeGreaterThanOrEqual(rockRadius(r) + PLAYER_RADIUS - 0.5); // repoussé au bord (un voisin a pu le décaler un peu)
+  });
+});
+
+describe('seuil de hauteur', () => {
+  it('moins de 40 cm : franchissable ; plus : bloque', () => {
+    expect(blocksPlayer({ size: 0.6 })).toBe(false);
+    expect(blocksPlayer({ size: 0.76 })).toBe(false);
+    expect(blocksPlayer({ size: 0.8 })).toBe(true);
+    expect(blocksPlayer({ size: 1.5 })).toBe(true);
   });
 });

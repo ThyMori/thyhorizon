@@ -1,5 +1,9 @@
 # Journal des versions
 
+## 1.40.2 — 2026-11-27
+
+Petits rochers franchissables (< 40 cm)
+
 ## 1.40.1 — 2026-11-27
 
 Rochers infranchissables, arbres plus hauts

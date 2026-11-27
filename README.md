@@ -391,6 +391,11 @@ Sans objet : jeu local, sans compte ni serveur.
 - Les **rochers** arrêtent le joueur comme les troncs : on glisse autour (`core/rockCollide.ts`, même placement que le dessin).
 - Les **arbres** sont 35 % plus grands (`TREE_GROWTH` dans `core/trees.ts`) ; le tronc grossit avec, donc la collision suit.
 
+## 1.40.2 — Petits rochers franchissables
+
+- Un rocher de moins de **40 cm** de haut (taille < 0,77) s'enjambe ; les plus hauts bloquent toujours (`ROCK_STEP_SIZE` dans `core/rockCollide.ts`).
+- Garde-fou testé : même avec les arbres plus grands, la caméra reste à plus de 0,3 m de l'écorce (`trunkClearance.test.ts`).
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

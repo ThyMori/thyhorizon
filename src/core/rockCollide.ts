@@ -8,6 +8,10 @@ import type { Terrain } from './terrain';
 
 const MAX_CACHED = 48; // nombre de tuiles dont on garde les rochers en mémoire
 
+// Un rocher de moins de 40 cm de haut (≈ 0,52 m × taille, donc taille < 0,77) s'enjambe : il ne bloque pas.
+export const ROCK_STEP_SIZE = 0.77;
+export const blocksPlayer = (p: { size: number }): boolean => p.size >= ROCK_STEP_SIZE;
+
 // Rayon d'un rocher au sol (m) : un peu en dessous du rayon dessiné (0,6 × taille), car la forme est bosselée.
 export const rockRadius = (p: { size: number }): number => 0.55 * p.size;
 
@@ -53,7 +57,7 @@ export class RockObstacles {
           const x0 = (cx + dx) * CHUNK_SIZE;
           const z0 = (cz + dz) * CHUNK_SIZE;
           const blocked = this.blockerFor ? this.blockerFor(cx + dx, cz + dz, CHUNK_SIZE) : null;
-          list = floraForChunk(this.terrain, cx + dx, cz + dz, 0, CHUNK_SIZE, blocked, this.terrain.hasWaterNear(x0, z0, CHUNK_SIZE)).filter((p) => p.kind === 'rock');
+          list = floraForChunk(this.terrain, cx + dx, cz + dz, 0, CHUNK_SIZE, blocked, this.terrain.hasWaterNear(x0, z0, CHUNK_SIZE)).filter((p) => p.kind === 'rock' && blocksPlayer(p));
           if (this.cache.size >= MAX_CACHED) this.cache.delete(this.cache.keys().next().value as string); // on oublie la plus ancienne
           this.cache.set(key, list);
         }

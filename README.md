@@ -413,6 +413,14 @@ Sans objet : jeu local, sans compte ni serveur.
 - Pas encore : pas de bruit d'animaux (chants, bêlements), pas d'animaux marins, les bêtes ne se mangent ni ne se reproduisent pas, pas de pattes animées (elles glissent en sautillant), pas d'option pour les désactiver (à ajouter si la fluidité en souffre sur ton téléphone).
 - Debug (`?debug`) : `__thy.fauna()` donne le nombre de bêtes par espèce et les 40 plus proches.
 
+## 1.43 — La voix des animaux
+
+- Les animaux que tu vois **crient vraiment** (`core/faunaSound.ts`, pur et testé) : oiseaux chanteurs, mouettes, rapaces (long cri plaintif), **moutons** (bêlement tremblant), **vaches** (meuglement grave), **cerfs** (aboiement quand ils s'alarment et fuient), **lapins** (coups de patte sur le sol quand ils détalent). Papillons et libellules restent silencieux.
+- Chaque cri vient **d'une bête précise** : un mouton à ta gauche bêle à gauche, un cri lointain est plus faible et plus sourd (filtre), tout près le son est centré. Tourne la tête, le côté change. Le vent fort et la pluie couvrent les voix.
+- Les chœurs d'oiseaux de fond de 1.22 (aube, forêt) restent : ce sont deux couches qui s'ajoutent.
+- Tout est synthétisé (aucun fichier son). Essai hors ligne avec `?debug` : `__thy.audioTest({ voice: 'cow' })` (aussi `sheep`, `deer`, `rabbit`, `songbird`, `gull`, `raptor`) mesure le niveau sans haut-parleur.
+- Pas encore : pas de bruit de pas des animaux, pas de cris de papillons ni d'insectes (les grillons du fond existent depuis 1.22), les sons ne sont pas réverbérés selon la forêt.
+
 ## Feuille de route
 **Planète cousine de la Terre** (monde inventé, relief et climats guidés par la vraie Terre, départ à Lannion) :
 1. ✅ Coordonnées lat/long + vrai soleil et saisons (1.2.0)

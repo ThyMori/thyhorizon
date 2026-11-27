@@ -2,6 +2,7 @@
 // Une seule source de bruit bouclée, filtrée de différentes façons : vent, pluie, houle, déferlement, eau le long de la coque.
 // Ce fichier ne décide de rien : il suit les niveaux calculés par src/core/soundMix.ts.
 
+import { FaunaVoices, SILENT_VOICES, VOICED, VoiceSource, VoicedSpecies } from '../core/faunaSound';
 import { SoundMix } from '../core/soundMix';
 
 const NOISE_SECONDS = 6; // durée du bruit bouclé (assez long pour qu'on n'entende pas la boucle)
@@ -16,6 +17,7 @@ export class Ambient {
   private readonly air: GainNode; // départ vers l'« air » : petit écho de forêt pour les cris d'animaux
   private readonly rates: Record<string, number> = { birds: 0, gulls: 0, frogs: 0, owl: 0, flap: 0, creak: 0 }; // rythmes des cris (par seconde)
   private readonly next: Record<string, number> = {}; // instant du prochain cri de chaque espèce
+  private voices: FaunaVoices = SILENT_VOICES; // la voix des animaux visibles : d'où vient chaque cri
   private stepRate = 0; // pas par seconde (0 = on ne marche pas)
   private stepLevel = 0; // niveau des pas
   private stepWet = 0; // pont mouillé (0 à 1)
@@ -303,6 +305,8 @@ export class Ambient {
     this.rates.gulls = l.gulls;
     this.rates.frogs = l.frogs;
     this.rates.owl = l.owl;
+    this.voices = mix.voices; // animaux visibles : chacun crie de sa place
+    for (const sp of VOICED) this.rates[`v_${sp}`] = mix.voices[sp].rate;
     // Bruits du bateau.
     const b = mix.boat;
     this.rates.flap = b.flap.rate;
@@ -331,6 +335,7 @@ export class Ambient {
     this.schedule('gulls', now, ahead, (t) => this.gullCall(t));
     this.schedule('frogs', now, ahead, (t) => this.frogCall(t));
     this.schedule('owl', now, ahead, (t) => this.owlCall(t));
+    for (const sp of VOICED) this.schedule(`v_${sp}`, now, ahead, (t) => this.voiceCall(sp, t));
     this.schedule('flap', now, ahead, (t) => this.flapCall(t));
     this.schedule('creak', now, ahead, (t) => this.creakCall(t));
     this.runSteps(now, ahead);
@@ -403,10 +408,10 @@ export class Ambient {
   }
 
   // Un chant d'oiseau : sifflement en deux ou trois notes, trille rapide, ou petit gazouillis.
-  private birdCall(at: number): void {
-    const out = this.spot();
+  private birdCall(at: number, from?: AudioNode, scale = 1): void {
+    const out = from ?? this.spot();
     const kind = this.rnd();
-    const level = 0.02 + this.rnd() * 0.035; // proche ou lointain
+    const level = (0.02 + this.rnd() * 0.035) * scale; // proche ou lointain
     if (kind < 0.4) { // « ti-ou, ti-ou »
       const f = 2100 + this.rnd() * 1700;
       const n = 2 + Math.floor(this.rnd() * 2);
@@ -431,8 +436,8 @@ export class Ambient {
   }
 
   // Un goéland : 2 à 4 « kiou » rauques (dent de scie filtrée qui monte puis retombe).
-  private gullCall(at: number): void {
-    const out = this.spot();
+  private gullCall(at: number, from?: AudioNode, scale = 1): void {
+    const out = from ?? this.spot();
     const n = 2 + Math.floor(this.rnd() * 3);
     const f = 900 + this.rnd() * 300;
     for (let k = 0; k < n; k++) {
@@ -447,7 +452,7 @@ export class Ambient {
       bp.frequency.value = 1700;
       bp.Q.value = 1.6;
       const g = this.ctx.createGain();
-      const lv = 0.05 * (1 - k * 0.12);
+      const lv = 0.05 * scale * (1 - k * 0.12);
       g.gain.setValueAtTime(0, t);
       g.gain.linearRampToValueAtTime(lv, t + 0.04);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.48);
@@ -585,5 +590,133 @@ export class Ambient {
     src.connect(f).connect(g).connect(dest);
     src.start(at, this.rnd() * (NOISE_SECONDS - 0.5)); // départ au hasard dans le bruit : deux coups ne sonnent jamais pareil
     src.stop(at + dur + 0.02);
+  }
+
+  // ---------- Voix des animaux visibles (1.43) ----------
+
+  // Choisit, parmi les bêtes audibles de l'espèce, celle qui crie (au hasard, les plus proches plus souvent).
+  private pickSource(list: readonly VoiceSource[]): VoiceSource | null {
+    const total = list.reduce((a, s) => a + s.weight, 0);
+    if (total <= 0) return null;
+    let r = this.rnd() * total;
+    for (const s of list) {
+      r -= s.weight;
+      if (r <= 0) return s;
+    }
+    return list[list.length - 1] ?? null;
+  }
+
+  // La sortie d'un cri venant d'une bête : placé à gauche ou à droite selon sa place, étouffé quand elle est loin (filtre passe-bas), avec l'écho de l'air.
+  private spotFrom(s: VoiceSource): AudioNode {
+    const lp = this.ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1400 + 14000 * Math.min(1, s.gain); // loin = sourd
+    const pan = this.ctx.createStereoPanner();
+    pan.pan.value = s.pan;
+    lp.connect(pan);
+    pan.connect(this.master);
+    pan.connect(this.air);
+    return lp;
+  }
+
+  // Le cri d'une espèce, poussé par l'une des bêtes audibles.
+  private voiceCall(sp: VoicedSpecies, at: number): void {
+    const src = this.pickSource(this.voices[sp].sources);
+    if (!src) return;
+    const out = this.spotFrom(src);
+    const k = 0.35 + 1.6 * src.gain; // niveau selon la proximité
+    switch (sp) {
+      case 'songbird': this.birdCall(at, out, k); break;
+      case 'gull': this.gullCall(at, out, k); break;
+      case 'raptor': this.raptorCall(at, out, k); break;
+      case 'sheep': this.sheepCall(at, out, k); break;
+      case 'cow': this.cowCall(at, out, k); break;
+      case 'deer': this.deerCall(at, out, k); break;
+      case 'rabbit': this.rabbitThump(at, out, k); break;
+    }
+  }
+
+  // Un rapace : long cri aigu et plaintif qui descend (« kiiiiou »).
+  private raptorCall(at: number, out: AudioNode, k: number): void {
+    const f = 2600 + this.rnd() * 700;
+    this.tone(at, f, f * 0.72, 0.9, 0.035 * k, out, 0.004);
+    this.tone(at + 0.02, f * 2, f * 1.45, 0.9, 0.012 * k, out); // harmonique
+  }
+
+  // Un mouton : « bêêê » nasillard (dents de scie qui tremble vite, filtre nasal), parfois deux de suite.
+  private sheepCall(at: number, out: AudioNode, k: number): void {
+    const n = this.rnd() < 0.4 ? 2 : 1;
+    for (let j = 0; j < n; j++) {
+      const t = at + j * 0.85;
+      const dur = 0.6 + this.rnd() * 0.3;
+      const f = 330 + this.rnd() * 110;
+      const o = this.ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f * 1.12, t);
+      o.frequency.linearRampToValueAtTime(f, t + dur * 0.3);
+      o.frequency.linearRampToValueAtTime(f * 0.86, t + dur);
+      const trem = this.ctx.createOscillator(); // le tremblement du bêlement
+      trem.frequency.value = 26 + this.rnd() * 10;
+      const tg = this.ctx.createGain();
+      tg.gain.value = f * 0.07;
+      trem.connect(tg).connect(o.frequency);
+      const bp = this.ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 1150;
+      bp.Q.value = 2.2;
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.09 * k, t + 0.06);
+      g.gain.linearRampToValueAtTime(0.06 * k, t + dur * 0.7);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(bp).connect(g).connect(out);
+      o.start(t);
+      trem.start(t);
+      o.stop(t + dur + 0.02);
+      trem.stop(t + dur + 0.02);
+    }
+  }
+
+  // Une vache : « meuuuh » grave et long (dents de scie qui monte puis redescend, la bouche s'ouvre puis se ferme : le filtre glisse).
+  private cowCall(at: number, out: AudioNode, k: number): void {
+    const dur = 1.3 + this.rnd() * 0.6;
+    const f = 92 + this.rnd() * 28;
+    const o = this.ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f, at);
+    o.frequency.linearRampToValueAtTime(f * 1.3, at + dur * 0.35);
+    o.frequency.linearRampToValueAtTime(f * 0.8, at + dur);
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 1.6;
+    bp.frequency.setValueAtTime(300, at);
+    bp.frequency.linearRampToValueAtTime(620, at + dur * 0.4);
+    bp.frequency.linearRampToValueAtTime(330, at + dur);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, at);
+    g.gain.linearRampToValueAtTime(0.12 * k, at + 0.18);
+    g.gain.linearRampToValueAtTime(0.09 * k, at + dur * 0.7);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(bp).connect(g).connect(out);
+    o.start(at);
+    o.stop(at + dur + 0.02);
+  }
+
+  // Un cerf qui s'alarme : aboiement sec et rauque, deux ou trois fois.
+  private deerCall(at: number, out: AudioNode, k: number): void {
+    const n = 2 + Math.floor(this.rnd() * 2);
+    for (let j = 0; j < n; j++) {
+      const t = at + j * (0.45 + this.rnd() * 0.2);
+      this.burst(t, 0.14, 650 + this.rnd() * 250, 1.2, 0.1 * k, out);
+      this.tone(t, 300, 220, 0.16, 0.05 * k, out);
+    }
+  }
+
+  // Un lapin qui détale : deux coups sourds de la patte arrière sur le sol.
+  private rabbitThump(at: number, out: AudioNode, k: number): void {
+    for (let j = 0; j < 2; j++) {
+      this.tone(at + j * 0.11, 130, 48, 0.09, 0.08 * k, out);
+      this.burst(at + j * 0.11, 0.05, 300, 0.8, 0.05 * k, out);
+    }
   }
 }

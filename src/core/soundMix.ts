@@ -3,6 +3,7 @@
 
 import { clamp, lerp, smoothstep } from './math';
 import { BoatSoundMix, SILENT_BOAT } from './boatSound';
+import { FaunaVoices, SILENT_VOICES } from './faunaSound';
 import { LifeMix, SILENT_LIFE } from './wildlife';
 import { SILENT_WATER, WaterMix } from './waterSound';
 
@@ -19,6 +20,7 @@ export interface SoundInput {
   active: boolean; // le joueur joue-t-il (souris capturée) ? Sinon le son baisse (menu)
   boat?: BoatSoundMix; // les bruits du bateau (voile, craquements, pas) déjà calculés par core/boatSound.ts ; absents = silence
   water?: WaterMix; // les bruits de l'eau douce (ruisseau, rivière, lac) déjà calculés par core/waterSound.ts ; absents = silence
+  voices?: FaunaVoices; // la voix des animaux visibles autour de nous, déjà calculée par core/faunaSound.ts ; absente = silence
   life?: LifeMix; // la vie sauvage (oiseaux, insectes…) déjà calculée par core/wildlife.ts ; absente = silence
 }
 
@@ -34,6 +36,7 @@ export interface SoundMix {
   boat: BoatSoundMix; // claquements de voile, craquements, pas
   water: WaterMix; // ruisseau, rivière, lac
   life: LifeMix; // oiseaux, insectes, grenouilles, chouette, feuillage
+  voices: FaunaVoices; // la voix des animaux visibles (cris par seconde, d'où ils viennent)
 }
 
 export function soundMix(i: SoundInput): SoundMix {
@@ -55,6 +58,7 @@ export function soundMix(i: SoundInput): SoundMix {
     boat: i.boat ?? SILENT_BOAT,
     water: i.water ?? SILENT_WATER,
     life: i.life ?? SILENT_LIFE,
+    voices: i.voices ?? SILENT_VOICES,
   };
 }
 

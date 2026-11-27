@@ -24,6 +24,7 @@ import { Avatar } from './render/avatar';
 import { EditObjects } from './render/editObjects';
 import { VillageObjects } from './render/villageObjects';
 import { Critter, Fauna, FaunaEnv, FaunaWorld } from './core/fauna';
+import { SILENT_VOICES, faunaVoices } from './core/faunaSound';
 import { lushness } from './core/flora';
 import { FaunaView } from './render/fauna';
 import { Cities, parseCities } from './core/cities';
@@ -342,6 +343,7 @@ export class Game {
           : undefined,
         life,
         water,
+        voices: faunaVoices(this.faunaNear, { x: this.controls.x, z: this.controls.z, y: this.controls.y, yaw: this.controls.yaw }, windFelt, this.wetRain), // chaque bête audible crie de sa place
       }),
     );
   }
@@ -995,6 +997,8 @@ export class Game {
         const amb = new Ambient(ctx);
         const base: LifeInput = { cls: 'Cfb', lat: 48.7, day: 196, sunElevation: 40, hours: 13, forest: 0.55, conifer: 0.1, land: true, snowy: false, shore: 0, rain: 0, wind: 2 };
         const mix = soundMix({ windSpeed: 2, rain: 0, seaHs: 0.2, onWater: false, shore: 0, boatSpeed: 0, aboard: false, volume: 0.8, active: true, ...over, life: lifeMix({ ...base, ...life }), boat: boat ? boatSoundMix({ aboard: true, walking: false, walkSpeed: 0, luff: 0, mainUp: 1, jibOut: 1, aws: 6, heelDeg: 0, heelRate: 0, boatSpeed: 0, seaHs: 0.1, rain: 0, ...boat }) : undefined });
+        const vsp = typeof over?.voice === 'string' ? (over.voice as keyof typeof SILENT_VOICES) : null; // essai d'une voix : `{ voice: 'cow' }`
+        if (vsp) mix.voices = { ...SILENT_VOICES, [vsp]: { rate: 3, sources: [{ pan: 0.4, gain: 0.8, weight: 1 }] } };
         amb.apply(mix, true);
         amb.renderCalls(2);
         const data = (await ctx.startRendering()).getChannelData(0);
